@@ -67,8 +67,10 @@ import Revan from './pages/Revan';
 import EldPortal from './pages/EldPortal';
 import RouteDashboard from './pages/RouteDashboard';
 import DomainEmails from './pages/DomainEmails';
-import About from './pages/About';
-import Contact from './pages/Contact';
+import DriverMobileLayout from './components/mobile/DriverMobileLayout';
+import DriverMobileHome from './pages/driver/DriverMobileHome';
+import DriverScan from './pages/driver/DriverScan';
+import DriverScans from './pages/DriverScans';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings } = useAuth();
@@ -89,6 +91,24 @@ const AuthenticatedApp = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/set-password" element={<SetPassword />} />
+
+      {/* FleetCo Driver mobile app — iOS / Android + mobile web */}
+      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login?app=driver" replace />} />}>
+        <Route path="/driver" element={<DriverMobileLayout />}>
+          <Route index element={<DriverMobileHome />} />
+          <Route path="clock" element={<TimeClock />} />
+          <Route path="route" element={<MyDeliveryRoute />} />
+          <Route path="scan" element={<DriverScan />} />
+          <Route path="loads" element={<LoadBoard />} />
+          <Route path="navigation" element={<Navigation />} />
+          <Route path="messages" element={<Messages />} />
+          <Route path="hos" element={<HOSReport />} />
+          <Route path="inspections" element={<Inspections />} />
+          <Route path="fuel" element={<FuelAudits />} />
+          <Route path="incidents" element={<IncidentReports />} />
+          <Route path="change-password" element={<ChangePassword />} />
+        </Route>
+      </Route>
 
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
         <Route path="/portal" element={<AppLayout />}>
@@ -140,6 +160,7 @@ const AuthenticatedApp = () => {
           <Route path="revan" element={<Revan />} />
           <Route path="eld" element={<EldPortal />} />
           <Route path="domain-emails" element={<DomainEmails />} />
+          <Route path="driver-scans" element={<DriverScans />} />
         </Route>
       </Route>
       <Route path="/fleet-owners" element={<FleetOwnerLanding />} />

@@ -10,11 +10,13 @@ function setToken(token) {
 }
 
 async function apiFetch(path, options = {}) {
+  const API_ROOT = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
+  const url = `${API_ROOT}/api${path.startsWith('/') ? path : `/${path}`}`;
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`/api${path}`, { ...options, headers });
+  const res = await fetch(url, { ...options, headers });
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
@@ -92,7 +94,7 @@ const ENTITY_NAMES = [
   'DeliveryStop', 'HOSLog', 'FuelStation', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
-  'DomainEmail', 'PaymentReminder', 'Subscription', 'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User',
+  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'Subscription', 'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User',
 ];
 
 const entities = {};
@@ -212,7 +214,8 @@ const integrations = {
       const token = getToken();
       const headers = {};
       if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch('/api/integrations/upload', { method: 'POST', headers, body: form });
+      const API_ROOT = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
+      const res = await fetch(`${API_ROOT}/api/integrations/upload`, { method: 'POST', headers, body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');
       return data;

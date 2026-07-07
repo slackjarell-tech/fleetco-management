@@ -8,6 +8,14 @@ import { Mail, Lock, Loader2 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
+import { isDriverAppContext, isNativeApp } from "@/lib/platform";
+
+function resolveLoginDestination(result) {
+  const isDriver = result?.user?.role === 'driver';
+  if (isDriver && (isNativeApp() || isDriverAppContext())) return '/driver';
+  if (isDriver && new URLSearchParams(window.location.search).get('app') === 'driver') return '/driver';
+  return '/portal';
+}
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -22,7 +30,7 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      await api.auth.loginViaEmailPassword(email, password);
+      const result = await api.auth.loginViaEmailPassword(email, password);
       
       // First-time login: upgrade role + mark activated + go to portal
       try {
@@ -40,7 +48,7 @@ export default function Login() {
         }
       } catch (_) {}
 
-      window.location.href = "/portal";
+      window.location.href = resolveLoginDestination(result);
     } catch (err) {
       // Check if this is a newly created account that needs OTP verification
       try {
@@ -81,7 +89,8 @@ export default function Login() {
         }
       } catch (_) {}
 
-      window.location.href = "/portal";
+      const me = await api.auth.me();
+      window.location.href = resolveLoginDestination({ user: me });
     } catch (err) {
       setError(err.message || "Invalid verification code");
     } finally {
