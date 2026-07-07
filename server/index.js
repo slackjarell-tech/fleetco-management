@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import {
   createEntity,
@@ -17,6 +18,7 @@ import {
   findUserById,
   getEntity,
   getUserRowByEmail,
+  getSiteSettings,
   listEntities,
   listUsers,
   nowIso,
@@ -25,7 +27,8 @@ import {
   db,
 } from './db.js';
 import { seedDatabase } from './seed.js';
-import { invokeFunction, invokeLLM } from './functions.js';
+import { invokeFunction } from './functions.js';
+import { runAgent, simpleLLM } from './aiAgent.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || 'fleet-pulse-dev-secret-change-in-production';
@@ -161,9 +164,80 @@ app.post('/api/auth/reset-password', (req, res) => {
   }
 });
 
-// Public settings stub (replaces Base44 public-settings check)
+// Public settings (replaces Base44 public-settings check)
 app.get('/api/public-settings', (_req, res) => {
-  res.json({ id: 'fleet-pulse', public_settings: { auth_required: false } });
+  res.json({
+    id: 'fleet-pulse',
+    public_settings: {
+      auth_required: false,
+      site: getSiteSettings(),
+    },
+  });
+});
+
+// ─── AI Agent (Site Commander) ───────────────────────────────────────────────
+
+const conversations = new Map();
+
+app.get('/api/agents/status', requireAuth, async (_req, res) => {
+  const { getAiStatus } = await import('./aiProvider.js');
+  res.json(getAiStatus());
+});
+
+app.post('/api/agents/conversations', requireAuth, (req, res) => {
+  const { agent_name = 'site_commander', metadata = {} } = req.body || {};
+  const id = randomUUID();
+  const welcome =
+    agent_name === 'revan'
+      ? 'Revan online — executive commander with Cursor-style control. I can change fleetcomanagement.org content, manage fleet records, run audits, and update users. Try: "Run a system health audit" or "Change the homepage headline to …"'
+      : 'Site Commander online. I can read your fleet data and make real changes — like Cursor for your portal. Try: "Show open work orders" or "Change the homepage headline to …"';
+  const conversation = {
+    id,
+    agent_name,
+    metadata,
+    user_id: req.user.id,
+    messages: [{ role: 'assistant', content: welcome }],
+    created_at: new Date().toISOString(),
+  };
+  conversations.set(id, conversation);
+  res.json(conversation);
+});
+
+app.post('/api/agents/conversations/:id/messages', requireAuth, async (req, res) => {
+  const conversation = conversations.get(req.params.id);
+  if (!conversation || conversation.user_id !== req.user.id) {
+    return res.status(404).json({ error: 'Conversation not found' });
+  }
+
+  const { role, content } = req.body || {};
+  if (role !== 'user' || !content?.trim()) {
+    return res.status(400).json({ error: 'Message content required' });
+  }
+
+  conversation.messages.push({ role: 'user', content: content.trim() });
+
+  try {
+    const { message, actions, ai_status } = await runAgent({
+      user: req.user,
+      messages: conversation.messages,
+      agentName: conversation.agent_name,
+    });
+
+    conversation.messages.push({
+      role: 'assistant',
+      content: message.content,
+      actions: actions?.length ? actions : undefined,
+    });
+
+    res.json({
+      ...conversation,
+      ai_status,
+      last_actions: actions || [],
+    });
+  } catch (err) {
+    console.error('[agent error]', err);
+    res.status(500).json({ error: err.message || 'Agent failed' });
+  }
 });
 
 // ─── Entities ───────────────────────────────────────────────────────────────
@@ -289,8 +363,13 @@ app.post('/api/integrations/upload', requireAuth, upload.single('file'), (req, r
   res.json({ file_url: fileUrl });
 });
 
-app.post('/api/integrations/llm', requireAuth, (req, res) => {
-  res.json(invokeLLM(req.body));
+app.post('/api/integrations/llm', requireAuth, async (req, res) => {
+  try {
+    const result = await simpleLLM({ prompt: req.body?.prompt, user: req.user });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Production: serve built frontend + SPA fallback

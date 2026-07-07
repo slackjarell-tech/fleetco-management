@@ -68,6 +68,17 @@ export async function invokeFunction(name, body, user) {
       return { success: true };
     case 'refreshFuelPrices':
       return { success: true, message: 'Fuel prices refreshed (local mode)' };
+    case 'seedDemoData': {
+      if (!user || user.role !== 'executive') throw new Error('Executive access required');
+      const { seedDemoData, getDemoSeedSummary } = await import('./seedDemo.js');
+      const created = seedDemoData();
+      return {
+        success: true,
+        created,
+        message: created ? 'Demo data seeded successfully' : 'Demo data already exists',
+        summary: getDemoSeedSummary(),
+      };
+    }
     default:
       throw new Error(`Unknown function: ${name}`);
   }
@@ -315,17 +326,9 @@ function createCheckout({ planName }) {
 }
 
 export function invokeLLM({ prompt }) {
-  if (prompt?.includes('diagnostic trouble code')) {
-    const match = prompt.match(/"([^"]+)"/);
-    const code = match?.[1] || 'unknown';
-    return {
-      description: `Code ${code} indicates a fault in a vehicle subsystem. Consult the manufacturer service manual for exact diagnosis.`,
-      system: 'Powertrain',
-      severity: 'warning',
-    };
-  }
+  // Legacy stub — use server/aiAgent.js simpleLLM via /api/integrations/llm
   return {
-    description: 'AI assistant is not configured. Set OPENAI_API_KEY to enable LLM features.',
+    description: 'Use /api/integrations/llm or configure GROQ_API_KEY for AI features.',
     system: 'General',
     severity: 'info',
   };

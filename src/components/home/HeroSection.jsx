@@ -1,10 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, Shield, Truck, Star, ArrowRight, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 
+const DEFAULTS = {
+  hero_badge: 'Dallas, TX — Serving Owner Operators Nationwide',
+  hero_title_line1: 'Keep Your Fleet',
+  hero_title_highlight: 'Running Strong.',
+  hero_description:
+    'FleetCo Management LLC helps owner operators and small fleet owners cut costs, find parts, optimize fuel, and stay compliant — so you can focus on moving freight, not managing breakdowns.',
+};
+
 export default function HeroSection() {
   const [loading, setLoading] = useState(false);
+  const [site, setSite] = useState(DEFAULTS);
+
+  useEffect(() => {
+    fetch('/api/public-settings')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.public_settings?.site) setSite({ ...DEFAULTS, ...data.public_settings.site });
+      })
+      .catch(() => {});
+  }, []);
+
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 
   const handleCheckout = async () => {
@@ -49,17 +68,16 @@ export default function HeroSection() {
           <div>
             <div className="inline-flex items-center gap-2 bg-amber-500/20 border border-amber-500/40 rounded-full px-4 py-1.5 mb-6">
               <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
-              <span className="text-amber-300 text-sm font-medium">Dallas, TX — Serving Owner Operators Nationwide</span>
+              <span className="text-amber-300 text-sm font-medium">{site.hero_badge}</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6 leading-tight">
-              Keep Your Fleet
-              <span className="block text-amber-400 mt-1">Running Strong.</span>
+              {site.hero_title_line1}
+              <span className="block text-amber-400 mt-1">{site.hero_title_highlight}</span>
             </h1>
 
             <p className="text-lg text-slate-300 mb-8 leading-relaxed max-w-lg">
-              FleetCo Management LLC helps owner operators and small fleet owners cut costs, find parts,
-              optimize fuel, and stay compliant — so you can focus on moving freight, not managing breakdowns.
+              {site.hero_description}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 mb-12">

@@ -13,7 +13,38 @@ const defaultStore = {
   users: [],
   entities: [],
   otp_codes: {},
+  site_settings: {},
 };
+
+export const DEFAULT_SITE_SETTINGS = {
+  hero_badge: 'Dallas, TX — Serving Owner Operators Nationwide',
+  hero_title_line1: 'Keep Your Fleet',
+  hero_title_highlight: 'Running Strong.',
+  hero_description:
+    'FleetCo Management LLC helps owner operators and small fleet owners cut costs, find parts, optimize fuel, and stay compliant — so you can focus on moving freight, not managing breakdowns.',
+  tagline: 'Move freight. We handle the rest.',
+  contact_email: 'info@fleetcomanagement.org',
+  contact_phone: '(214) 555-0198',
+  company_location: 'Dallas, TX',
+};
+
+export function getSiteSettings() {
+  const store = loadStore();
+  return { ...DEFAULT_SITE_SETTINGS, ...(store.site_settings || {}) };
+}
+
+export function updateSiteSettings(changes) {
+  const allowed = Object.keys(DEFAULT_SITE_SETTINGS);
+  const patch = {};
+  for (const [key, value] of Object.entries(changes || {})) {
+    if (allowed.includes(key) && value != null) patch[key] = String(value);
+  }
+  if (!Object.keys(patch).length) return getSiteSettings();
+  withStore((store) => {
+    store.site_settings = { ...(store.site_settings || {}), ...patch };
+  });
+  return getSiteSettings();
+}
 
 function loadStore() {
   if (!fs.existsSync(dbPath)) {

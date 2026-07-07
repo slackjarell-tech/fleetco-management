@@ -103,7 +103,7 @@ const NAV_GROUPS = [
     items: [
       { label: 'Customers & Team', icon: Building2, path: '/portal/customers' },
       { label: 'Messages', icon: MessageCircle, path: '/portal/messages' },
-      { label: 'AI Assistant', icon: Bot, path: '/portal/assistant' },
+      { label: 'Site Commander AI', icon: Bot, path: '/portal/assistant' },
       { label: 'Revan', icon: Zap, path: '/portal/revan' },
       { label: 'Advertisement', icon: Megaphone, path: '/portal/advertisement' },
       { label: 'Marketing Gallery', icon: Megaphone, path: '/portal/marketing-gallery' },

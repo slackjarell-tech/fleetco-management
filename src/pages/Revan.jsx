@@ -31,16 +31,19 @@ export default function Revan() {
     <div className="h-screen flex flex-col" style={{ height: 'calc(100vh - 0px)' }}>
       <AssistantChat
         agentName="revan"
+        variant="revan"
         title="Revan"
-        subtitle="Executive Commander · Full system authority"
-        placeholder="Command your fleet — audits, analysis, record management..."
+        subtitle="Executive Commander · Cursor-style control over site & fleet"
+        placeholder="Command Revan — change the website, audit the fleet, manage users..."
+        emptyTitle="What should Revan change?"
+        emptySubtitle="Full executive authority: update fleetcomanagement.org content, fleet records, users, and run system-wide audits."
         suggestedQuestions={[
-          "Run a full system health audit",
-          "Show me fleet-wide P&L summary",
-          "List all customers with their fleet size",
-          "Find vehicles with overdue maintenance",
-          "Analyze fuel spend trends last 6 months",
-          "Show all drivers with expired documents",
+          'Change the homepage headline to "FleetCo — Powering Owner Operators"',
+          'Run a full system health audit',
+          'List all open work orders and overdue maintenance',
+          'Show fleet-wide summary — vehicles, drivers, customers',
+          'Update the contact phone on the public website',
+          'Create a work order for brake inspection on unit 104',
         ]}
       />
     </div>

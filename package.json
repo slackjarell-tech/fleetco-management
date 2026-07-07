@@ -14,7 +14,8 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "marketing:deck": "node scripts/generate-client-deck.js"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",
@@ -68,6 +69,7 @@
     "moment": "^2.30.1",
     "multer": "^2.0.1",
     "next-themes": "^0.4.4",
+    "pptxgenjs": "^4.0.1",
     "react": "^18.2.0",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.2.0",

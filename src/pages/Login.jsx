@@ -188,6 +188,9 @@ export default function Login() {
         <Button type="submit" className="w-full h-11 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold mt-2" disabled={loading}>
           {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Signing in...</> : "Sign In to Portal"}
         </Button>
+        <p className="text-center text-xs text-slate-500 pt-2">
+          After login, open <span className="text-amber-400/90">Site Commander AI</span> in the portal to update your website and fleet with natural language.
+        </p>
       </form>
     </AuthLayout>
   );

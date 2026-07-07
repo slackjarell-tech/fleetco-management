@@ -228,17 +228,15 @@ const integrations = {
 };
 
 const agents = {
+  async getStatus() {
+    return apiFetch('/agents/status');
+  },
+
   async createConversation({ agent_name, metadata }) {
-    const id = crypto.randomUUID();
-    return {
-      id,
-      agent_name,
-      metadata,
-      messages: [{
-        role: 'assistant',
-        content: 'Hi! I\'m your FleetCo assistant. Ask me about fleet operations, compliance, work orders, or troubleshooting.',
-      }],
-    };
+    return apiFetch('/agents/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ agent_name, metadata }),
+    });
   },
 
   subscribeToConversation(_conversationId, callback) {
@@ -246,17 +244,11 @@ const agents = {
   },
 
   async addMessage(conversation, { role, content }) {
-    const messages = [...(conversation.messages || []), { role, content }];
-    let reply = 'I can help with fleet management questions. Configure an LLM provider on the server for full AI responses.';
-    try {
-      const result = await integrations.Core.InvokeLLM({ prompt: content });
-      reply = typeof result === 'string' ? result : result.description || result.content || reply;
-    } catch {
-      reply = 'Assistant is running in offline mode. Try asking about work orders, HOS rules, or vehicle diagnostics.';
-    }
-    messages.push({ role: 'assistant', content: reply });
-    conversation.messages = messages;
-    return { ...conversation, messages };
+    const updated = await apiFetch(`/agents/conversations/${conversation.id}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ role, content }),
+    });
+    return updated;
   },
 };
 
