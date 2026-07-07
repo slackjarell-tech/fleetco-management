@@ -42,13 +42,7 @@ export default function AuthLayout({ title, subtitle, footer, children }) {
       <div className="flex-1 flex flex-col justify-center items-center px-6 py-12">
         {/* Mobile logo */}
         <Link to="/" className="flex items-center gap-2 mb-10 lg:hidden">
-          <div className="bg-amber-500 p-1.5 rounded-lg">
-            <Truck className="w-4 h-4 text-slate-900" />
-          </div>
-          <div>
-            <div className="text-white font-black text-base leading-none">FLEETCO</div>
-            <div className="text-amber-400 text-xs tracking-widest">MANAGEMENT</div>
-          </div>
+          <FleetcoLogo size={36} variant="full" />
         </Link>
 
         <div className="w-full max-w-md">
