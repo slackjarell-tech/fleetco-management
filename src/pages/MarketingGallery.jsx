@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, Download, Printer, FileText } from 'lucide-react';
+import { Eye, Download, Printer, Presentation } from 'lucide-react';
 import Flyer01_FleetServices from '@/components/marketing/Flyer01_FleetServices';
 import Flyer02_SafetyCompliance from '@/components/marketing/Flyer02_SafetyCompliance';
 import Flyer03_ShopServices from '@/components/marketing/Flyer03_ShopServices';
@@ -14,6 +14,7 @@ import Email01_Welcome from '@/components/marketing/Email01_Welcome';
 import Email02_Newsletter from '@/components/marketing/Email02_Newsletter';
 import Sign01_YardSign from '@/components/marketing/Sign01_YardSign';
 import Deck01_PitchDeck from '@/components/marketing/Deck01_PitchDeck';
+import Deck02_ClientPresentation from '@/components/marketing/Deck02_ClientPresentation';
 import Ad01_LinkedInHeader from '@/components/marketing/Ad01_LinkedInHeader';
 import Ad02_GoogleDisplay from '@/components/marketing/Ad02_GoogleDisplay';
 import CaseStudy01_MidwestCarrier from '@/components/marketing/CaseStudy01_MidwestCarrier';
@@ -21,6 +22,7 @@ import Flyer11_IFTACompliance from '@/components/marketing/Flyer11_IFTAComplianc
 import Flyer12_MaintenanceProgram from '@/components/marketing/Flyer12_MaintenanceProgram';
 import Banner01_TradeShow from '@/components/marketing/Banner01_TradeShow';
 import Email03_Nurture from '@/components/marketing/Email03_Nurture';
+import { CLIENT_DECK_DOWNLOAD } from '@/lib/brand';
 
 const TEMPLATES = [
   { id: 'Flyer01', name: 'Fleet Services Flyer', category: 'Flyer', component: Flyer01_FleetServices, desc: 'Full-service fleet management overview with service cards and CTA' },
@@ -37,6 +39,15 @@ const TEMPLATES = [
   { id: 'Email02', name: 'Monthly Newsletter', category: 'Email', component: Email02_Newsletter, desc: 'Monthly fleet insights, fuel prices, and platform updates' },
   { id: 'Sign01', name: 'Yard Sign', category: 'Signage', component: Sign01_YardSign, desc: 'Outdoor sign for fleet yards, terminals, and truck stops' },
   { id: 'Deck01', name: 'Investor Pitch Deck', category: 'Presentation', component: Deck01_PitchDeck, desc: 'Multi-slide presentation covering problem, solution, and features' },
+  {
+    id: 'Deck02',
+    name: 'Client Sales PowerPoint',
+    category: 'Presentation',
+    component: Deck02_ClientPresentation,
+    desc: '8-slide client deck with pricing, AI demo, ROI — download .pptx for sales meetings',
+    downloadUrl: CLIENT_DECK_DOWNLOAD,
+    downloadLabel: 'Download PowerPoint (.pptx)',
+  },
   { id: 'Ad01', name: 'LinkedIn Banner', category: 'Digital Ad', component: Ad01_LinkedInHeader, desc: 'Company page header for LinkedIn and professional networks' },
   { id: 'Ad02', name: 'Google Display Ads', category: 'Digital Ad', component: Ad02_GoogleDisplay, desc: 'Leaderboard (728x90), Rectangle (300x250), and Skyscraper (160x600)' },
   { id: 'Case01', name: 'Case Study — Midwest Carrier', category: 'Sales', component: CaseStudy01_MidwestCarrier, desc: '47-truck carrier case study: 28% cost reduction across fuel, maintenance, compliance, and IFTA' },
@@ -47,6 +58,7 @@ const TEMPLATES = [
 ];
 
 const CATEGORIES = [...new Set(TEMPLATES.map(t => t.category))];
+const TOTAL = TEMPLATES.length;
 
 export default function MarketingGallery() {
   const [selectedId, setSelectedId] = useState(null);
@@ -59,12 +71,12 @@ export default function MarketingGallery() {
     <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-black text-slate-900">Marketing Gallery</h1>
-        <p className="text-slate-500 text-sm mt-0.5">21 print-ready marketing templates — click any to preview, then print or save as PDF</p>
+        <p className="text-slate-500 text-sm mt-0.5">{TOTAL} print-ready marketing templates — click any to preview, then print, save as PDF, or download PowerPoint</p>
       </div>
 
       {/* Category Filter */}
       <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit flex-wrap">
-        <button onClick={() => setFilter('all')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${filter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>All (21)</button>
+        <button onClick={() => setFilter('all')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${filter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>All ({TOTAL})</button>
         {CATEGORIES.map(cat => (
           <button key={cat} onClick={() => setFilter(cat)} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${filter === cat ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
             {cat} ({TEMPLATES.filter(t => t.category === cat).length})
@@ -81,7 +93,17 @@ export default function MarketingGallery() {
                 <h3 className="font-black text-slate-900">{selected.name}</h3>
                 <p className="text-xs text-slate-500">{selected.category} — {selected.desc}</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap justify-end">
+                {selected.downloadUrl && (
+                  <a
+                    href={selected.downloadUrl}
+                    download="FleetCo-Client-Presentation.pptx"
+                    className="px-4 py-2 text-sm font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800 flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    {selected.downloadLabel || 'Download'}
+                  </a>
+                )}
                 <button onClick={() => window.print()} className="px-4 py-2 text-sm font-bold bg-amber-500 text-slate-900 rounded-lg hover:bg-amber-400 flex items-center gap-2">
                   <Printer className="w-4 h-4" /> Print / PDF
                 </button>
@@ -105,12 +127,24 @@ export default function MarketingGallery() {
           >
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-full uppercase">{template.category}</span>
-              <Eye className="w-4 h-4 text-slate-300 group-hover:text-amber-500 transition-colors" />
+              {template.downloadUrl ? (
+                <Presentation className="w-4 h-4 text-slate-300 group-hover:text-amber-500 transition-colors" />
+              ) : (
+                <Eye className="w-4 h-4 text-slate-300 group-hover:text-amber-500 transition-colors" />
+              )}
             </div>
             <div className="font-black text-slate-900 text-sm">{template.name}</div>
             <p className="text-xs text-slate-500 mt-1 line-clamp-2">{template.desc}</p>
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 text-[10px] text-slate-400">
-              <Printer className="w-3 h-3" /> Click to preview & print
+              {template.downloadUrl ? (
+                <>
+                  <Download className="w-3 h-3" /> Preview & download .pptx
+                </>
+              ) : (
+                <>
+                  <Printer className="w-3 h-3" /> Click to preview & print
+                </>
+              )}
             </div>
           </button>
         ))}

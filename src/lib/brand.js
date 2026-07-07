@@ -1,0 +1,23 @@
+/** FleetCo brand constants (shared with marketing/brand.js) */
+export const BRAND = {
+  company: 'Fleetco Management LLC',
+  shortName: 'FleetCo Management',
+  phone: '(360) 952-1249',
+  phoneTel: '+13609521249',
+  email: 'info@fleetcomanagement.org',
+  supportEmail: 'support@fleetcomanagement.org',
+  website: 'fleetcomanagement.org',
+  url: 'https://fleetcomanagement.org',
+  location: 'Dallas, TX',
+  tagline: 'Move freight. We handle the rest.',
+  ownersLine: 'JaRell D. Slack & Desiree M. Clark, Owners',
+  owner1: { name: 'JaRell D. Slack', title: 'Owner, Director of Fleet Management' },
+  owner2: { name: 'Desiree M. Clark', title: 'Co-Owner, Director of Operations' },
+  pricing: [
+    { name: 'Starter', price: '$299/mo', fleetSize: '1–5 vehicles', detail: 'Fleet manager · parts sourcing · fuel optimization · monthly reports' },
+    { name: 'Growth', price: '$599/mo', fleetSize: '6–15 vehicles', detail: 'Everything in Starter · PM scheduling · priority support · budget reviews', highlighted: true },
+    { name: 'Enterprise', price: '$999/mo', fleetSize: '16+ vehicles', detail: 'Full-service · telematics · tax docs · dedicated account team' },
+  ],
+};
+
+export const CLIENT_DECK_DOWNLOAD = '/marketing/FleetCo-Client-Presentation.pptx';

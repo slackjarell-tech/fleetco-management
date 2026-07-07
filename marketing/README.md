@@ -9,7 +9,7 @@ npm install
 npm run marketing:deck
 ```
 
-Output: **`FleetCo-Client-Presentation.pptx`** (8 slides)
+Output: **`FleetCo-Client-Presentation.pptx`** (8 slides) — also copied to `public/marketing/` for download from the Marketing Gallery.
 
 Topics covered:
 - Cover & value proposition

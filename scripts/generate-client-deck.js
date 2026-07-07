@@ -235,7 +235,13 @@ async function main() {
   });
 
   await pptx.writeFile({ fileName: outFile });
+
+  const publicDir = path.join(__dirname, '..', 'public', 'marketing');
+  if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
+  const publicFile = path.join(publicDir, 'FleetCo-Client-Presentation.pptx');
+  fs.copyFileSync(outFile, publicFile);
   console.log('Created:', outFile);
+  console.log('Copied to:', publicFile);
 }
 
 main().catch((err) => {
