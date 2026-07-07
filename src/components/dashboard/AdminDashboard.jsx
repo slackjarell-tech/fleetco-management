@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import ComplianceAlertBanner from '@/components/dashboard/ComplianceAlertBanner';
 import TodayActivityFeed from '@/components/dashboard/TodayActivityFeed';
+import FleetCoEmailAccessPanel from '@/components/admin/FleetCoEmailAccessPanel';
+import { isSLT } from '@/lib/roles';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -70,7 +72,7 @@ const CustomTooltip = ({ active, payload, label, prefix = '$' }) => {
 };
 
 // ── Main Dashboard ─────────────────────────────────────────────────────────
-export default function AdminDashboard({ data }) {
+export default function AdminDashboard({ data, user }) {
   const { loads, invoices, fuel, vehicles, workOrders } = data;
 
   // ── Financial KPIs ──
@@ -182,6 +184,13 @@ export default function AdminDashboard({ data }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-5 bg-slate-900 min-h-screen">
+
+      {/* SLT — FleetCo employee email access */}
+      {isSLT(user?.role) && (
+        <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-5">
+          <FleetCoEmailAccessPanel variant="dashboard" user={user} />
+        </div>
+      )}
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between">

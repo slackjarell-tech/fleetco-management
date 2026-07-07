@@ -102,7 +102,7 @@ const NAV_GROUPS = [
     icon: Building2,
     items: [
       { label: 'Customers & Team', icon: Building2, path: '/portal/customers' },
-      { label: 'Company Emails', icon: Mail, path: '/portal/domain-emails', ownerOnly: true },
+      { label: 'Company Emails', icon: Mail, path: '/portal/domain-emails', sltOnly: true },
       { label: 'Messages', icon: MessageCircle, path: '/portal/messages' },
       { label: 'Site Commander AI', icon: Bot, path: '/portal/assistant' },
       { label: 'Revan', icon: Zap, path: '/portal/revan' },
@@ -194,6 +194,7 @@ export default function AppLayout() {
 
             // Filter items based on user role
             const visibleItems = group.items.filter(item => {
+              if (item.sltOnly && !['owner', 'executive', 'fleet_manager'].includes(user?.role)) return false;
               if (item.ownerOnly && user?.role !== 'owner') return false;
               if (isFleetCoAdmin(user?.role)) return true;
               if (user?.role === 'fleet_coordinator') {

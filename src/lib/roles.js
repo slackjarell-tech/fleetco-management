@@ -4,6 +4,17 @@ export const FLEETCO_ADMIN_ROLES = ['owner', 'executive', 'fleet_manager', 'admi
 export const EXECUTIVE_VIEW_ROLES = ['owner', 'executive'];
 export const INTERNAL_ROLES = ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'];
 
+/** Senior Leadership Team — owner, executive, fleet managers */
+export const SLT_ROLES = ['owner', 'executive', 'fleet_manager'];
+
+export function isSLT(role) {
+  return SLT_ROLES.includes(role);
+}
+
+export function canManageDomainEmails(role) {
+  return isSLT(role);
+}
+
 export function isPlatformAdmin(role) {
   return PLATFORM_ADMIN_ROLES.includes(role);
 }

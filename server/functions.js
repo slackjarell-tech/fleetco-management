@@ -4,6 +4,7 @@ import {
   createUser,
   filterEntities,
   findUserByEmail,
+  findUserById,
   getUserRowByEmail,
   updateUser,
   updateEntity,
@@ -20,6 +21,7 @@ import {
   SUBSCRIPTION_PLANS,
   FLEETCO_EMAIL_DOMAIN,
   canManageDomainEmails,
+  canGrantEmployeeEmailAccess,
   normalizeFleetCoEmail,
   isFleetCoDomainEmail,
   requireFleetCoEmail,
@@ -170,6 +172,50 @@ function upgradeUserRole(body, user) {
   return { success: true, email, role };
 }
 
+function provisionInternalPortalUser({ email, tempPassword, role, employeeNumber, fullName }, actingUser) {
+  if (!canGrantEmployeeEmailAccess(actingUser.role)) {
+    throw new Error('Only owner or SLT (Senior Leadership Team) can grant employee email and portal access');
+  }
+  const normalizedEmail = requireFleetCoEmail(email);
+  const internalRoles = ['executive', 'fleet_manager', 'fleet_coordinator'];
+  if (!internalRoles.includes(role)) {
+    throw new Error('Portal role must be executive, fleet_manager, or fleet_coordinator');
+  }
+
+  let existing = getUserRowByEmail(normalizedEmail);
+  if (!existing) {
+    const hash = bcrypt.hashSync(tempPassword, 10);
+    createUser({
+      email: normalizedEmail,
+      passwordHash: hash,
+      role,
+      customerId: null,
+      employeeNumber,
+      fullName,
+    });
+  } else {
+    updateUser(existing.id, {
+      role,
+      customer_id: null,
+      employee_number: employeeNumber,
+      password_hash: bcrypt.hashSync(tempPassword, 10),
+      ...(fullName ? { full_name: fullName } : {}),
+    });
+  }
+
+  createEntity('PendingAccount', {
+    email: normalizedEmail,
+    temp_password: tempPassword,
+    role,
+    customer_id: null,
+    activated: false,
+    created_by: actingUser.full_name || actingUser.email,
+    employee_number: employeeNumber || '',
+  });
+
+  return findUserByEmail(normalizedEmail);
+}
+
 function createUserAccount(body, user) {
   if (!user) throw new Error('Unauthorized');
   const { email, tempPassword, role, customerId, employeeNumber, fullName } = body;
@@ -250,7 +296,7 @@ function createUserAccount(body, user) {
 
 function createDomainEmail(body, user) {
   if (!user || !canManageDomainEmails(user.role)) {
-    throw new Error('Only the owner can create @fleetcomanagement.org company emails');
+    throw new Error('Only owner or SLT (Senior Leadership Team) can create @fleetcomanagement.org company emails');
   }
 
   const {
@@ -263,6 +309,7 @@ function createDomainEmail(body, user) {
     tempPassword,
     employeeNumber,
     notes,
+    linkExistingUserId,
   } = body;
 
   const email = normalizeFleetCoEmail(rawEmail || localPart);
@@ -276,18 +323,23 @@ function createDomainEmail(body, user) {
     throw new Error(`${email} already exists in the company email directory`);
   }
 
+  const linkedExisting = linkExistingUserId ? findUserById(linkExistingUserId) : null;
+  if (linkExistingUserId && !linkedExisting) {
+    throw new Error('Linked portal user not found');
+  }
+
   const local_part = email.split('@')[0];
   const ts = nowIso();
-  let linkedUserId = existingUser?.id || null;
+  let linkedUserId = existingUser?.id || linkedExisting?.id || null;
   let portalMessage = '';
 
-  if (createPortalAccess) {
+  if (createPortalAccess && !linkedExisting) {
     if (!tempPassword) throw new Error('Temp password is required when creating portal access');
     const internalRoles = ['executive', 'fleet_manager', 'fleet_coordinator'];
     if (!internalRoles.includes(portalRole)) {
       throw new Error('Portal role must be executive, fleet_manager, or fleet_coordinator');
     }
-    const account = createUserAccount(
+    provisionInternalPortalUser(
       {
         email,
         tempPassword,
@@ -299,6 +351,10 @@ function createDomainEmail(body, user) {
     );
     linkedUserId = findUserByEmail(email)?.id || linkedUserId;
     portalMessage = ` Portal login created (${portalRole}).`;
+  } else if (linkedExisting) {
+    updateUser(linkedExisting.id, { email });
+    linkedUserId = linkedExisting.id;
+    portalMessage = ` Linked to existing portal account (login email updated to ${email}).`;
   } else if (existingUser) {
     linkedUserId = existingUser.id;
   }
@@ -310,8 +366,8 @@ function createDomainEmail(body, user) {
     mailbox_type: mailboxType,
     status: 'active',
     linked_user_id: linkedUserId,
-    portal_role: createPortalAccess ? portalRole : '',
-    has_portal_access: !!createPortalAccess,
+    portal_role: createPortalAccess ? portalRole : (linkedExisting?.role || ''),
+    has_portal_access: !!createPortalAccess || !!linkedExisting,
     created_by: user.email,
     notes: notes || '',
     provisioned_at: ts,

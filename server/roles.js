@@ -18,6 +18,9 @@ export function subscriptionAmount(planName, term) {
 export const FLEETCO_INTERNAL_ROLES = ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'];
 export const CUSTOMER_TEAM_ROLES = ['user', 'driver'];
 
+/** Senior Leadership Team — can grant @fleetcomanagement.org email access */
+export const SLT_ROLES = ['owner', 'executive', 'fleet_manager'];
+
 export function isFleetCoInternal(role) {
   return FLEETCO_INTERNAL_ROLES.includes(role);
 }
@@ -37,7 +40,11 @@ export function canManageCustomerTeam(role) {
 export const FLEETCO_EMAIL_DOMAIN = 'fleetcomanagement.org';
 
 export function canManageDomainEmails(role) {
-  return role === 'owner';
+  return SLT_ROLES.includes(role);
+}
+
+export function canGrantEmployeeEmailAccess(role) {
+  return SLT_ROLES.includes(role);
 }
 
 export function normalizeFleetCoEmail(input) {

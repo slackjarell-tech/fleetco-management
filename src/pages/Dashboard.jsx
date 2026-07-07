@@ -99,7 +99,7 @@ export default function Dashboard() {
 
   const role = user?.role || 'user';
 
-  if (isExecutiveView(role) || role === 'fleet_manager') return <AdminDashboard data={data} />;
+  if (isExecutiveView(role) || role === 'fleet_manager') return <AdminDashboard data={data} user={user} />;
   if (role === 'driver') return <DriverDashboard user={user} data={data} />;
   if (role === 'employee') return <EmployeeDashboard user={user} data={data} />;
   return <CustomerDashboard user={user} data={data} />;
