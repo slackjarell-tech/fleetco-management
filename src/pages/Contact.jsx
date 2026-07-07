@@ -146,8 +146,10 @@ export default function Contact() {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900">Phone</h3>
-                  <p className="text-slate-600">Call for immediate inquiries</p>
-                  <p className="text-slate-500 text-sm">Available weekdays 8 AM – 6 PM CT</p>
+                  <a href="tel:+13609521249" className="text-amber-600 hover:text-amber-500 font-medium text-lg">
+                    (360) 952-1249
+                  </a>
+                  <p className="text-slate-500 text-sm mt-1">Available weekdays 8 AM – 6 PM CT</p>
                 </div>
               </div>
 

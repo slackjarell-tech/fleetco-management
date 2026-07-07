@@ -6,6 +6,7 @@ import PptxGenJS from 'pptxgenjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { BRAND } from '../marketing/brand.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(__dirname, '..', 'marketing');
@@ -17,8 +18,8 @@ const SLATE = '64748B';
 const WHITE = 'FFFFFF';
 const LIGHT = 'F8FAFC';
 
-function addFooter(slide, pptx) {
-  slide.addText('Fleetco Management LLC  ·  fleetcomanagement.org  ·  Dallas, TX', {
+function addFooter(slide) {
+  slide.addText(`${BRAND.company}  ·  ${BRAND.website}  ·  ${BRAND.phone}  ·  ${BRAND.location}`, {
     x: 0.5,
     y: 7.1,
     w: 9,
@@ -33,9 +34,9 @@ async function main() {
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
   const pptx = new PptxGenJS();
-  pptx.author = 'Fleetco Management LLC';
-  pptx.company = 'Fleetco Management';
-  pptx.title = 'FleetCo Management — Client Presentation';
+  pptx.author = BRAND.company;
+  pptx.company = BRAND.shortName;
+  pptx.title = `${BRAND.shortName} — Client Presentation`;
   pptx.subject = 'Fleet operations platform for owner-operators and small fleets';
   pptx.layout = 'LAYOUT_WIDE';
 
@@ -48,11 +49,14 @@ async function main() {
   slide.addText('Complete Fleet Operations.\nOne Platform.', {
     x: 0.7, y: 2.6, w: 9, h: 1.6, fontSize: 36, bold: true, color: WHITE, fontFace: 'Arial',
   });
-  slide.addText('Built for owner-operators & small fleets', {
-    x: 0.7, y: 4.3, w: 8, h: 0.5, fontSize: 16, color: SLATE,
+  slide.addText(BRAND.tagline, {
+    x: 0.7, y: 4.15, w: 8, h: 0.45, fontSize: 16, color: SLATE, italic: true,
   });
-  slide.addText('fleetcomanagement.org  ·  (214) 555-0198  ·  Dallas, TX', {
-    x: 0.7, y: 5.0, w: 8, h: 0.4, fontSize: 14, color: AMBER, bold: true,
+  slide.addText('Built for owner-operators & small fleets · Dallas, TX', {
+    x: 0.7, y: 4.65, w: 8, h: 0.4, fontSize: 14, color: SLATE,
+  });
+  slide.addText(`${BRAND.website}  ·  ${BRAND.phone}`, {
+    x: 0.7, y: 5.15, w: 8, h: 0.4, fontSize: 14, color: AMBER, bold: true,
   });
   slide.addText('Client Presentation — July 2026', { x: 0.7, y: 6.2, w: 5, h: 0.3, fontSize: 11, color: SLATE });
 
@@ -80,7 +84,7 @@ async function main() {
     });
     slide.addText(text, { x: 1.35 + col * 4.7, y: 1.9 + row * 1.55, w: 3.5, h: 1, fontSize: 13, color: NAVY, valign: 'middle' });
   });
-  addFooter(slide, pptx);
+  addFooter(slide);
 
   // ── Slide 3: Solution ──
   slide = pptx.addSlide();
@@ -108,7 +112,7 @@ async function main() {
     slide.addText(title, { x: 0.75 + col * 3.15, y: 2.35 + row * 1.65, w: 2.7, h: 0.35, fontSize: 12, bold: true, color: NAVY });
     slide.addText(desc, { x: 0.75 + col * 3.15, y: 2.75 + row * 1.65, w: 2.7, h: 0.7, fontSize: 10, color: SLATE });
   });
-  addFooter(slide, pptx);
+  addFooter(slide);
 
   // ── Slide 4: AI Site Commander ──
   slide = pptx.addSlide();
@@ -130,10 +134,10 @@ async function main() {
   slide.addShape(pptx.shapes.ROUNDED_RECTANGLE, {
     x: 0.6, y: 4.8, w: 8.8, h: 1.2, fill: { color: '1E293B' }, line: { color: AMBER, width: 1 },
   });
-  slide.addText('Demo live at fleetcomanagement.org/login  ·  admin@fleetco.com', {
+  slide.addText(`Live demo: ${BRAND.url}/login`, {
     x: 0.8, y: 5.05, w: 8.4, h: 0.35, fontSize: 13, color: AMBER, bold: true,
   });
-  slide.addText('4 customers · 12 units · 8 work orders · 5 active loads — pre-loaded demo data', {
+  slide.addText('4 customers · 12 units · 8 work orders · 5 loads — pre-loaded demo data', {
     x: 0.8, y: 5.45, w: 8.4, h: 0.35, fontSize: 11, color: SLATE,
   });
 
@@ -157,7 +161,7 @@ async function main() {
     slide.addText(title, { x: 0.85 + (i % 2) * 4.7, y: 2.25 + Math.floor(i / 2) * 1.75, w: 3.9, h: 0.35, fontSize: 13, bold: true, color: NAVY });
     slide.addText(sub, { x: 0.85 + (i % 2) * 4.7, y: 2.6 + Math.floor(i / 2) * 1.75, w: 3.9, h: 0.35, fontSize: 10, color: SLATE });
   });
-  addFooter(slide, pptx);
+  addFooter(slide);
 
   // ── Slide 6: Who We Serve ──
   slide = pptx.addSlide();
@@ -166,8 +170,8 @@ async function main() {
   slide.addText('Built for Real Fleet Operators', { x: 0.6, y: 0.75, w: 9, h: 0.7, fontSize: 28, bold: true, color: NAVY });
   const segments = [
     ['Owner-Operators', '1–5 trucks', 'Fuel savings, compliance, parts sourcing'],
-    ['Small Fleets', '6–50 units', 'Dispatch, maintenance, driver management'],
-    ['Fleet Managers', 'Multi-customer', 'Client portal, P&L, executive dashboards'],
+    ['Small Fleets', '6–15 units', 'Dispatch, maintenance, driver management'],
+    ['Established Fleets', '16+ units', 'Full-service management & dedicated support'],
   ];
   segments.forEach(([title, size, benefit], i) => {
     slide.addShape(pptx.shapes.ROUNDED_RECTANGLE, {
@@ -178,48 +182,56 @@ async function main() {
     slide.addText(size, { x: 0.75 + i * 3.15, y: 2.5, w: 2.7, h: 0.35, fontSize: 12, color: WHITE });
     slide.addText(benefit, { x: 0.75 + i * 3.15, y: 3.1, w: 2.7, h: 1.5, fontSize: 11, color: SLATE });
   });
-  addFooter(slide, pptx);
+  addFooter(slide);
 
-  // ── Slide 7: Pricing / Next Steps ──
+  // ── Slide 7: Pricing ──
   slide = pptx.addSlide();
   slide.background = { color: LIGHT };
-  slide.addText('GET STARTED', { x: 0.6, y: 0.4, w: 3, h: 0.35, fontSize: 11, bold: true, color: AMBER });
+  slide.addText('PLANS & PRICING', { x: 0.6, y: 0.4, w: 3, h: 0.35, fontSize: 11, bold: true, color: AMBER });
   slide.addText('Simple Plans. Fast Onboarding.', { x: 0.6, y: 0.75, w: 9, h: 0.7, fontSize: 28, bold: true, color: NAVY });
-  const plans = [
-    ['Starter', '$99/mo', 'Up to 5 units · Core portal & compliance'],
-    ['Growth', '$249/mo', 'Up to 25 units · Full ops + fuel + analytics'],
-    ['Enterprise', 'Custom', 'Unlimited · Multi-tenant · AI + white-label'],
-  ];
-  plans.forEach(([name, price, detail], i) => {
+  BRAND.pricing.forEach((plan, i) => {
     slide.addShape(pptx.shapes.ROUNDED_RECTANGLE, {
-      x: 0.6 + i * 3.15, y: 1.7, w: 2.95, h: 2.5,
-      fill: { color: WHITE }, line: { color: i === 1 ? AMBER : 'E2E8F0', width: i === 1 ? 2 : 1 }, rectRadius: 0.08,
+      x: 0.6 + i * 3.15, y: 1.7, w: 2.95, h: 2.85,
+      fill: { color: WHITE }, line: { color: plan.highlighted ? AMBER : 'E2E8F0', width: plan.highlighted ? 2 : 1 }, rectRadius: 0.08,
     });
-    slide.addText(name, { x: 0.75 + i * 3.15, y: 1.9, w: 2.7, h: 0.35, fontSize: 14, bold: true, color: NAVY });
-    slide.addText(price, { x: 0.75 + i * 3.15, y: 2.35, w: 2.7, h: 0.5, fontSize: 20, bold: true, color: AMBER });
-    slide.addText(detail, { x: 0.75 + i * 3.15, y: 2.95, w: 2.7, h: 0.9, fontSize: 10, color: SLATE });
+    slide.addText(plan.name, { x: 0.75 + i * 3.15, y: 1.9, w: 2.7, h: 0.35, fontSize: 14, bold: true, color: NAVY });
+    slide.addText(plan.price, { x: 0.75 + i * 3.15, y: 2.3, w: 2.7, h: 0.5, fontSize: 20, bold: true, color: AMBER });
+    slide.addText(plan.fleetSize, { x: 0.75 + i * 3.15, y: 2.85, w: 2.7, h: 0.3, fontSize: 11, bold: true, color: NAVY });
+    slide.addText(plan.detail, { x: 0.75 + i * 3.15, y: 3.2, w: 2.7, h: 1.1, fontSize: 10, color: SLATE });
   });
-  slide.addText('Next step: Schedule a 30-minute live demo at fleetcomanagement.org', {
-    x: 0.6, y: 4.5, w: 9, h: 0.4, fontSize: 13, color: NAVY, bold: true,
+  slide.addText(`Schedule a free demo: ${BRAND.phone}  ·  ${BRAND.website}`, {
+    x: 0.6, y: 4.85, w: 9, h: 0.4, fontSize: 13, color: NAVY, bold: true,
   });
-  addFooter(slide, pptx);
+  addFooter(slide);
 
   // ── Slide 8: Contact ──
   slide = pptx.addSlide();
   slide.background = { color: NAVY };
   slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 0, w: '100%', h: 0.08, fill: { color: AMBER } });
   slide.addText("Let's Move Your Fleet Forward", {
-    x: 0.6, y: 1.5, w: 9, h: 0.9, fontSize: 32, bold: true, color: WHITE, align: 'center',
+    x: 0.6, y: 1.3, w: 9, h: 0.9, fontSize: 32, bold: true, color: WHITE, align: 'center',
   });
   slide.addText('Schedule a demo · Request a custom quote · Tour the live portal', {
-    x: 0.6, y: 2.5, w: 9, h: 0.5, fontSize: 14, color: SLATE, align: 'center',
+    x: 0.6, y: 2.2, w: 9, h: 0.5, fontSize: 14, color: SLATE, align: 'center',
   });
-  slide.addText('fleetcomanagement.org', { x: 0.6, y: 3.5, w: 9, h: 0.5, fontSize: 20, bold: true, color: AMBER, align: 'center' });
-  slide.addText('info@fleetcomanagement.org  ·  (214) 555-0198  ·  Dallas, TX', {
-    x: 0.6, y: 4.1, w: 9, h: 0.4, fontSize: 14, color: WHITE, align: 'center',
+  slide.addText(BRAND.website, { x: 0.6, y: 3.0, w: 9, h: 0.5, fontSize: 22, bold: true, color: AMBER, align: 'center' });
+  slide.addText(`${BRAND.email}  ·  ${BRAND.phone}  ·  ${BRAND.location}`, {
+    x: 0.6, y: 3.6, w: 9, h: 0.4, fontSize: 14, color: WHITE, align: 'center',
   });
-  slide.addText('JaRell & Desiree Slack, Owners — Fleetco Management LLC', {
-    x: 0.6, y: 5.2, w: 9, h: 0.35, fontSize: 11, color: SLATE, align: 'center',
+  slide.addText(BRAND.owner1.name, {
+    x: 0.6, y: 4.5, w: 9, h: 0.35, fontSize: 12, color: WHITE, align: 'center', bold: true,
+  });
+  slide.addText(BRAND.owner1.title, {
+    x: 0.6, y: 4.85, w: 9, h: 0.3, fontSize: 10, color: SLATE, align: 'center',
+  });
+  slide.addText(BRAND.owner2.name, {
+    x: 0.6, y: 5.25, w: 9, h: 0.35, fontSize: 12, color: WHITE, align: 'center', bold: true,
+  });
+  slide.addText(BRAND.owner2.title, {
+    x: 0.6, y: 5.6, w: 9, h: 0.3, fontSize: 10, color: SLATE, align: 'center',
+  });
+  slide.addText(BRAND.company, {
+    x: 0.6, y: 6.1, w: 9, h: 0.3, fontSize: 10, color: SLATE, align: 'center',
   });
 
   await pptx.writeFile({ fileName: outFile });

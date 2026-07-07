@@ -24,7 +24,7 @@ export const DEFAULT_SITE_SETTINGS = {
     'FleetCo Management LLC helps owner operators and small fleet owners cut costs, find parts, optimize fuel, and stay compliant — so you can focus on moving freight, not managing breakdowns.',
   tagline: 'Move freight. We handle the rest.',
   contact_email: 'info@fleetcomanagement.org',
-  contact_phone: '(214) 555-0198',
+  contact_phone: '(360) 952-1249',
   company_location: 'Dallas, TX',
 };
 

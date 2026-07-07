@@ -5,7 +5,8 @@ export const SITE = {
   domain: 'https://fleetcomanagement.org',
   url: import.meta.env.VITE_SITE_URL || 'https://fleetcomanagement.org',
   email: 'info@fleetcomanagement.org',
-  phone: '(214) 555-0198',
+  supportEmail: 'support@fleetcomanagement.org',
+  phone: '(360) 952-1249',
   location: 'Dallas, TX',
   description:
     'Fleet management for owner-operators and small fleets — parts sourcing, fuel optimization, DOT compliance, and fleet operations in one portal.',
