@@ -6,7 +6,7 @@ import {
   BarChart2, ClipboardList, Building2, Users, ClipboardCheck, Wrench, UserCheck,
   Archive, Calendar, Cpu, Store, Bot, Crown, MessageCircle, Navigation, TrendingUp,
   Map, Route, DollarSign, Globe, Clock, ShieldCheck, AlertTriangle, Award, Lightbulb,
-  MapPin, Megaphone, Zap,
+  MapPin, Megaphone, Zap, Mail,
   ChevronDown, KeyRound
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -102,6 +102,7 @@ const NAV_GROUPS = [
     icon: Building2,
     items: [
       { label: 'Customers & Team', icon: Building2, path: '/portal/customers' },
+      { label: 'Company Emails', icon: Mail, path: '/portal/domain-emails', ownerOnly: true },
       { label: 'Messages', icon: MessageCircle, path: '/portal/messages' },
       { label: 'Site Commander AI', icon: Bot, path: '/portal/assistant' },
       { label: 'Revan', icon: Zap, path: '/portal/revan' },
@@ -193,6 +194,7 @@ export default function AppLayout() {
 
             // Filter items based on user role
             const visibleItems = group.items.filter(item => {
+              if (item.ownerOnly && user?.role !== 'owner') return false;
               if (isFleetCoAdmin(user?.role)) return true;
               if (user?.role === 'fleet_coordinator') {
                 if (item.path === '/portal/executive') return false;

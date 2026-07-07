@@ -18,6 +18,11 @@ import {
   isFleetCoInternal,
   subscriptionAmount,
   SUBSCRIPTION_PLANS,
+  FLEETCO_EMAIL_DOMAIN,
+  canManageDomainEmails,
+  normalizeFleetCoEmail,
+  isFleetCoDomainEmail,
+  requireFleetCoEmail,
 } from './roles.js';
 
 const SIM_ROUTES = [
@@ -58,6 +63,8 @@ export async function invokeFunction(name, body, user) {
       return createUserAccount(body, user);
     case 'provisionCustomer':
       return provisionCustomer(body, user);
+    case 'createDomainEmail':
+      return createDomainEmail(body, user);
     case 'simulateDrivers':
       return simulateDrivers(body);
     case 'predictFuelPrices':
@@ -165,7 +172,7 @@ function upgradeUserRole(body, user) {
 
 function createUserAccount(body, user) {
   if (!user) throw new Error('Unauthorized');
-  const { email, tempPassword, role, customerId, employeeNumber } = body;
+  const { email, tempPassword, role, customerId, employeeNumber, fullName } = body;
   if (!email || !tempPassword || !role) {
     throw new Error('Email, tempPassword, and role are required');
   }
@@ -173,11 +180,14 @@ function createUserAccount(body, user) {
   const internalRoles = ['executive', 'fleet_manager', 'fleet_coordinator'];
   const customerRoles = ['user', 'driver'];
 
+  let normalizedEmail = email.trim().toLowerCase();
+
   if (internalRoles.includes(role)) {
     if (!canCreateFleetCoEmployees(user.role)) {
       throw new Error('Only the owner (JaRell Slack) can create FleetCo employee accounts');
     }
     if (customerId) throw new Error('FleetCo employees are not linked to a customer account');
+    normalizedEmail = requireFleetCoEmail(normalizedEmail);
   } else if (customerRoles.includes(role)) {
     if (canManageCustomerTeam(user.role)) {
       if (!user.customer_id) throw new Error('Your account is not linked to a customer organization');
@@ -199,15 +209,16 @@ function createUserAccount(body, user) {
     ? null
     : (customerId || user.customer_id || null);
 
-  let existing = getUserRowByEmail(email);
+  let existing = getUserRowByEmail(normalizedEmail);
   if (!existing) {
     const hash = bcrypt.hashSync(tempPassword, 10);
     createUser({
-      email,
+      email: normalizedEmail,
       passwordHash: hash,
       role,
       customerId: effectiveCustomerId,
       employeeNumber,
+      fullName,
     });
   } else {
     updateUser(existing.id, {
@@ -215,11 +226,12 @@ function createUserAccount(body, user) {
       customer_id: effectiveCustomerId,
       employee_number: employeeNumber,
       password_hash: bcrypt.hashSync(tempPassword, 10),
+      ...(fullName ? { full_name: fullName } : {}),
     });
   }
 
   createEntity('PendingAccount', {
-    email,
+    email: normalizedEmail,
     temp_password: tempPassword,
     role,
     customer_id: effectiveCustomerId,
@@ -228,11 +240,91 @@ function createUserAccount(body, user) {
     employee_number: employeeNumber || '',
   });
 
-  console.log(`[account created] ${email} role=${role}`);
+  console.log(`[account created] ${normalizedEmail} role=${role}`);
   return {
     success: true,
+    email: normalizedEmail,
+    message: `${normalizedEmail} account created. They can sign in with the temporary password.`,
+  };
+}
+
+function createDomainEmail(body, user) {
+  if (!user || !canManageDomainEmails(user.role)) {
+    throw new Error('Only the owner can create @fleetcomanagement.org company emails');
+  }
+
+  const {
+    localPart,
+    email: rawEmail,
+    displayName,
+    mailboxType = 'employee',
+    createPortalAccess = true,
+    portalRole = 'fleet_coordinator',
+    tempPassword,
+    employeeNumber,
+    notes,
+  } = body;
+
+  const email = normalizeFleetCoEmail(rawEmail || localPart);
+  if (!email) {
+    throw new Error('Enter a valid email name (e.g. jane.doe)');
+  }
+
+  const existingUser = getUserRowByEmail(email);
+  const existingMailbox = filterEntities('DomainEmail', { email }, null, 1)[0];
+  if (existingMailbox) {
+    throw new Error(`${email} already exists in the company email directory`);
+  }
+
+  const local_part = email.split('@')[0];
+  const ts = nowIso();
+  let linkedUserId = existingUser?.id || null;
+  let portalMessage = '';
+
+  if (createPortalAccess) {
+    if (!tempPassword) throw new Error('Temp password is required when creating portal access');
+    const internalRoles = ['executive', 'fleet_manager', 'fleet_coordinator'];
+    if (!internalRoles.includes(portalRole)) {
+      throw new Error('Portal role must be executive, fleet_manager, or fleet_coordinator');
+    }
+    const account = createUserAccount(
+      {
+        email,
+        tempPassword,
+        role: portalRole,
+        employeeNumber,
+        fullName: displayName || local_part.replace(/[._]/g, ' '),
+      },
+      user
+    );
+    linkedUserId = findUserByEmail(email)?.id || linkedUserId;
+    portalMessage = ` Portal login created (${portalRole}).`;
+  } else if (existingUser) {
+    linkedUserId = existingUser.id;
+  }
+
+  const mailbox = createEntity('DomainEmail', {
     email,
-    message: `${email} account created. They can sign in with the temporary password.`,
+    local_part,
+    display_name: displayName || local_part.replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    mailbox_type: mailboxType,
+    status: 'active',
+    linked_user_id: linkedUserId,
+    portal_role: createPortalAccess ? portalRole : '',
+    has_portal_access: !!createPortalAccess,
+    created_by: user.email,
+    notes: notes || '',
+    provisioned_at: ts,
+  });
+
+  console.log(`[domain email] ${email} created by ${user.email}`);
+  console.log(`[email] Welcome ${email} — mailbox registered. Set up IONOS mailbox to receive mail at this address.`);
+
+  return {
+    success: true,
+    mailbox,
+    email,
+    message: `Company email ${email} created.${portalMessage} Configure the mailbox in IONOS Email & Office to receive mail.`,
   };
 }
 

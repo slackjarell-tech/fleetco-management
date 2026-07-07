@@ -66,6 +66,7 @@ import CompetitiveAnalysis from './pages/CompetitiveAnalysis';
 import Revan from './pages/Revan';
 import EldPortal from './pages/EldPortal';
 import RouteDashboard from './pages/RouteDashboard';
+import DomainEmails from './pages/DomainEmails';
 import About from './pages/About';
 import Contact from './pages/Contact';
 
@@ -138,6 +139,7 @@ const AuthenticatedApp = () => {
           <Route path="competitive-analysis" element={<CompetitiveAnalysis />} />
           <Route path="revan" element={<Revan />} />
           <Route path="eld" element={<EldPortal />} />
+          <Route path="domain-emails" element={<DomainEmails />} />
         </Route>
       </Route>
       <Route path="/fleet-owners" element={<FleetOwnerLanding />} />

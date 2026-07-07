@@ -1,7 +1,10 @@
 import bcrypt from 'bcryptjs';
 import {
   createUser,
+  createEntity,
+  filterEntities,
   findUserByEmail,
+  nowIso,
 } from './db.js';
 import { seedDemoData } from './seedDemo.js';
 
@@ -19,6 +22,24 @@ export function seedDatabase() {
       role: 'owner',
     });
     console.log(`Seeded owner: ${OWNER_EMAIL} / FleetCo2026!`);
+  }
+
+  const ownerUser = findUserByEmail(OWNER_EMAIL);
+  const ownerMailbox = filterEntities('DomainEmail', { email: OWNER_EMAIL }, null, 1)[0];
+  if (!ownerMailbox && ownerUser) {
+    createEntity('DomainEmail', {
+      email: OWNER_EMAIL,
+      local_part: 'jarrell',
+      display_name: 'JaRell D. Slack',
+      mailbox_type: 'employee',
+      status: 'active',
+      linked_user_id: ownerUser.id,
+      portal_role: 'owner',
+      has_portal_access: true,
+      created_by: OWNER_EMAIL,
+      notes: 'Owner account',
+      provisioned_at: nowIso(),
+    });
   }
 
   const admin = findUserByEmail('admin@fleetco.com');

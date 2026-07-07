@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/api/apiClient';
-import { Plus, Search, Building2, Phone, Mail, Edit, Trash2, UserCheck, Users, UserPlus, Shield, User, KeyRound, Crown, ToggleLeft, ToggleRight, Truck, Wrench, ClipboardList, MessageCircle } from 'lucide-react';
+import { Plus, Search, Building2, Phone, Mail, Edit, Trash2, UserCheck, Users, UserPlus, Shield, User, KeyRound, Crown, ToggleLeft, ToggleRight, Truck, Wrench, ClipboardList, MessageCircle, AtSign } from 'lucide-react';
 import CustomerModal from '@/components/admin/CustomerModal';
 import CustomerMessagePanel from '@/components/admin/CustomerMessagePanel';
+import { FLEETCO_EMAIL_DOMAIN, normalizeFleetCoEmail } from '@/lib/domain';
 
 const STATUS_COLORS = {
   active: 'bg-green-100 text-green-700',
@@ -329,6 +330,7 @@ function TeamTab({ user, isOwner, isCustomerAdmin, canManageTeam, availableRoles
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteLocalPart, setInviteLocalPart] = useState('');
   const [tempPassword, setTempPassword] = useState('');
   const [inviteRole, setInviteRole] = useState(availableRoles[0] || 'user');
   const [inviteEmployeeNumber, setInviteEmployeeNumber] = useState('');
@@ -356,12 +358,15 @@ function TeamTab({ user, isOwner, isCustomerAdmin, canManageTeam, availableRoles
     setInviteSuccess('');
     setInviteError('');
     try {
-      const payload = { email: inviteEmail, tempPassword, role: inviteRole };
+      const email = isOwner ? normalizeFleetCoEmail(inviteLocalPart) : inviteEmail;
+      if (!email) throw new Error(`Enter a valid @${FLEETCO_EMAIL_DOMAIN} address`);
+      const payload = { email, tempPassword, role: inviteRole };
       if (user?.customer_id) payload.customerId = user.customer_id;
       if (inviteEmployeeNumber) payload.employeeNumber = inviteEmployeeNumber;
       const result = await api.functions.invoke('createUserAccount', payload);
-      setInviteSuccess(result.message || `${inviteEmail} invited as ${inviteRole}.`);
+      setInviteSuccess(result.message || `${email} invited as ${inviteRole}.`);
       setInviteEmail('');
+      setInviteLocalPart('');
       setTempPassword('');
       setInviteEmployeeNumber('');
       loadTeam();
@@ -437,16 +442,33 @@ function TeamTab({ user, isOwner, isCustomerAdmin, canManageTeam, availableRoles
         </h2>
         <p className="text-slate-400 text-sm mb-4">
           {isOwner
-            ? 'Only you (owner) can create FleetCo employee accounts. Enter email and a temp password.'
+            ? `Create FleetCo employees with @${FLEETCO_EMAIL_DOMAIN} addresses and portal access.`
             : 'Add drivers and team members to your organization. They can sign in with the temp password you set.'}
         </p>
         <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3 flex-wrap">
+          {isOwner ? (
+            <div className="relative flex-1 min-w-[240px] flex rounded-lg overflow-hidden bg-white">
+              <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+              <input
+                type="text"
+                required
+                value={inviteLocalPart}
+                onChange={e => setInviteLocalPart(e.target.value.replace(/@.*/, ''))}
+                placeholder="firstname.lastname"
+                className="flex-1 pl-9 pr-3 py-2.5 text-sm border-0 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900"
+              />
+              <span className="flex items-center px-3 bg-slate-100 text-slate-600 text-xs font-bold border-l border-slate-200">
+                @{FLEETCO_EMAIL_DOMAIN}
+              </span>
+            </div>
+          ) : (
           <div className="relative flex-1 min-w-[200px]">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input type="email" required value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
               placeholder="colleague@email.com"
               className="w-full pl-9 pr-4 py-2.5 rounded-lg text-sm border-0 focus:outline-none focus:ring-2 focus:ring-amber-400" />
           </div>
+          )}
           <div className="relative flex-1 min-w-[140px]">
             <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input type="text" required value={tempPassword} onChange={e => setTempPassword(e.target.value)}
