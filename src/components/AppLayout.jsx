@@ -6,7 +6,7 @@ import {
   BarChart2, ClipboardList, Building2, Users, ClipboardCheck, Wrench, UserCheck,
   Archive, Calendar, Cpu, Store, Bot, Crown, MessageCircle, Navigation, TrendingUp,
   Map, Route, DollarSign, Globe, Clock, ShieldCheck, AlertTriangle, Award, Lightbulb,
-  MapPin, Megaphone, Zap, Mail, ScanLine,
+  MapPin, Megaphone, Zap, Mail, ScanLine, Video,
   ChevronDown, KeyRound
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -97,6 +97,7 @@ const NAV_GROUPS = [
       { label: 'Fuel Stations', icon: MapPin, path: '/portal/fuel-stations' },
       { label: 'Fuel Audits', icon: Fuel, path: '/portal/fuel' },
       { label: 'Driver Scans', icon: ScanLine, path: '/portal/driver-scans' },
+      { label: 'Driver Media', icon: Video, path: '/portal/driver-media' },
       { label: 'Reports', icon: BarChart2, path: '/portal/reports' },
     ]
   },

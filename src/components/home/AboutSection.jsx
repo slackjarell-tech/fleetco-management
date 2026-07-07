@@ -39,9 +39,9 @@ export default function AboutSection() {
               Your Fleet's Trusted Partner
             </h2>
             <p className="text-slate-600 leading-relaxed mb-4">
-              FleetCo Management LLC was founded by JaRell D. Slack and co-owner Desiree M. Clark to serve 
-              owner operators and small fleet owners who can't afford the downtime or the rising cost of doing 
-              it alone. We handle the logistics so you can handle the road.
+              FleetCo Management LLC was founded in Dallas, Texas to serve owner operators and small fleet
+              owners who can't afford the downtime or the rising cost of doing it alone. We handle the logistics
+              so you can handle the road.
             </p>
             <p className="text-slate-600 leading-relaxed mb-6">
               Our mission is simple: <strong>quality, low-cost service to keep your fleet running.</strong> 

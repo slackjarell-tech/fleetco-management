@@ -10,9 +10,7 @@ export const BRAND = {
   url: 'https://fleetcomanagement.org',
   location: 'Dallas, TX',
   tagline: 'Move freight. We handle the rest.',
-  ownersLine: 'JaRell D. Slack & Desiree M. Clark, Owners',
-  owner1: { name: 'JaRell D. Slack', title: 'Owner, Director of Fleet Management' },
-  owner2: { name: 'Desiree M. Clark', title: 'Co-Owner, Director of Operations' },
+  ownersLine: 'FleetCo Management LLC',
   pricing: [
     { name: 'Starter', price: '$299/mo', fleetSize: '1–5 vehicles', detail: 'Fleet manager · parts sourcing · fuel optimization · monthly reports' },
     { name: 'Growth', price: '$599/mo', fleetSize: '6–15 vehicles', detail: 'Everything in Starter · PM scheduling · priority support · budget reviews', highlighted: true },
@@ -21,3 +19,10 @@ export const BRAND = {
 };
 
 export const CLIENT_DECK_DOWNLOAD = '/marketing/FleetCo-Client-Presentation.pptx';
+export const CLIENT_VIDEO_URL = '/marketing/FleetCo-Client-Presentation.mp4';
+
+export const LEGAL = {
+  company: 'FleetCo Management LLC',
+  foundedYear: 2022,
+  patentNotice: 'Patent Pending. FleetCo platform and related fleet management systems are proprietary.',
+};

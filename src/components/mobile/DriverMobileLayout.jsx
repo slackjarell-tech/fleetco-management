@@ -4,7 +4,7 @@ import { api } from '@/api/apiClient';
 import {
   LayoutDashboard, Clock, Route, ScanLine, Menu, LogOut, Package,
   MessageCircle, Navigation, ClipboardCheck, Fuel, AlertTriangle, MapPin,
-  X, ChevronRight,
+  X, ChevronRight, Video,
 } from 'lucide-react';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
 import CustomerPausedOverlay from '@/components/billing/CustomerPausedOverlay';
@@ -13,6 +13,7 @@ import { isNativeApp } from '@/lib/platform';
 const TABS = [
   { path: '/driver', label: 'Home', icon: LayoutDashboard, end: true },
   { path: '/driver/clock', label: 'Clock', icon: Clock },
+  { path: '/driver/dashcam', label: 'Dashcam', icon: Video },
   { path: '/driver/route', label: 'Route', icon: Route },
   { path: '/driver/scan', label: 'Scan', icon: ScanLine },
 ];

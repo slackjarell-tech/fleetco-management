@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Truck, Mail, MapPin, Facebook, Linkedin, Youtube } from 'lucide-react';
+import SiteLegalNotice from '@/components/home/SiteLegalNotice';
 
 export default function FooterSection() {
   return (
@@ -66,18 +67,12 @@ export default function FooterSection() {
                 </a>
               </div>
             </div>
-
-            <div className="mt-6">
-              <div className="text-slate-500 text-xs mb-1 font-semibold uppercase tracking-wider">Principal Members</div>
-              <div className="text-slate-300 text-sm">JaRell D. Slack — Owner, Director of Fleet Management</div>
-              <div className="text-slate-300 text-sm">Desiree M. Clark — Co-Owner, Director of Operations</div>
-            </div>
           </div>
         </div>
 
-        <div className="border-t border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-slate-500 text-sm">© 2024 FleetCo Management LLC. All rights reserved.</p>
-          <p className="text-slate-600 text-xs">Dallas, TX | Founded 2022 | Licensed LLC</p>
+        <div className="border-t border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <SiteLegalNotice className="text-slate-500 text-sm text-center sm:text-left" />
+          <p className="text-slate-600 text-xs text-center sm:text-right">Dallas, TX | Founded 2022 | Licensed LLC</p>
         </div>
       </div>
     </footer>

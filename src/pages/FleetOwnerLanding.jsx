@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CheckCircle, ArrowRight, Phone, Mail, Truck, Shield, Fuel, Wrench, Star, DollarSign, Clock, FileText } from 'lucide-react';
 import { api } from '@/api/apiClient';
+import SiteLegalNotice from '@/components/home/SiteLegalNotice';
 
 const painPoints = [
   { icon: DollarSign, text: 'Overpaying for fuel and parts with no leverage?' },
@@ -310,8 +311,9 @@ export default function FleetOwnerLanding() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 text-center py-6 text-sm">
-        © 2024 FleetCo Management LLC — Dallas, TX | Licensed & Insured
+      <footer className="bg-slate-900 text-slate-400 text-center py-6 px-4 text-sm space-y-2">
+        <SiteLegalNotice className="text-slate-400 text-sm" />
+        <p className="text-slate-600 text-xs">Dallas, TX | Licensed &amp; Insured</p>
       </footer>
     </div>
   );

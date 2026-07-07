@@ -5,6 +5,7 @@ import InquiryForm from '@/components/home/InquiryForm';
 import FooterSection from '@/components/home/FooterSection';
 import NavBar from '@/components/home/NavBar';
 import AboutSection from '@/components/home/AboutSection';
+import VideoPresentationSection from '@/components/home/VideoPresentationSection';
 import TestimonialsSection from '@/components/home/TestimonialsSection';
 
 export default function Home() {
@@ -35,6 +36,7 @@ export default function Home() {
         </div>
       )}
       <HeroSection />
+      <VideoPresentationSection />
       <ServicesSection />
       <AboutSection />
       <TestimonialsSection />

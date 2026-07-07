@@ -70,7 +70,11 @@ import DomainEmails from './pages/DomainEmails';
 import DriverMobileLayout from './components/mobile/DriverMobileLayout';
 import DriverMobileHome from './pages/driver/DriverMobileHome';
 import DriverScan from './pages/driver/DriverScan';
+import DriverDashcam from './pages/driver/DriverDashcam';
 import DriverScans from './pages/DriverScans';
+import DriverMedia from './pages/DriverMedia';
+import About from './pages/About';
+import Contact from './pages/Contact';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings } = useAuth();
@@ -99,6 +103,7 @@ const AuthenticatedApp = () => {
           <Route path="clock" element={<TimeClock />} />
           <Route path="route" element={<MyDeliveryRoute />} />
           <Route path="scan" element={<DriverScan />} />
+          <Route path="dashcam" element={<DriverDashcam />} />
           <Route path="loads" element={<LoadBoard />} />
           <Route path="navigation" element={<Navigation />} />
           <Route path="messages" element={<Messages />} />
@@ -161,6 +166,7 @@ const AuthenticatedApp = () => {
           <Route path="eld" element={<EldPortal />} />
           <Route path="domain-emails" element={<DomainEmails />} />
           <Route path="driver-scans" element={<DriverScans />} />
+          <Route path="driver-media" element={<DriverMedia />} />
         </Route>
       </Route>
       <Route path="/fleet-owners" element={<FleetOwnerLanding />} />

@@ -157,11 +157,11 @@ export default function Deck02_ClientPresentation() {
           <span className="flex items-center gap-2"><Globe className="w-4 h-4 text-amber-400" /> {BRAND.email}</span>
           <span className="flex items-center gap-2"><Phone className="w-4 h-4 text-amber-400" /> {BRAND.phone}</span>
         </div>
-        <div className="mt-8 space-y-3 text-sm">
-          <div><span className="font-bold">{BRAND.owner1.name}</span><span className="block text-slate-500 text-xs">{BRAND.owner1.title}</span></div>
-          <div><span className="font-bold">{BRAND.owner2.name}</span><span className="block text-slate-500 text-xs">{BRAND.owner2.title}</span></div>
+        <div className="mt-8 text-sm">
+          <p className="font-bold">{BRAND.company}</p>
+          <p className="text-slate-500 text-xs mt-1">{BRAND.location}</p>
         </div>
-        <p className="text-slate-500 text-xs mt-6">{BRAND.company}</p>
+        <p className="text-slate-500 text-xs mt-6">{BRAND.ownersLine}</p>
       </div>
     </div>
   );

@@ -33,7 +33,7 @@ export default function About() {
       <section className="py-16 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="prose prose-lg prose-slate max-w-none space-y-6 text-slate-700 leading-relaxed">
           <p>
-            FleetCo Management LLC is a Dallas, Texas-based fleet management services company founded in 2022 by JaRell D. Slack and Desiree M. Clark. We are dedicated to providing quality, low-cost fleet management solutions to owner-operators and small fleet owners across the United States. Our mission is to level the playing field by giving independent carriers access to the same tools, data, and operational support that large enterprise fleets enjoy — without the enterprise price tag.
+            FleetCo Management LLC is a Dallas, Texas-based fleet management services company founded in 2022. We are dedicated to providing quality, low-cost fleet management solutions to owner-operators and small fleet owners across the United States. Our mission is to level the playing field by giving independent carriers access to the same tools, data, and operational support that large enterprise fleets enjoy — without the enterprise price tag.
           </p>
           
           <p>

@@ -154,17 +154,11 @@ export default function Contact() {
               </div>
 
               <div className="mt-8 p-6 bg-slate-50 border border-slate-200 rounded-xl">
-                <h3 className="font-bold text-slate-900 mb-3">Our Leadership</h3>
-                <div className="space-y-2">
-                  <div className="text-slate-700">
-                    <span className="font-semibold">JaRell D. Slack</span>
-                    <span className="text-slate-500 block text-sm">Owner, Director of Fleet Management</span>
-                  </div>
-                  <div className="text-slate-700">
-                    <span className="font-semibold">Desiree M. Clark</span>
-                    <span className="text-slate-500 block text-sm">Co-Owner, Director of Operations</span>
-                  </div>
-                </div>
+                <h3 className="font-bold text-slate-900 mb-3">FleetCo Management LLC</h3>
+                <p className="text-slate-600 text-sm">
+                  Dallas, TX — serving owner-operators and small fleets nationwide. Reach us by phone or email
+                  for demos, onboarding, and support.
+                </p>
               </div>
             </div>
           </div>

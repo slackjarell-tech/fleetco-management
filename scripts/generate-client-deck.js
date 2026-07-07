@@ -221,19 +221,13 @@ async function main() {
   slide.addText(`${BRAND.email}  ·  ${BRAND.phone}  ·  ${BRAND.location}`, {
     x: 0.6, y: 3.6, w: 9, h: 0.4, fontSize: 14, color: WHITE, align: 'center',
   });
-  slide.addText(BRAND.owner1.name, {
+  slide.addText(BRAND.company, {
     x: 0.6, y: 4.5, w: 9, h: 0.35, fontSize: 12, color: WHITE, align: 'center', bold: true,
   });
-  slide.addText(BRAND.owner1.title, {
-    x: 0.6, y: 4.85, w: 9, h: 0.3, fontSize: 10, color: SLATE, align: 'center',
+  slide.addText(BRAND.location, {
+    x: 0.6, y: 4.9, w: 9, h: 0.3, fontSize: 10, color: SLATE, align: 'center',
   });
-  slide.addText(BRAND.owner2.name, {
-    x: 0.6, y: 5.25, w: 9, h: 0.35, fontSize: 12, color: WHITE, align: 'center', bold: true,
-  });
-  slide.addText(BRAND.owner2.title, {
-    x: 0.6, y: 5.6, w: 9, h: 0.3, fontSize: 10, color: SLATE, align: 'center',
-  });
-  slide.addText(BRAND.company, {
+  slide.addText(BRAND.ownersLine, {
     x: 0.6, y: 6.1, w: 9, h: 0.3, fontSize: 10, color: SLATE, align: 'center',
   });
 

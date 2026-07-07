@@ -82,6 +82,12 @@ export async function invokeFunction(name, body, user) {
       return recordCustomerPayment(body, user);
     case 'setCustomerPause':
       return setCustomerPause(body, user);
+    case 'startDashcamSession':
+      return startDashcamSession(body, user);
+    case 'captureDashcamFrame':
+      return captureDashcamFrame(body, user);
+    case 'stopDashcamSession':
+      return stopDashcamSession(body, user);
     case 'createDomainEmail':
       return createDomainEmail(body, user);
     case 'simulateDrivers':
@@ -93,12 +99,24 @@ export async function invokeFunction(name, body, user) {
     case 'sendNotification':
       console.log('[notification]', body);
       return { success: true };
-    case 'sendSystemEmail':
-      console.log('[email]', body);
-      return { success: true };
-    case 'sendMaterials':
-      console.log('[materials]', body);
-      return { success: true };
+    case 'sendSystemEmail': {
+      const { sendEmail } = await import('./email.js');
+      const { to, subject, html, text } = body;
+      if (!to || !subject) throw new Error('to and subject are required');
+      return sendEmail({ to, subject, html, text });
+    }
+    case 'sendMaterials': {
+      const { sendEmail, fileAttachment } = await import('./email.js');
+      const { to, subject, html, attachmentPaths = [] } = body;
+      if (!to) throw new Error('to is required');
+      const attachments = attachmentPaths.map((p) => fileAttachment(p));
+      return sendEmail({
+        to,
+        subject: subject || 'FleetCo Marketing Materials',
+        html: html || '<p>Your FleetCo materials are attached.</p>',
+        attachments,
+      });
+    }
     case 'notifyDvirReview':
       console.log('[dvir review]', body);
       return { success: true };
@@ -766,6 +784,115 @@ function setCustomerPause(body, user) {
     message: shouldPause
       ? `${customer.company_name} portal paused until payment is received.`
       : `${customer.company_name} portal access restored.`,
+  };
+}
+
+const DASHCAM_MODES = ['view_ahead', 'cabin', 'broll'];
+const DASHCAM_INTERVALS = [3, 5, 10, 15];
+
+function assertDriver(user) {
+  if (!user) throw new Error('Unauthorized');
+  if (user.role !== 'driver') throw new Error('Dashcam recording is for driver accounts only');
+}
+
+function startDashcamSession(body, user) {
+  assertDriver(user);
+
+  const { mode = 'view_ahead', intervalSec = 5, mountNotes = '', vehicleId = '' } = body;
+  if (!DASHCAM_MODES.includes(mode)) {
+    throw new Error('mode must be view_ahead, cabin, or broll');
+  }
+  const interval = Number(intervalSec);
+  if (!DASHCAM_INTERVALS.includes(interval) && mode === 'view_ahead') {
+    throw new Error('intervalSec must be 3, 5, 10, or 15 for time-lapse');
+  }
+
+  const active = filterEntities('DashcamSession', { driver_id: user.id, status: 'recording' }, null, 1)[0];
+  if (active) {
+    throw new Error('Stop the current recording session before starting a new one');
+  }
+
+  const ts = nowIso();
+  const session = createEntity('DashcamSession', {
+    driver_id: user.id,
+    driver_name: user.full_name || user.email,
+    customer_id: user.customer_id || '',
+    mode,
+    interval_sec: mode === 'view_ahead' ? interval : 0,
+    mount_notes: mountNotes,
+    vehicle_id: vehicleId,
+    status: 'recording',
+    frame_count: 0,
+    started_at: ts,
+    ended_at: '',
+    safety_acknowledged: true,
+  });
+
+  return {
+    success: true,
+    session,
+    message: mode === 'view_ahead'
+      ? `View-ahead time-lapse started — 1 frame every ${interval}s (photos only, saves memory).`
+      : `${mode.replace('_', ' ')} capture session started.`,
+  };
+}
+
+function captureDashcamFrame(body, user) {
+  assertDriver(user);
+
+  const { sessionId, imageUrl, lat, lng, heading, speed } = body;
+  if (!sessionId || !imageUrl) throw new Error('sessionId and imageUrl are required');
+
+  const session = getEntity('DashcamSession', sessionId);
+  if (!session) throw new Error('Session not found');
+  if (session.driver_id !== user.id) throw new Error('Not your recording session');
+  if (session.status !== 'recording') throw new Error('Session is not actively recording');
+
+  const frameIndex = (session.frame_count || 0) + 1;
+  const frame = createEntity('DashcamFrame', {
+    session_id: sessionId,
+    driver_id: user.id,
+    customer_id: user.customer_id || '',
+    frame_index: frameIndex,
+    image_url: imageUrl,
+    lat: lat ?? null,
+    lng: lng ?? null,
+    heading: heading ?? 0,
+    speed: speed ?? 0,
+    captured_at: nowIso(),
+    mode: session.mode,
+  });
+
+  updateEntity('DashcamSession', sessionId, { frame_count: frameIndex });
+
+  return { success: true, frame, frameIndex };
+}
+
+function stopDashcamSession(body, user) {
+  assertDriver(user);
+
+  const { sessionId } = body;
+  if (!sessionId) throw new Error('sessionId is required');
+
+  const session = getEntity('DashcamSession', sessionId);
+  if (!session) throw new Error('Session not found');
+  if (session.driver_id !== user.id && !['owner', 'executive', 'fleet_manager'].includes(user.role)) {
+    throw new Error('Not authorized to stop this session');
+  }
+
+  const ts = nowIso();
+  const updated = updateEntity('DashcamSession', sessionId, {
+    status: 'completed',
+    ended_at: ts,
+  });
+
+  const durationMs = new Date(ts) - new Date(session.started_at);
+  const durationMin = Math.round(durationMs / 60000);
+
+  return {
+    success: true,
+    session: updated,
+    message: `Recording saved — ${updated.frame_count} frame(s) over ${durationMin} min. Visible to your fleet office.`,
   };
 }
 

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <rect width="1920" height="1080" fill="#0F172A"/>
+  <rect x="0" y="0" width="12" height="1080" fill="#F59E0B"/>
+  <text x="120" y="480" fill="#F59E0B" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700" letter-spacing="4">FLEETCO MANAGEMENT</text>
+  <text x="120" y="560" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="64" font-weight="900">Platform Tour</text>
+  <text x="120" y="630" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="28">Press play to watch</text>
+  <circle cx="960" cy="540" r="72" fill="#F59E0B" opacity="0.9"/>
+  <polygon points="940,500 940,580 1010,540" fill="#0F172A"/>
+</svg>

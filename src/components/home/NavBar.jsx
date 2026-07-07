@@ -44,6 +44,12 @@ export default function NavBar() {
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-6">
             <button
+              onClick={() => scrollTo('platform-tour')}
+              className="text-slate-300 hover:text-amber-400 text-sm font-medium capitalize transition-colors"
+            >
+              Platform Tour
+            </button>
+            <button
               onClick={() => scrollTo('services')}
               className="text-slate-300 hover:text-amber-400 text-sm font-medium capitalize transition-colors"
             >
@@ -82,6 +88,7 @@ export default function NavBar() {
       {/* Mobile menu */}
       {open && (
         <div className="md:hidden bg-slate-900 border-t border-slate-700 px-4 py-4 space-y-3">
+          <button onClick={() => scrollTo('platform-tour')} className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium capitalize py-2">Platform Tour</button>
           <button onClick={() => scrollTo('services')} className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium capitalize py-2">Services</button>
           <Link to="/about" className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium capitalize py-2" onClick={() => setOpen(false)}>About</Link>
           <Link to="/contact" className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium py-2" onClick={() => setOpen(false)}>Contact / Get a Quote</Link>
