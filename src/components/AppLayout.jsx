@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
+import PaymentDueBanner from '@/components/billing/PaymentDueBanner';
+import CustomerPausedOverlay from '@/components/billing/CustomerPausedOverlay';
 
 const isInternalRole = (role) => {
   return ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(role);
@@ -292,7 +294,9 @@ export default function AppLayout() {
             <span className="font-bold text-slate-900 text-sm">Fleetco Portal</span>
           </div>
         </header>
-        <main className="flex-1">
+        <PaymentDueBanner user={user} />
+        <main className="flex-1 relative">
+          <CustomerPausedOverlay user={user} billing={user?.billing} />
           <Outlet />
         </main>
       </div>

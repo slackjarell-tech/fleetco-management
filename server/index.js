@@ -29,6 +29,7 @@ import {
 import { seedDatabase } from './seed.js';
 import { invokeFunction } from './functions.js';
 import { runAgent, simpleLLM } from './aiAgent.js';
+import { getBillingSnapshot } from './billing.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || 'fleet-pulse-dev-secret-change-in-production';
@@ -122,7 +123,16 @@ app.post('/api/auth/resend-otp', (req, res) => {
 });
 
 app.get('/api/auth/me', requireAuth, (req, res) => {
-  res.json(req.user);
+  const user = { ...req.user };
+  if (user.customer_id) {
+    const customer = getEntity('Customer', user.customer_id);
+    if (customer) {
+      user.billing = getBillingSnapshot(customer);
+      user.system_paused = !!customer.system_paused;
+      user.customer_name = customer.company_name;
+    }
+  }
+  res.json(user);
 });
 
 app.patch('/api/auth/me', requireAuth, (req, res) => {
@@ -247,7 +257,7 @@ const ENTITY_NAMES = [
   'DeliveryStop', 'HOSLog', 'FuelStation', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
-  'DomainEmail', 'Subscription', 'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User',
+  'DomainEmail', 'PaymentReminder', 'Subscription', 'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User',
 ];
 
 function handleUserEntity(req, res, action) {

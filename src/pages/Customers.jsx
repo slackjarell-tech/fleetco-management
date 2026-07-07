@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/api/apiClient';
-import { Plus, Search, Building2, Phone, Mail, Edit, Trash2, UserCheck, Users, UserPlus, Shield, User, KeyRound, Crown, ToggleLeft, ToggleRight, Truck, Wrench, ClipboardList, MessageCircle, AtSign, Send, Check } from 'lucide-react';
+import { Plus, Search, Building2, Phone, Mail, Edit, Trash2, UserCheck, Users, UserPlus, Shield, User, KeyRound, Crown, ToggleLeft, ToggleRight, Truck, Wrench, ClipboardList, MessageCircle, AtSign, Send, Check, Clock, PauseCircle, PlayCircle, DollarSign } from 'lucide-react';
 import CustomerModal from '@/components/admin/CustomerModal';
 import CustomerMessagePanel from '@/components/admin/CustomerMessagePanel';
 import { FLEETCO_EMAIL_DOMAIN, normalizeFleetCoEmail } from '@/lib/domain';
+import { getBillingSnapshot, formatCountdown, formatDueDate, billingStatusColor } from '@/lib/billing';
 
 const STATUS_COLORS = {
   active: 'bg-green-100 text-green-700',
@@ -55,6 +56,7 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
   const [messageCustomer, setMessageCustomer] = useState(null);
   const [sendingLoginId, setSendingLoginId] = useState(null);
   const [copiedLoginId, setCopiedLoginId] = useState(null);
+  const [billingActionId, setBillingActionId] = useState(null);
 
   const loadCustomers = async () => {
     const allCustomers = await api.entities.Customer.list('-created_date');
@@ -150,6 +152,37 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
 
   const isFilteredRole = user?.role === 'fleet_manager' || user?.role === 'fleet_coordinator';
 
+  const handleRecordPayment = async (customer) => {
+    if (!confirm(`Record payment received for ${customer.company_name}?`)) return;
+    setBillingActionId(customer.id);
+    setMessage('');
+    try {
+      const result = await api.functions.invoke('recordCustomerPayment', { customerId: customer.id });
+      setMessage(result.message || 'Payment recorded.');
+      loadCustomers();
+    } catch (err) {
+      setMessage(`Failed: ${err?.data?.error || err?.message || 'Could not record payment'}`);
+    } finally {
+      setBillingActionId(null);
+    }
+  };
+
+  const handleTogglePause = async (customer, pause) => {
+    const action = pause ? 'pause' : 'resume';
+    if (!confirm(`${pause ? 'Pause' : 'Resume'} portal access for ${customer.company_name}?`)) return;
+    setBillingActionId(customer.id);
+    setMessage('');
+    try {
+      const result = await api.functions.invoke('setCustomerPause', { customerId: customer.id, paused: pause });
+      setMessage(result.message || `Customer ${action}d.`);
+      loadCustomers();
+    } catch (err) {
+      setMessage(`Failed: ${err?.data?.error || err?.message || `Could not ${action} customer`}`);
+    } finally {
+      setBillingActionId(null);
+    }
+  };
+
   const getEmployeeName = (id) => {
     const user = allUsers.find(u => u.id === id);
     return user ? user.full_name : '—';
@@ -239,8 +272,10 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map(c => (
-            <div key={c.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all p-5">
+          {filtered.map(c => {
+            const billing = getBillingSnapshot(c);
+            return (
+            <div key={c.id} className={`bg-white rounded-xl border shadow-sm hover:shadow-md transition-all p-5 ${c.system_paused ? 'border-slate-400 ring-1 ring-slate-300' : billing?.status === 'overdue' ? 'border-red-200' : billing?.status === 'due_soon' ? 'border-amber-200' : 'border-slate-200'}`}>
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -291,6 +326,20 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
                     </span>
                   </div>
                 )}
+                {billing?.dueAt && (
+                  <div className={`mt-2 rounded-lg px-2.5 py-2 ${billing.isPaused ? 'bg-slate-100' : billing.isOverdue ? 'bg-red-50' : billing.status === 'due_soon' ? 'bg-amber-50' : 'bg-green-50'}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full capitalize ${billingStatusColor(billing.status)}`}>
+                        {billing.isPaused ? <PauseCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                        {billing.status.replace('_', ' ')}
+                      </span>
+                      <span className={`text-xs font-black ${billing.isOverdue ? 'text-red-700' : billing.status === 'due_soon' ? 'text-amber-800' : 'text-green-700'}`}>
+                        {formatCountdown(billing.daysUntilDue)}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-1">Due {formatDueDate(billing.dueAt)}</div>
+                  </div>
+                )}
               </div>
               {canAddCustomers && (c.assigned_manager_id || c.assigned_coordinator_id) && (
                 <div className="space-y-1 text-xs text-slate-500 bg-slate-50 rounded-lg px-2.5 py-1.5 mb-3">
@@ -310,6 +359,40 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
               )}
               {c.notes && (
                 <p className="text-xs text-slate-400 italic border-t border-slate-100 pt-2 mb-3 line-clamp-2">{c.notes}</p>
+              )}
+              {canAddCustomers && billing && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {(billing.isOverdue || billing.status === 'due_soon') && !billing.isPaused && (
+                    <button
+                      type="button"
+                      disabled={billingActionId === c.id}
+                      onClick={() => handleTogglePause(c, true)}
+                      className="flex items-center gap-1 text-xs font-bold border border-red-200 text-red-700 bg-red-50 rounded-lg px-3 py-1.5 hover:bg-red-100 disabled:opacity-50"
+                    >
+                      <PauseCircle className="w-3.5 h-3.5" /> Pause portal
+                    </button>
+                  )}
+                  {billing.isPaused && (
+                    <button
+                      type="button"
+                      disabled={billingActionId === c.id}
+                      onClick={() => handleTogglePause(c, false)}
+                      className="flex items-center gap-1 text-xs font-bold border border-green-200 text-green-700 bg-green-50 rounded-lg px-3 py-1.5 hover:bg-green-100 disabled:opacity-50"
+                    >
+                      <PlayCircle className="w-3.5 h-3.5" /> Resume portal
+                    </button>
+                  )}
+                  {(billing.isOverdue || billing.status === 'due_soon' || billing.isPaused) && (
+                    <button
+                      type="button"
+                      disabled={billingActionId === c.id}
+                      onClick={() => handleRecordPayment(c)}
+                      className="flex items-center gap-1 text-xs font-bold border border-emerald-200 text-emerald-800 bg-emerald-50 rounded-lg px-3 py-1.5 hover:bg-emerald-100 disabled:opacity-50"
+                    >
+                      <DollarSign className="w-3.5 h-3.5" /> Payment received
+                    </button>
+                  )}
+                </div>
               )}
               {canAddCustomers && (
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
@@ -351,7 +434,7 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
                 </div>
               )}
             </div>
-          ))}
+          );})}
         </div>
       )}
 

@@ -11,6 +11,7 @@ import {
   updateEntity,
   deleteEntity,
   listEntities,
+  listUsers,
   nowIso,
 } from './db.js';
 import {
@@ -27,6 +28,13 @@ import {
   isFleetCoDomainEmail,
   requireFleetCoEmail,
 } from './roles.js';
+import {
+  computeNextDueDate,
+  getBillingSnapshot,
+  formatCountdown,
+  reminderTypeForDays,
+  REMINDER_THRESHOLDS,
+} from './billing.js';
 
 const SIM_ROUTES = [
   { name: 'I-80 Westbound', id: 'sim_driver_01', userName: '👤 Mike R. (Sim)', steps: [
@@ -68,6 +76,12 @@ export async function invokeFunction(name, body, user) {
       return provisionCustomer(body, user);
     case 'sendCustomerTestLogin':
       return sendCustomerTestLogin(body, user);
+    case 'getBillingAlerts':
+      return getBillingAlerts(body, user);
+    case 'recordCustomerPayment':
+      return recordCustomerPayment(body, user);
+    case 'setCustomerPause':
+      return setCustomerPause(body, user);
     case 'createDomainEmail':
       return createDomainEmail(body, user);
     case 'simulateDrivers':
@@ -416,6 +430,7 @@ function provisionCustomer(body, user) {
 
   const amount = subscriptionAmount(subscription_plan, subscription_term);
   const ts = nowIso();
+  const nextDue = computeNextDueDate(ts, subscription_term);
 
   const customer = createEntity('Customer', {
     ...customerData,
@@ -424,7 +439,11 @@ function provisionCustomer(body, user) {
     subscription_term,
     subscription_amount: amount,
     payment_collected_at: ts,
+    last_payment_at: ts,
+    next_payment_due_at: nextDue,
     subscription_status: 'active',
+    payment_status: 'current',
+    system_paused: false,
     provisioned_by: user.email,
   });
 
@@ -524,6 +543,229 @@ function sendCustomerTestLogin(body, user) {
     messageId: message.id,
     message: `Test login ready for ${customer.contact_name || customer.company_name}. Credentials saved to customer messages — copy and send to the prospect.`,
     credentialsText: credentialText,
+  };
+}
+
+function customersForUser(user) {
+  const all = listEntities('Customer');
+  if (!user) return [];
+  if (['owner', 'executive'].includes(user.role)) return all;
+  if (user.role === 'fleet_manager') {
+    return all.filter((c) => c.assigned_manager_id === user.id);
+  }
+  if (user.role === 'fleet_coordinator') {
+    return all.filter((c) => c.assigned_coordinator_id === user.id);
+  }
+  if (user.customer_id) {
+    return all.filter((c) => c.id === user.customer_id);
+  }
+  return [];
+}
+
+function buildAlertRow(customer) {
+  const billing = getBillingSnapshot(customer);
+  if (!billing || billing.status === 'current') return null;
+  return {
+    customerId: customer.id,
+    companyName: customer.company_name,
+    contactName: customer.contact_name,
+    email: customer.email,
+    status: billing.status,
+    daysUntilDue: billing.daysUntilDue,
+    dueAt: billing.dueAt,
+    amount: billing.amount,
+    term: billing.term,
+    plan: billing.plan,
+    systemPaused: billing.isPaused,
+    countdown: formatCountdown(billing.daysUntilDue),
+    canPause: billing.canPause,
+  };
+}
+
+function syncPaymentReminders(customers, actingUser) {
+  const today = new Date().toISOString().slice(0, 10);
+  const created = [];
+
+  for (const customer of customers) {
+    const billing = getBillingSnapshot(customer);
+    if (!billing?.dueAt) continue;
+
+    const type = reminderTypeForDays(billing.daysUntilDue);
+    if (!type && !billing.isPaused) continue;
+
+    const reminderKey = `${customer.id}_${type || 'paused'}_${today}`;
+    const existing = filterEntities('PaymentReminder', { reminder_key: reminderKey }, null, 1)[0];
+    if (existing) continue;
+
+    const message = billing.isPaused
+      ? `${customer.company_name} portal is paused — subscription payment required.`
+      : `${customer.company_name}: ${formatCountdown(billing.daysUntilDue)} ($${billing.amount?.toLocaleString() || '—'}/${billing.term === 'yearly' ? 'yr' : 'mo'}).`;
+
+    const targets = listUsers().filter((u) => {
+      if (['owner', 'executive'].includes(u.role)) return true;
+      if (u.role === 'fleet_manager' && customer.assigned_manager_id === u.id) return true;
+      if (u.role === 'fleet_coordinator' && customer.assigned_coordinator_id === u.id) return true;
+      if (u.customer_id === customer.id) return true;
+      return false;
+    });
+
+    for (const target of targets) {
+      created.push(createEntity('PaymentReminder', {
+        reminder_key: reminderKey,
+        customer_id: customer.id,
+        recipient_user_id: target.id,
+        recipient_email: target.email,
+        type: billing.isPaused ? 'system_paused' : type,
+        message,
+        due_at: billing.dueAt,
+        days_remaining: billing.daysUntilDue,
+        read: false,
+        created_by: actingUser?.email || 'system',
+      }));
+    }
+  }
+
+  return created;
+}
+
+function getBillingAlerts(body, user) {
+  if (!user) throw new Error('Unauthorized');
+
+  const customers = customersForUser(user);
+  const alertCustomers = customers.filter((c) => {
+    const b = getBillingSnapshot(c);
+    return b && (b.status !== 'current' || b.isPaused);
+  });
+
+  syncPaymentReminders(alertCustomers.length ? alertCustomers : customers, user);
+
+  const alerts = customers.map(buildAlertRow).filter(Boolean);
+
+  let userBilling = null;
+  if (user.customer_id) {
+    const customer = getEntity('Customer', user.customer_id);
+    userBilling = customer ? { ...getBillingSnapshot(customer), companyName: customer.company_name } : null;
+  }
+
+  const reminders = filterEntities('PaymentReminder', { recipient_user_id: user.id, read: false });
+
+  return {
+    success: true,
+    alerts,
+    userBilling,
+    reminders: reminders.slice(0, 20),
+    unreadCount: reminders.length,
+    summary: {
+      overdue: alerts.filter((a) => a.status === 'overdue').length,
+      dueSoon: alerts.filter((a) => a.status === 'due_soon').length,
+      paused: alerts.filter((a) => a.status === 'paused').length,
+    },
+  };
+}
+
+function recordCustomerPayment(body, user) {
+  if (!user || !canProvisionCustomers(user.role)) {
+    throw new Error('Only FleetCo owner, executive, or fleet managers can record customer payments');
+  }
+
+  const { customerId } = body;
+  if (!customerId) throw new Error('customerId is required');
+
+  const customer = getEntity('Customer', customerId);
+  if (!customer) throw new Error('Customer not found');
+
+  const ts = nowIso();
+  const term = customer.subscription_term || 'monthly';
+  const nextDue = computeNextDueDate(ts, term);
+
+  updateEntity('Customer', customerId, {
+    last_payment_at: ts,
+    payment_collected_at: ts,
+    next_payment_due_at: nextDue,
+    subscription_status: 'active',
+    payment_status: 'current',
+    system_paused: false,
+    paused_at: '',
+    paused_by: '',
+    pause_reason: '',
+  });
+
+  createEntity('Subscription', {
+    customer_id: customerId,
+    plan: customer.subscription_plan,
+    term,
+    amount: customer.subscription_amount,
+    status: 'active',
+    started_at: ts,
+    collected_by: user.email,
+    type: 'renewal',
+  });
+
+  const message = createEntity('Message', {
+    conversation_id: `customer_${customerId}`,
+    sender_id: user.id,
+    sender_name: user.full_name || user.email,
+    sender_role: user.role,
+    customer_id: customerId,
+    text: `Payment received — thank you! Your subscription is active through ${new Date(nextDue).toLocaleDateString()}.`,
+  });
+
+  return {
+    success: true,
+    next_payment_due_at: nextDue,
+    message: `Payment recorded for ${customer.company_name}. Next due ${new Date(nextDue).toLocaleDateString()}.`,
+    customerMessageId: message.id,
+  };
+}
+
+function setCustomerPause(body, user) {
+  if (!user || !canProvisionCustomers(user.role)) {
+    throw new Error('Only FleetCo owner, executive, or fleet managers can pause customer access');
+  }
+
+  const { customerId, paused, reason } = body;
+  if (!customerId) throw new Error('customerId is required');
+
+  const customer = getEntity('Customer', customerId);
+  if (!customer) throw new Error('Customer not found');
+
+  const billing = getBillingSnapshot(customer);
+  const shouldPause = paused !== false;
+
+  if (shouldPause && !billing?.canPause && !['owner', 'executive'].includes(user.role)) {
+    throw new Error('Customer payment must be due or overdue before pausing portal access');
+  }
+
+  const ts = nowIso();
+  updateEntity('Customer', customerId, {
+    system_paused: shouldPause,
+    paused_at: shouldPause ? ts : '',
+    paused_by: shouldPause ? user.email : '',
+    pause_reason: shouldPause ? (reason || 'Unpaid subscription') : '',
+    payment_status: shouldPause ? 'paused' : (billing?.isOverdue ? 'overdue' : 'current'),
+  });
+
+  const note = shouldPause
+    ? `Portal access paused — ${reason || 'subscription payment overdue'}. Contact FleetCo to restore access.`
+    : 'Portal access restored — thank you for your payment.';
+
+  createEntity('Message', {
+    conversation_id: `customer_${customerId}`,
+    sender_id: user.id,
+    sender_name: user.full_name || user.email,
+    sender_role: user.role,
+    customer_id: customerId,
+    text: note,
+  });
+
+  syncPaymentReminders([getEntity('Customer', customerId)], user);
+
+  return {
+    success: true,
+    paused: shouldPause,
+    message: shouldPause
+      ? `${customer.company_name} portal paused until payment is received.`
+      : `${customer.company_name} portal access restored.`,
   };
 }
 

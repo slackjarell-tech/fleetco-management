@@ -8,6 +8,7 @@ import {
   listEntities,
   nowIso,
 } from './db.js';
+import { computeNextDueDate } from './billing.js';
 import { seedDemoData } from './seedDemo.js';
 
 const OWNER_EMAIL = 'jarrell@fleetcomanagement.org';
@@ -65,8 +66,17 @@ export function seedDatabase() {
   const manager = findUserByEmail('manager@fleetco.com');
   if (manager) {
     for (const customer of listEntities('Customer')) {
-      if (!customer.assigned_manager_id) {
-        updateEntity('Customer', customer.id, { assigned_manager_id: manager.id });
+      const patch = {};
+      if (!customer.assigned_manager_id) patch.assigned_manager_id = manager.id;
+      if (!customer.next_payment_due_at) {
+        const base = customer.last_payment_at || customer.payment_collected_at || nowIso();
+        patch.last_payment_at = customer.last_payment_at || base;
+        patch.next_payment_due_at = computeNextDueDate(base, customer.subscription_term || 'monthly');
+        patch.payment_status = customer.payment_status || 'current';
+        patch.system_paused = customer.system_paused || false;
+      }
+      if (Object.keys(patch).length) {
+        updateEntity('Customer', customer.id, patch);
       }
     }
   }

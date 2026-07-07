@@ -5,7 +5,9 @@ import {
   createEntity,
   filterEntities,
   listEntities,
+  nowIso,
 } from './db.js';
+import { computeNextDueDate } from './billing.js';
 
 function daysAgo(n) {
   const d = new Date();
@@ -47,6 +49,11 @@ export function seedDemoData() {
     role: 'driver',
   });
 
+  const ts = nowIso();
+  const monthlyDue = computeNextDueDate(ts, 'monthly');
+  const overdueDue = new Date();
+  overdueDue.setDate(overdueDue.getDate() - 5);
+
   const customers = [
     createEntity('Customer', {
       company_name: 'Lone Star Freight LLC',
@@ -62,6 +69,15 @@ export function seedDemoData() {
       fleet_size: 18,
       status: 'active',
       assigned_manager_id: manager.id,
+      subscription_plan: 'Growth',
+      subscription_term: 'monthly',
+      subscription_amount: 599,
+      payment_collected_at: ts,
+      last_payment_at: ts,
+      next_payment_due_at: monthlyDue,
+      subscription_status: 'active',
+      payment_status: 'current',
+      system_paused: false,
       notes: 'Owner-operator group — 12 trucks, 6 trailers. Priority fuel program.',
     }),
     createEntity('Customer', {
@@ -78,6 +94,15 @@ export function seedDemoData() {
       fleet_size: 42,
       status: 'active',
       assigned_manager_id: manager.id,
+      subscription_plan: 'Growth',
+      subscription_term: 'monthly',
+      subscription_amount: 599,
+      payment_collected_at: ts,
+      last_payment_at: ts,
+      next_payment_due_at: monthlyDue,
+      subscription_status: 'active',
+      payment_status: 'current',
+      system_paused: false,
       notes: 'Regional dry van — strong maintenance contract candidate.',
     }),
     createEntity('Customer', {
@@ -94,6 +119,15 @@ export function seedDemoData() {
       fleet_size: 27,
       status: 'active',
       assigned_manager_id: manager.id,
+      subscription_plan: 'Starter',
+      subscription_term: 'monthly',
+      subscription_amount: 299,
+      payment_collected_at: ts,
+      last_payment_at: ts,
+      next_payment_due_at: monthlyDue,
+      subscription_status: 'active',
+      payment_status: 'current',
+      system_paused: false,
     }),
     createEntity('Customer', {
       company_name: 'Peak Transport Co',
@@ -109,7 +143,16 @@ export function seedDemoData() {
       fleet_size: 9,
       status: 'prospect',
       assigned_manager_id: manager.id,
-      notes: 'Demo scheduled — interested in compliance + fuel modules.',
+      subscription_plan: 'Starter',
+      subscription_term: 'monthly',
+      subscription_amount: 299,
+      payment_collected_at: ts,
+      last_payment_at: ts,
+      next_payment_due_at: overdueDue.toISOString(),
+      subscription_status: 'active',
+      payment_status: 'overdue',
+      system_paused: false,
+      notes: 'Demo scheduled — interested in compliance + fuel modules. Payment overdue for pause demo.',
     }),
   ];
 
