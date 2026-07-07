@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/api/apiClient';
-import { Plus, Search, Building2, Phone, Mail, Edit, Trash2, UserCheck, Users, UserPlus, Shield, User, KeyRound, Crown, ToggleLeft, ToggleRight, Truck, Wrench, ClipboardList, MessageCircle, AtSign } from 'lucide-react';
+import { Plus, Search, Building2, Phone, Mail, Edit, Trash2, UserCheck, Users, UserPlus, Shield, User, KeyRound, Crown, ToggleLeft, ToggleRight, Truck, Wrench, ClipboardList, MessageCircle, AtSign, Send, Check } from 'lucide-react';
 import CustomerModal from '@/components/admin/CustomerModal';
 import CustomerMessagePanel from '@/components/admin/CustomerMessagePanel';
 import { FLEETCO_EMAIL_DOMAIN, normalizeFleetCoEmail } from '@/lib/domain';
@@ -53,6 +53,8 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [message, setMessage] = useState('');
   const [messageCustomer, setMessageCustomer] = useState(null);
+  const [sendingLoginId, setSendingLoginId] = useState(null);
+  const [copiedLoginId, setCopiedLoginId] = useState(null);
 
   const loadCustomers = async () => {
     const allCustomers = await api.entities.Customer.list('-created_date');
@@ -122,6 +124,31 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
     await api.auth.resetPasswordRequest(email);
     alert(`Password reset link sent to ${email}`);
   };
+
+  const handleSendTestLogin = async (customer) => {
+    if (!customer.email) {
+      alert('Add an email to this customer before sending a test login.');
+      return;
+    }
+    setSendingLoginId(customer.id);
+    setMessage('');
+    try {
+      const result = await api.functions.invoke('sendCustomerTestLogin', { customerId: customer.id });
+      setMessage(result.message || `Test login created for ${customer.email}`);
+      if (result.credentialsText && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(result.credentialsText);
+        setCopiedLoginId(customer.id);
+        setTimeout(() => setCopiedLoginId(null), 3000);
+      }
+      loadCustomers();
+    } catch (err) {
+      setMessage(`Failed: ${err?.data?.error || err?.message || 'Could not send test login'}`);
+    } finally {
+      setSendingLoginId(null);
+    }
+  };
+
+  const isFilteredRole = user?.role === 'fleet_manager' || user?.role === 'fleet_coordinator';
 
   const getEmployeeName = (id) => {
     const user = allUsers.find(u => u.id === id);
@@ -200,7 +227,15 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
         <div className="text-center py-16 text-slate-400">
           <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="font-medium">No customers found</p>
-          {canAddCustomers && <p className="text-sm mt-1">Add your first customer to get started</p>}
+          {isFilteredRole && customers.length === 0 ? (
+            <p className="text-sm mt-1 max-w-md mx-auto">
+              No customers are assigned to you yet. Ask an owner or executive to assign a fleet manager on each customer account.
+            </p>
+          ) : isFilteredRole ? (
+            <p className="text-sm mt-1">Try clearing your search or status filter.</p>
+          ) : canAddCustomers ? (
+            <p className="text-sm mt-1">Add your first customer to get started</p>
+          ) : null}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -277,10 +312,25 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
                 <p className="text-xs text-slate-400 italic border-t border-slate-100 pt-2 mb-3 line-clamp-2">{c.notes}</p>
               )}
               {canAddCustomers && (
-                <div className="flex gap-2 pt-2 border-t border-slate-100">
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
                   <button onClick={() => { setEditingCustomer(c); setShowModal(true); }}
-                    className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold border border-slate-200 rounded-lg py-1.5 hover:bg-slate-50">
+                    className="flex-1 min-w-[72px] flex items-center justify-center gap-1 text-xs font-semibold border border-slate-200 rounded-lg py-1.5 hover:bg-slate-50">
                     <Edit className="w-3 h-3" /> Edit
+                  </button>
+                  <button
+                    onClick={() => handleSendTestLogin(c)}
+                    disabled={sendingLoginId === c.id || !c.email}
+                    title="Create portal login and copy credentials for this prospect"
+                    className="flex-1 min-w-[96px] flex items-center justify-center gap-1 text-xs font-semibold border border-emerald-100 text-emerald-700 rounded-lg py-1.5 hover:bg-emerald-50 disabled:opacity-50"
+                  >
+                    {sendingLoginId === c.id ? (
+                      <span className="w-3 h-3 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                    ) : copiedLoginId === c.id ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Send className="w-3 h-3" />
+                    )}
+                    {copiedLoginId === c.id ? 'Copied' : 'Test login'}
                   </button>
                   <button onClick={() => setMessageCustomer(c)}
                     title="Message customer"

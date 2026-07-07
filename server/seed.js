@@ -4,6 +4,8 @@ import {
   createEntity,
   filterEntities,
   findUserByEmail,
+  updateEntity,
+  listEntities,
   nowIso,
 } from './db.js';
 import { seedDemoData } from './seedDemo.js';
@@ -57,5 +59,15 @@ export function seedDatabase() {
   // Full demo dataset for client presentations (skips if customers already exist)
   if (seedDemoData()) {
     console.log('Demo fleet data ready for client presentations');
+  }
+
+  // Backfill manager assignment on demo customers (fixes blank Customers tab for fleet managers)
+  const manager = findUserByEmail('manager@fleetco.com');
+  if (manager) {
+    for (const customer of listEntities('Customer')) {
+      if (!customer.assigned_manager_id) {
+        updateEntity('Customer', customer.id, { assigned_manager_id: manager.id });
+      }
+    }
   }
 }

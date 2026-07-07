@@ -6,6 +6,7 @@ import {
   findUserByEmail,
   findUserById,
   getUserRowByEmail,
+  getEntity,
   updateUser,
   updateEntity,
   deleteEntity,
@@ -65,6 +66,8 @@ export async function invokeFunction(name, body, user) {
       return createUserAccount(body, user);
     case 'provisionCustomer':
       return provisionCustomer(body, user);
+    case 'sendCustomerTestLogin':
+      return sendCustomerTestLogin(body, user);
     case 'createDomainEmail':
       return createDomainEmail(body, user);
     case 'simulateDrivers':
@@ -455,6 +458,72 @@ function provisionCustomer(body, user) {
     customer,
     subscription: { plan: subscription_plan, term: subscription_term, amount },
     message: `Customer ${customerData.company_name} activated.${loginMessage}`,
+  };
+}
+
+function sendCustomerTestLogin(body, user) {
+  if (!user || !canProvisionCustomers(user.role)) {
+    throw new Error('Only FleetCo owner, executive, or fleet managers can send customer test logins');
+  }
+
+  const { customerId, tempPassword: providedPassword } = body;
+  if (!customerId) throw new Error('customerId is required');
+
+  const customer = getEntity('Customer', customerId);
+  if (!customer) throw new Error('Customer not found');
+  if (!customer.email) throw new Error('Customer has no email on file');
+
+  const tempPassword = providedPassword || `Fleet${Math.random().toString(36).slice(2, 8)}!`;
+  const email = customer.email.trim().toLowerCase();
+
+  createUserAccount(
+    {
+      email,
+      tempPassword,
+      role: 'user',
+      customerId: customer.id,
+      fullName: customer.contact_name || customer.company_name,
+    },
+    user
+  );
+
+  updateEntity('Customer', customer.id, {
+    user_id: findUserByEmail(email)?.id,
+    status: customer.status === 'inactive' ? 'prospect' : customer.status,
+  });
+
+  const loginUrl = process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org/login';
+  const credentialText = [
+    'Welcome to FleetCo Management!',
+    '',
+    `Company: ${customer.company_name}`,
+    `Portal: ${loginUrl}`,
+    `Email: ${email}`,
+    `Temporary password: ${tempPassword}`,
+    '',
+    'Please sign in and change your password after your first login.',
+    'From there you can add drivers and team members under Customers & Team → My Team.',
+  ].join('\n');
+
+  const message = createEntity('Message', {
+    conversation_id: `customer_${customer.id}`,
+    sender_id: user.id,
+    sender_name: user.full_name || user.email,
+    sender_role: user.role,
+    customer_id: customer.id,
+    text: credentialText,
+  });
+
+  console.log(`[test login] ${email} for ${customer.company_name} by ${user.email}`);
+
+  return {
+    success: true,
+    email,
+    tempPassword,
+    loginUrl,
+    messageId: message.id,
+    message: `Test login ready for ${customer.contact_name || customer.company_name}. Credentials saved to customer messages — copy and send to the prospect.`,
+    credentialsText: credentialText,
   };
 }
 

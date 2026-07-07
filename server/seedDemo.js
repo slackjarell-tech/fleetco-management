@@ -61,6 +61,7 @@ export function seedDemoData() {
       dot_number: '3847291',
       fleet_size: 18,
       status: 'active',
+      assigned_manager_id: manager.id,
       notes: 'Owner-operator group — 12 trucks, 6 trailers. Priority fuel program.',
     }),
     createEntity('Customer', {
@@ -76,6 +77,7 @@ export function seedDemoData() {
       dot_number: '2918473',
       fleet_size: 42,
       status: 'active',
+      assigned_manager_id: manager.id,
       notes: 'Regional dry van — strong maintenance contract candidate.',
     }),
     createEntity('Customer', {
@@ -91,6 +93,7 @@ export function seedDemoData() {
       dot_number: '4102837',
       fleet_size: 27,
       status: 'active',
+      assigned_manager_id: manager.id,
     }),
     createEntity('Customer', {
       company_name: 'Peak Transport Co',
@@ -105,6 +108,7 @@ export function seedDemoData() {
       dot_number: '3374102',
       fleet_size: 9,
       status: 'prospect',
+      assigned_manager_id: manager.id,
       notes: 'Demo scheduled — interested in compliance + fuel modules.',
     }),
   ];
