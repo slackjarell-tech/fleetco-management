@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: fleetco-management
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ORIGIN
+        value: https://fleetcomanagement.org
+      - key: VITE_SITE_URL
+        value: https://fleetcomanagement.org
+      - key: JWT_SECRET
+        generateValue: true
+    disk:
+      name: fleetco-data
+      mountPath: /opt/render/project/src/server/data
+      sizeGB: 1
+    healthCheckPath: /api/public-settings

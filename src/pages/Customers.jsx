@@ -1,0 +1,618 @@
+import React, { useState, useEffect } from 'react';
+import { api } from '@/api/apiClient';
+import { Plus, Search, Building2, Phone, Mail, Edit, Trash2, UserCheck, Users, UserPlus, Shield, User, KeyRound, Crown, ToggleLeft, ToggleRight, Truck, Wrench, ClipboardList, MessageCircle } from 'lucide-react';
+import CustomerModal from '@/components/admin/CustomerModal';
+import CustomerMessagePanel from '@/components/admin/CustomerMessagePanel';
+
+const STATUS_COLORS = {
+  active: 'bg-green-100 text-green-700',
+  inactive: 'bg-slate-100 text-slate-500',
+  prospect: 'bg-blue-100 text-blue-600',
+};
+
+const ROLE_COLORS = {
+  executive: 'bg-yellow-100 text-yellow-800',
+  fleet_manager: 'bg-blue-100 text-blue-700',
+  fleet_coordinator: 'bg-emerald-100 text-emerald-700',
+  user: 'bg-slate-100 text-slate-600',
+};
+
+const ROLE_ICONS = {
+  executive: Crown,
+  fleet_manager: Shield,
+  fleet_coordinator: ClipboardList,
+  user: User,
+};
+
+const CUSTOMER_ROLES = ['user'];
+
+const getAvailableRoles = (userRole) => {
+  if (userRole === 'executive') {
+    return ['user', 'fleet_manager', 'fleet_coordinator'];
+  }
+  if (userRole === 'fleet_manager') {
+    return ['user', 'fleet_coordinator'];
+  }
+  return [];
+};
+
+// ── Customers Tab ──
+function CustomersTab({ user, isInternal, fleetManagers, fleetCoordinators, allUsers }) {
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showModal, setShowModal] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
+  const [message, setMessage] = useState('');
+  const [messageCustomer, setMessageCustomer] = useState(null);
+
+  const loadCustomers = async () => {
+    const allCustomers = await api.entities.Customer.list('-created_date');
+    if (user?.role === 'fleet_manager') {
+      setCustomers(allCustomers.filter(c => c.assigned_manager_id === user.id));
+    } else if (user?.role === 'fleet_coordinator') {
+      setCustomers(allCustomers.filter(c => c.assigned_coordinator_id === user.id));
+    } else {
+      setCustomers(allCustomers);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadCustomers(); }, []);
+
+  const handleSave = async (data, loginData) => {
+    let customerId = editingCustomer?.id;
+    let createdCustomer = null;
+
+    // Clean up assignment fields
+    const cleanData = { ...data };
+    if (!cleanData.assigned_manager_id) cleanData.assigned_manager_id = '';
+    if (!cleanData.assigned_coordinator_id) cleanData.assigned_coordinator_id = '';
+    // fleet_size must be a number or null — input returns a string
+    if (cleanData.fleet_size !== undefined && cleanData.fleet_size !== '') {
+      cleanData.fleet_size = Number(cleanData.fleet_size);
+    } else {
+      delete cleanData.fleet_size;
+    }
+
+    if (editingCustomer) {
+      await api.entities.Customer.update(customerId, cleanData);
+    } else {
+      createdCustomer = await api.entities.Customer.create(cleanData);
+      customerId = createdCustomer.id;
+    }
+
+    // Create portal login if requested
+    if (loginData && createdCustomer) {
+      try {
+        const result = await api.functions.invoke('createUserAccount', {
+          email: data.email,
+          tempPassword: loginData.tempPassword,
+          role: loginData.loginRole,
+          customerId: createdCustomer.id,
+        });
+        setMessage(`Account created! ${data.email} will receive a welcome email with login details and a setup email to set their password.`);
+      } catch (err) {
+        setMessage(`Customer created but login failed: ${err?.response?.data?.error || 'Please create login manually from the Team tab.'}`);
+      }
+    }
+
+    setShowModal(false);
+    setEditingCustomer(null);
+    loadCustomers();
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this customer?')) return;
+    await api.entities.Customer.delete(id);
+    loadCustomers();
+  };
+
+  const handleResetCustomerPassword = async (customer) => {
+    const linkedUser = allUsers.find(u => u.id === customer.user_id);
+    const email = customer.email;
+    if (!email) {
+      alert('No email on file for this customer.');
+      return;
+    }
+    await api.auth.resetPasswordRequest(email);
+    alert(`Password reset link sent to ${email}`);
+  };
+
+  const getEmployeeName = (id) => {
+    const user = allUsers.find(u => u.id === id);
+    return user ? user.full_name : '—';
+  };
+
+  const filtered = customers.filter(c => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || c.company_name?.toLowerCase().includes(q) ||
+      c.contact_name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q);
+    const matchStatus = statusFilter === 'all' || c.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  const active = customers.filter(c => c.status === 'active').length;
+  const prospects = customers.filter(c => c.status === 'prospect').length;
+
+  if (loading) return <div className="flex items-center justify-center h-40"><div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>;
+
+  return (
+    <div className="space-y-5">
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: 'Total', value: customers.length, icon: Building2, color: 'text-slate-600', bg: 'bg-slate-100' },
+          { label: 'Active', value: active, icon: UserCheck, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Prospects', value: prospects, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+        ].map(({ label, value, icon: Icon, color, bg }) => (
+          <div key={label} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center mb-2`}>
+              <Icon className={`w-4 h-4 ${color}`} />
+            </div>
+            <div className="text-xl font-black text-slate-900">{value}</div>
+            <div className="text-xs text-slate-500">{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Message */}
+      {message && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 font-semibold flex items-center justify-between">
+          <span>{message}</span>
+          <button onClick={() => setMessage('')} className="text-green-400 hover:text-green-600 ml-2">&times;</button>
+        </div>
+      )}
+
+      {/* Controls */}
+      <div className="flex flex-wrap gap-3 items-center justify-between">
+        <div className="flex flex-wrap gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search by company, contact, or email..."
+              className="w-64 pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          </div>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400">
+            <option value="all">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="prospect">Prospect</option>
+          </select>
+        </div>
+        {isInternal && (
+          <button
+            onClick={() => { setEditingCustomer(null); setShowModal(true); }}
+            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-4 py-2.5 rounded-lg text-sm"
+          >
+            <Plus className="w-4 h-4" /> Add Customer
+          </button>
+        )}
+      </div>
+
+      {/* Customer Cards */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 text-slate-400">
+          <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">No customers found</p>
+          {isInternal && <p className="text-sm mt-1">Add your first customer to get started</p>}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map(c => (
+            <div key={c.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all p-5">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Building2 className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-black text-slate-900 text-sm leading-tight">{c.company_name}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{c.contact_name}</div>
+                  </div>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize flex-shrink-0 ${STATUS_COLORS[c.status]}`}>
+                  {c.status}
+                </span>
+              </div>
+              <div className="space-y-1.5 text-xs text-slate-600 mb-3">
+                {c.email && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                    <span className="truncate">{c.email}</span>
+                  </div>
+                )}
+                {c.phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                    <span>{c.phone}</span>
+                  </div>
+                )}
+                {(c.city || c.state) && (
+                  <div className="text-slate-400">{[c.city, c.state].filter(Boolean).join(', ')}</div>
+                )}
+                {(c.mc_number || c.dot_number) && (
+                  <div className="flex gap-3">
+                    {c.mc_number && <span className="bg-slate-100 px-2 py-0.5 rounded font-mono">MC: {c.mc_number}</span>}
+                    {c.dot_number && <span className="bg-slate-100 px-2 py-0.5 rounded font-mono">DOT: {c.dot_number}</span>}
+                  </div>
+                )}
+                {c.fleet_size && (
+                  <div className="text-slate-500">Fleet: <strong>{c.fleet_size}</strong> vehicles</div>
+                )}
+              </div>
+              {isInternal && (c.assigned_manager_id || c.assigned_coordinator_id) && (
+                <div className="space-y-1 text-xs text-slate-500 bg-slate-50 rounded-lg px-2.5 py-1.5 mb-3">
+                  {c.assigned_manager_id && (
+                    <div className="flex items-center gap-1.5">
+                      <UserCheck className="w-3.5 h-3.5 text-blue-500" />
+                      <span>Manager: <strong>{getEmployeeName(c.assigned_manager_id)}</strong></span>
+                    </div>
+                  )}
+                  {c.assigned_coordinator_id && (
+                    <div className="flex items-center gap-1.5">
+                      <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Coordinator: <strong>{getEmployeeName(c.assigned_coordinator_id)}</strong></span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {c.notes && (
+                <p className="text-xs text-slate-400 italic border-t border-slate-100 pt-2 mb-3 line-clamp-2">{c.notes}</p>
+              )}
+              {isInternal && (
+                <div className="flex gap-2 pt-2 border-t border-slate-100">
+                  <button onClick={() => { setEditingCustomer(c); setShowModal(true); }}
+                    className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold border border-slate-200 rounded-lg py-1.5 hover:bg-slate-50">
+                    <Edit className="w-3 h-3" /> Edit
+                  </button>
+                  <button onClick={() => setMessageCustomer(c)}
+                    title="Message customer"
+                    className="flex items-center justify-center gap-1 text-xs font-semibold border border-blue-100 text-blue-600 rounded-lg px-3 py-1.5 hover:bg-blue-50">
+                    <MessageCircle className="w-3 h-3" />
+                  </button>
+                  <button onClick={() => handleResetCustomerPassword(c)}
+                    title="Send password reset link"
+                    className="flex items-center justify-center gap-1 text-xs font-semibold border border-amber-100 text-amber-600 rounded-lg px-3 py-1.5 hover:bg-amber-50">
+                    <KeyRound className="w-3 h-3" />
+                  </button>
+                  {user?.role === 'executive' && (
+                    <button onClick={() => handleDelete(c.id)}
+                      className="flex items-center justify-center gap-1 text-xs font-semibold border border-red-100 text-red-500 rounded-lg px-3 py-1.5 hover:bg-red-50">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showModal && (
+        <CustomerModal
+          customer={editingCustomer}
+          fleetManagers={fleetManagers}
+          fleetCoordinators={fleetCoordinators}
+          onSave={handleSave}
+          onClose={() => { setShowModal(false); setEditingCustomer(null); }}
+        />
+      )}
+      {messageCustomer && (
+        <CustomerMessagePanel
+          customer={messageCustomer}
+          currentUser={user}
+          onClose={() => setMessageCustomer(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Team Tab ──
+function TeamTab({ user, isInternal, isFleetCoAdmin, isCustomerCreator, availableRoles }) {
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [tempPassword, setTempPassword] = useState('');
+  const [inviteRole, setInviteRole] = useState('user');
+  const [inviteEmployeeNumber, setInviteEmployeeNumber] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState('');
+  const [inviteError, setInviteError] = useState('');
+
+  const loadTeam = async () => {
+    const users = await api.entities.User.list();
+    if (user?.role === 'user') {
+      setTeamMembers(users.filter(m => m.customer_id === user.customer_id));
+    } else {
+      setTeamMembers(users);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadTeam(); }, []);
+
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    setInviting(true);
+    setInviteSuccess('');
+    setInviteError('');
+    try {
+      const payload = { email: inviteEmail, tempPassword, role: inviteRole };
+      if (user?.customer_id) payload.customerId = user.customer_id;
+      if (inviteEmployeeNumber) payload.employeeNumber = inviteEmployeeNumber;
+      const result = await api.functions.invoke('createUserAccount', payload);
+      setInviteSuccess(result.data.message || `${inviteEmail} invited as ${inviteRole}.`);
+      setInviteEmail('');
+      setTempPassword('');
+      setInviteEmployeeNumber('');
+      loadTeam();
+    } catch (err) {
+      setInviteError(err?.response?.data?.error || err?.message || 'Failed to create account.');
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRoleChange = async (memberId, newRole) => {
+    await api.entities.User.update(memberId, { role: newRole });
+    loadTeam();
+  };
+
+  const handleStatusToggle = async (member) => {
+    const newStatus = member.status === 'suspended' ? 'active' : 'suspended';
+    await api.entities.User.update(member.id, { status: newStatus });
+    loadTeam();
+  };
+
+  const handleResetPassword = async (email) => {
+    await api.auth.resetPasswordRequest(email);
+    alert(`Password reset link sent to ${email}`);
+  };
+
+  const handleDeleteUser = async (member) => {
+    if (!confirm(`Permanently delete user "${member.full_name || member.email}"? This cannot be undone.`)) return;
+    try {
+      const pending = await api.entities.PendingAccount.filter({ user_id: member.id });
+      for (const p of pending) {
+        await api.entities.PendingAccount.delete(p.id);
+      }
+    } catch {}
+    await api.entities.User.delete(member.id);
+    loadTeam();
+  };
+
+  if (loading) return <div className="flex items-center justify-center h-40"><div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>;
+
+  // Count roles
+  const counts = {};
+  teamMembers.forEach(m => {
+    counts[m.role] = (counts[m.role] || 0) + 1;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        {Object.entries(counts).map(([role, count]) => {
+          const Icon = ROLE_ICONS[role] || User;
+          const colors = ROLE_COLORS[role] || 'bg-slate-100 text-slate-500';
+          const [textColor] = [colors.split(' ')[1] || 'text-slate-500'];
+          const bgColor = colors.split(' ')[0].replace('text-', 'bg-').replace('700','100').replace('800','100').replace('600','50').replace('500','100');
+          return (
+            <div key={role} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${bgColor}`}>
+                <Icon className={`w-4 h-4 ${textColor}`} />
+              </div>
+              <div className="text-xl font-black text-slate-900">{count}</div>
+              <div className="text-xs text-slate-500 capitalize">{role.replace(/_/g, ' ')}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Invite Panel */}
+      {isInternal && availableRoles.length > 0 && (
+      <div className="bg-slate-900 rounded-2xl p-6">
+        <h2 className="text-white font-black text-base mb-1">Create New Account</h2>
+        <p className="text-slate-400 text-sm mb-4">
+          Enter their email and a temp password. They'll receive a setup email from the platform to set their password.
+        </p>
+        <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input type="email" required value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+              placeholder="colleague@email.com"
+              className="w-full pl-9 pr-4 py-2.5 rounded-lg text-sm border-0 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          </div>
+          <div className="relative flex-1 min-w-[140px]">
+            <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input type="text" required value={tempPassword} onChange={e => setTempPassword(e.target.value)}
+              placeholder="Temp password"
+              className="w-full pl-9 pr-4 py-2.5 rounded-lg text-sm border-0 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          </div>
+          <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}
+            className="bg-white text-slate-700 rounded-lg px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-amber-400">
+            {availableRoles.map(r => (
+              <option key={r} value={r}>{r.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+            ))}
+          </select>
+          <input type="text" value={inviteEmployeeNumber} onChange={e => setInviteEmployeeNumber(e.target.value)}
+            placeholder="Employee # (optional)"
+            className="bg-white text-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 w-40" />
+          <button type="submit" disabled={inviting}
+            className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-5 py-2.5 rounded-lg text-sm disabled:opacity-60">
+            <UserPlus className="w-4 h-4" />
+            {inviting ? 'Creating...' : 'Create Account'}
+          </button>
+        </form>
+        {inviteSuccess && (
+          <div className="mt-4 p-3 bg-green-900/30 border border-green-800/50 rounded-lg">
+            <p className="text-green-400 text-sm">{inviteSuccess}</p>
+          </div>
+        )}
+        {inviteError && <p className="text-red-400 text-sm mt-3">{inviteError}</p>}
+
+        <div className="mt-5 pt-4 border-t border-slate-800">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-amber-900/40 border border-amber-700/50 rounded-lg p-3">
+              <div className="text-amber-400 font-bold text-xs flex items-center gap-1.5">
+                Customer User <span className="text-[10px] bg-amber-500 text-slate-900 px-1.5 py-0.5 rounded-full font-black">PORTAL</span>
+              </div>
+              <div className="text-slate-400 text-xs mt-0.5">Portal access — fleet data, operations, reports</div>
+            </div>
+            <div className="bg-blue-900/40 border border-blue-700/50 rounded-lg p-3">
+              <div className="text-blue-400 font-bold text-xs flex items-center gap-1.5">
+                Fleet Manager <span className="text-[10px] bg-blue-500 text-slate-900 px-1.5 py-0.5 rounded-full font-black">INTERNAL</span>
+              </div>
+              <div className="text-slate-400 text-xs mt-0.5">Full access to assigned customers &amp; data</div>
+            </div>
+            <div className="bg-emerald-900/40 border border-emerald-700/50 rounded-lg p-3">
+              <div className="text-emerald-400 font-bold text-xs flex items-center gap-1.5">
+                Fleet Coordinator <span className="text-[10px] bg-emerald-500 text-slate-900 px-1.5 py-0.5 rounded-full font-black">INTERNAL</span>
+              </div>
+              <div className="text-slate-400 text-xs mt-0.5">View &amp; update assigned customer documents</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* Members Table */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100">
+          <h2 className="font-black text-slate-900">All Users ({teamMembers.length})</h2>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {teamMembers.map(m => {
+            const RoleIcon = ROLE_ICONS[m.role] || User;
+            return (
+              <div key={m.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50">
+                <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-slate-600">
+                    {m.full_name?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-900 text-sm">{m.full_name || '—'}</span>
+                    {m.status === 'suspended' && (
+                      <span className="text-xs font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Suspended</span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate">{m.email}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold capitalize ${ROLE_COLORS[m.role] || 'bg-slate-100 text-slate-500'}`}>
+                    <RoleIcon className="w-3 h-3" />
+                    {m.role}
+                  </span>
+                  {m.id !== user?.id && isFleetCoAdmin && (
+                    <>
+                      <select value={m.role} onChange={e => handleRoleChange(m.id, e.target.value)}
+                        className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-400">
+                        {availableRoles.map(r => (
+                          <option key={r} value={r}>{r.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+                        ))}
+                      </select>
+                      <button
+                        title={m.status === 'suspended' ? 'Account suspended — click to activate' : 'Account active — click to suspend'}
+                        onClick={() => handleStatusToggle(m)}
+                        className={`p-1.5 rounded-lg transition-colors ${m.status === 'suspended' ? 'text-red-500 bg-red-50 hover:bg-red-100' : 'text-emerald-500 hover:bg-emerald-50'}`}
+                      >
+                        {m.status === 'suspended' ? <ToggleLeft className="w-4 h-4" /> : <ToggleRight className="w-4 h-4" />}
+                      </button>
+                    </>
+                  )}
+                  <button title="Send password reset link" onClick={() => handleResetPassword(m.email)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
+                    <KeyRound className="w-3.5 h-3.5" />
+                  </button>
+                  {isFleetCoAdmin && m.id !== user?.id && (
+                    <button title="Delete user" onClick={() => handleDeleteUser(m)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {teamMembers.length === 0 && (
+            <div className="text-center py-10 text-slate-400 text-sm">No users yet</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Combined Page ──
+export default function Customers() {
+  const [user, setUser] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('customers');
+
+  useEffect(() => {
+    api.auth.me().then(async u => {
+      setUser(u);
+      const allUsers = await api.entities.User.list();
+      setAllUsers(allUsers);
+      setEmployees(allUsers.filter(u => u.role === 'fleet_manager' || u.role === 'fleet_coordinator'));
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  const isInternal = ['executive', 'fleet_manager', 'fleet_coordinator'].includes(user?.role);
+  const isFleetCoAdmin = user?.role === 'executive' || user?.role === 'fleet_manager';
+  const isCustomerCreator = CUSTOMER_ROLES.includes(user?.role);
+  const availableRoles = getAvailableRoles(user?.role);
+  const fleetManagers = allUsers.filter(u => u.role === 'fleet_manager');
+  const fleetCoordinators = allUsers.filter(u => u.role === 'fleet_coordinator');
+
+  return (
+    <div className="p-4 sm:p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900">Customers & Team</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Manage customer accounts, team members, and access</p>
+        </div>
+      </div>
+
+      {/* Tabs - Team tab only visible to internal roles */}
+      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+        <button onClick={() => setTab('customers')}
+          className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${tab === 'customers' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          <Building2 className="w-4 h-4 inline mr-1.5" />
+          Customers
+        </button>
+        {isInternal && (
+          <button onClick={() => setTab('team')}
+            className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${tab === 'team' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            <Users className="w-4 h-4 inline mr-1.5" />
+            Team & Access
+          </button>
+        )}
+      </div>
+
+      {/* Tab Content */}
+      {tab === 'customers' ? (
+        <CustomersTab user={user} isInternal={isInternal} fleetManagers={fleetManagers} fleetCoordinators={fleetCoordinators} allUsers={allUsers} />
+      ) : (
+        <TeamTab user={user} isInternal={isInternal} isFleetCoAdmin={isFleetCoAdmin} isCustomerCreator={isCustomerCreator} availableRoles={availableRoles} />
+      )}
+    </div>
+  );
+}
