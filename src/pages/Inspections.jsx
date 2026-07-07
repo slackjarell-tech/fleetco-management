@@ -3,6 +3,7 @@ import { api } from '@/api/apiClient';
 import { Plus, ClipboardCheck, AlertTriangle, CheckCircle2, Clock, Search, Trash2, FileDown } from 'lucide-react';
 import InspectionModal from '@/components/inspections/InspectionModal';
 import { exportDVIRPdf } from '@/components/inspections/ExportDVIRPdf';
+import { isFleetCoAdmin } from '@/lib/roles';
 
 const STATUS_STYLES = {
   passed: 'bg-green-100 text-green-700',
@@ -100,7 +101,7 @@ export default function Inspections() {
           >
             <FileDown className="w-4 h-4" /> Export PDF
           </button>
-          {(user?.role === 'executive' || user?.role === 'user') && (
+          {(isExecutiveView(user?.role) || user?.role === 'user') && (
             <button
               onClick={() => { setEditing(null); setShowModal(true); }}
               className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-4 py-2.5 rounded-lg text-sm"
@@ -183,7 +184,7 @@ export default function Inspections() {
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-500 max-w-xs truncate">{ins.notes || '—'}</td>
                     <td className="px-4 py-3">
-                      {(user?.role === 'executive') && (
+                      {(isExecutiveView(user?.role)) && (
                         <div className="flex gap-2">
                           <button onClick={() => { setEditing(ins); setShowModal(true); }} className="text-slate-400 hover:text-amber-500 text-xs font-medium">Edit</button>
                           <button onClick={() => handleDelete(ins.id)} className="text-slate-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>

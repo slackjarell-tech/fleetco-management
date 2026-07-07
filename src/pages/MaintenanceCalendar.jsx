@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '@/api/apiClient';
 import { ChevronLeft, ChevronRight, Wrench, Calendar, Truck, AlertTriangle, Shield } from 'lucide-react';
 import { addDays, addWeeks, addMonths, startOfWeek, startOfMonth, endOfMonth, endOfWeek, format, isSameDay, isToday, parseISO, isSameMonth } from 'date-fns';
+import { isPlatformAdmin } from '@/lib/roles';
 
 const STATUS_COLOR = {
   open:        { bg: 'bg-blue-100',   text: 'text-blue-800',   dot: 'bg-blue-500' },
@@ -246,7 +247,7 @@ export default function MaintenanceCalendar() {
     </div>
   );
 
-  if (user?.role !== 'admin' && user?.role !== 'executive') return (
+  if (!isPlatformAdmin(user?.role)) return (
     <div className="flex items-center justify-center h-64 text-slate-400">
       <div className="text-center"><Shield className="w-10 h-10 mx-auto mb-3 opacity-30" /><p>Admin access required</p></div>
     </div>

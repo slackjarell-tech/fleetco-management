@@ -6,6 +6,7 @@ import HOSGrid from '@/components/hos/HOSGrid';
 import HOSViolations from '@/components/hos/HOSViolations';
 import DVIRModal from '@/components/hos/DVIRModal';
 import DVIRSignoffModal from '@/components/hos/DVIRSignoffModal';
+import { isExecutiveView } from '@/lib/roles';
 
 const STATUS_STYLES = {
   draft:     'bg-slate-100 text-slate-600',
@@ -172,7 +173,7 @@ export default function HOSReport() {
       </div>
 
       {/* Pending DVIR sign-off banner for managers */}
-      {(user?.role === 'executive') && pendingSignoffs.length > 0 && (
+      {(isExecutiveView(user?.role)) && pendingSignoffs.length > 0 && (
         <div className="bg-amber-50 border border-amber-300 rounded-xl p-4">
           <div className="flex items-center gap-2 text-amber-800 font-black text-sm mb-2">
             <AlertTriangle className="w-4 h-4" /> {pendingSignoffs.length} DVIR(s) Awaiting Your Sign-Off
@@ -212,7 +213,7 @@ export default function HOSReport() {
             value={search} onChange={e => setSearch(e.target.value)}
           />
         </div>
-        {(user?.role === 'executive') && (
+        {(isExecutiveView(user?.role)) && (
           <select value={driverFilter} onChange={e => setDriverFilter(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400">
             <option value="all">All Drivers</option>
@@ -354,7 +355,7 @@ export default function HOSReport() {
                               {dvir.status === 'awaiting_signoff' && <span className="text-amber-700 font-bold flex items-center gap-1"><Shield className="w-3 h-3" /> Awaiting Sign-Off</span>}
                               {dvir.manager_name && <span className="text-slate-400">· Mgr: {dvir.manager_name}</span>}
                             </div>
-                            {(user?.role === 'executive') && dvir.status === 'awaiting_signoff' && (
+                            {(isExecutiveView(user?.role)) && dvir.status === 'awaiting_signoff' && (
                               <button
                                 onClick={() => setDvirSignoff(dvir)}
                                 className="text-xs bg-amber-500 hover:bg-amber-400 text-slate-900 font-black px-2.5 py-1 rounded-lg flex items-center gap-1"
@@ -388,13 +389,13 @@ export default function HOSReport() {
                       onClick={() => { setEditing(log); setShowForm(true); }}
                       className="text-xs border border-slate-200 px-3 py-1.5 rounded-lg font-bold text-slate-600 hover:bg-slate-50"
                     >Edit Log</button>
-                    {(user?.role === 'executive') && log.status === 'submitted' && (
+                    {(isExecutiveView(user?.role)) && log.status === 'submitted' && (
                       <button
                         onClick={() => handleStatusChange(log, 'reviewed')}
                         className="text-xs bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-3 py-1.5 rounded-lg"
                       >Mark Reviewed</button>
                     )}
-                    {(user?.role === 'executive') && log.status === 'draft' && (
+                    {(isExecutiveView(user?.role)) && log.status === 'draft' && (
                       <button
                         onClick={() => handleStatusChange(log, 'submitted')}
                         className="text-xs bg-blue-500 hover:bg-blue-400 text-white font-bold px-3 py-1.5 rounded-lg"

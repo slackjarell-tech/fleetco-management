@@ -29,9 +29,11 @@ export const BRAND = {
     },
     {
       name: 'Enterprise',
-      price: '$999/mo',
+      price: 'Custom pricing',
+      priceSub: 'Quote on request',
       fleetSize: '16+ vehicles',
-      detail: 'Full-service · telematics · tax docs · dedicated account team',
+      detail: 'Tailored scope · telematics · custom integrations · dedicated account team',
+      contactOnly: true,
     },
   ],
 };

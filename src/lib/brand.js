@@ -16,7 +16,7 @@ export const BRAND = {
   pricing: [
     { name: 'Starter', price: '$299/mo', fleetSize: '1–5 vehicles', detail: 'Fleet manager · parts sourcing · fuel optimization · monthly reports' },
     { name: 'Growth', price: '$599/mo', fleetSize: '6–15 vehicles', detail: 'Everything in Starter · PM scheduling · priority support · budget reviews', highlighted: true },
-    { name: 'Enterprise', price: '$999/mo', fleetSize: '16+ vehicles', detail: 'Full-service · telematics · tax docs · dedicated account team' },
+    { name: 'Enterprise', price: 'Custom pricing', priceSub: 'Quote on request', fleetSize: '16+ vehicles', detail: 'Tailored scope · telematics · custom integrations · dedicated account team', contactOnly: true },
   ],
 };
 

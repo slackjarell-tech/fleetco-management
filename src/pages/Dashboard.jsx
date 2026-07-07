@@ -4,6 +4,7 @@ import AdminDashboard from '@/components/dashboard/AdminDashboard';
 import DriverDashboard from '@/components/dashboard/DriverDashboard';
 import CustomerDashboard from '@/components/dashboard/CustomerDashboard';
 import EmployeeDashboard from '@/components/dashboard/EmployeeDashboard';
+import { isExecutiveView, isInternalRole, isCustomerPortalUser } from '@/lib/roles';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -16,9 +17,9 @@ export default function Dashboard() {
       const u = await api.auth.me().catch(() => null);
       setUser(u);
 
-      const role = u?.role || 'customer';
+      const role = u?.role || 'user';
 
-      if (role === 'executive') {
+      if (isExecutiveView(role) || u?.role === 'fleet_manager') {
         const [loads, invoices, fuel, vehicles, workOrders, customers] = await Promise.all([
           api.entities.Load.list('-created_date', 200),
           api.entities.Invoice.list('-created_date', 200),
@@ -40,8 +41,24 @@ export default function Dashboard() {
           api.entities.Invoice.list('-created_date', 100),
         ]);
         setData({ customers, invoices, loads: [], fuel: [], vehicles: [], workOrders: [] });
+      } else if (isCustomerPortalUser(u)) {
+        const [invoices, vehicles, loads] = await Promise.all([
+          api.entities.Invoice.filter({ customer_id: u.customer_id }),
+          api.entities.Vehicle.filter({ customer_id: u.customer_id }),
+          api.entities.Load.filter({ customer_id: u.customer_id }),
+        ]);
+        setData({ invoices, vehicles, loads, fuel: [], workOrders: [], customers: [] });
+      } else if (isInternalRole(role)) {
+        const [loads, invoices, fuel, vehicles, workOrders, customers] = await Promise.all([
+          api.entities.Load.list('-created_date', 200),
+          api.entities.Invoice.list('-created_date', 200),
+          api.entities.FuelLog.list('-created_date', 200),
+          api.entities.Vehicle.list('-created_date', 200),
+          api.entities.WorkOrder.list('-created_date', 200),
+          api.entities.Customer.list('-created_date', 200),
+        ]);
+        setData({ loads, invoices, fuel, vehicles, workOrders, customers });
       } else {
-        // customer role
         const [invoices, vehicles] = await Promise.all([
           api.entities.Invoice.list('-created_date', 100),
           api.entities.Vehicle.list('-created_date', 100),
@@ -80,9 +97,9 @@ export default function Dashboard() {
     );
   }
 
-  const role = user?.role || 'customer';
+  const role = user?.role || 'user';
 
-  if (role === 'executive') return <AdminDashboard data={data} />;
+  if (isExecutiveView(role) || role === 'fleet_manager') return <AdminDashboard data={data} />;
   if (role === 'driver') return <DriverDashboard user={user} data={data} />;
   if (role === 'employee') return <EmployeeDashboard user={user} data={data} />;
   return <CustomerDashboard user={user} data={data} />;

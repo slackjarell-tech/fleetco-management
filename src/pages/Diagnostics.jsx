@@ -4,6 +4,7 @@ import { Plus, Search, Cpu, AlertTriangle, CheckCircle2, Info, X, ChevronDown, C
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import DiagnosticModal from '@/components/diagnostics/DiagnosticModal';
+import { isFleetCoAdmin } from '@/lib/roles';
 
 const SEVERITY_STYLES = {
   critical: { bg: 'bg-red-100 text-red-700', dot: 'bg-red-500', icon: AlertTriangle },
@@ -66,7 +67,7 @@ export default function Diagnostics() {
   };
 
   const getVehicle = (id) => vehicles.find(v => v.id === id);
-  const isAdmin = user?.role === 'admin' || user?.role === 'tech' || user?.role === 'executive';
+  const isAdmin = isFleetCoAdmin(user?.role) || user?.role === 'admin' || user?.role === 'tech';
 
   const filtered = codes.filter(c => {
     const v = getVehicle(c.vehicle_id);

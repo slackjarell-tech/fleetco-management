@@ -13,10 +13,10 @@ import { Button } from '@/components/ui/button';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
 
 const isInternalRole = (role) => {
-  return ['executive', 'fleet_manager', 'fleet_coordinator'].includes(role);
+  return ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(role);
 };
 
-const isFleetCoAdmin = (role) => role === 'executive' || role === 'fleet_manager';
+const isFleetCoAdmin = (role) => ['owner', 'executive', 'fleet_manager'].includes(role);
 
 const NAV_GROUPS = [
   {

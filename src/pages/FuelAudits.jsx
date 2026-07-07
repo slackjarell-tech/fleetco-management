@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import FuelLogModal from '@/components/fleet/FuelLogModal';
 import IFTAReport from '@/components/fuel/IFTAReport';
+import { isFleetCoAdmin } from '@/lib/roles';
 
 export default function FuelAudits() {
   const [user, setUser] = useState(null);
@@ -65,7 +66,7 @@ export default function FuelAudits() {
     setEditLog(null);
   };
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'executive';
+  const isAdmin = isFleetCoAdmin(user?.role) || user?.role === 'admin';
   const isDriver = user?.role === 'driver';
   const canAdd = isAdmin || isDriver;
 

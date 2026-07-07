@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import LoadModal from '@/components/fleet/LoadModal';
 import WeightScaleModal from '@/components/loadboard/WeightScaleModal';
+import { isFleetCoAdmin, filterByCustomerId } from '@/lib/roles';
 
 const STATUS_COLORS = {
   available: 'bg-green-100 text-green-700',
@@ -21,6 +22,7 @@ export default function LoadBoard() {
   const [loads, setLoads] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [users, setUsers] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -37,17 +39,22 @@ export default function LoadBoard() {
 
   const fetchData = async (u) => {
     setLoading(true);
-    const [ls, vs, us] = await Promise.all([
+    const [ls, vs, us, cs] = await Promise.all([
       api.entities.Load.list('-created_date', 200),
       api.entities.Vehicle.list(),
       api.entities.User.list(),
+      api.entities.Customer.list(),
     ]);
-    const filtered = u?.role === 'driver' ? ls.filter(l => l.assigned_driver_id === u.id) :
-                     u?.role === 'customer' ? ls.filter(l => l.customer_id === u.id) :
-                     ls; // admin, executive, employee see all
+    let filtered = ls;
+    if (u?.role === 'driver') {
+      filtered = ls.filter((l) => l.assigned_driver_id === u.id);
+    } else {
+      filtered = filterByCustomerId(ls, u);
+    }
     setLoads(filtered);
     setVehicles(vs);
     setUsers(us);
+    setCustomers(cs);
     setLoading(false);
   };
 
@@ -74,7 +81,7 @@ export default function LoadBoard() {
     alert(`Email notification sent to driver for Load #${load.load_number}`);
   };
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'executive';
+  const isAdmin = isFleetCoAdmin(user?.role) || user?.role === 'admin';
   const canWeigh = isAdmin || user?.role === 'driver';
 
   const SCALE_STATUS_STYLE = {
@@ -229,6 +236,7 @@ export default function LoadBoard() {
           load={editLoad}
           vehicles={vehicles}
           users={users}
+          customers={customers}
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditLoad(null); }}
         />

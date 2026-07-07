@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/api/apiClient';
 import { AlertTriangle, Plus, Search, X, Car, User, MapPin, ShieldAlert, DollarSign, FileText } from 'lucide-react';
+import { isPlatformAdmin } from '@/lib/roles';
 
 const SEVERITY_COLORS = {
   minor: 'bg-yellow-100 text-yellow-700',
@@ -104,7 +105,7 @@ export default function IncidentReports() {
     </div>
   );
 
-  const canEdit = ['admin', 'executive'].includes(user?.role);
+  const canEdit = isPlatformAdmin(user?.role);
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5">

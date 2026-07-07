@@ -17,12 +17,12 @@ export default function Revan() {
     </div>
   );
 
-  if (user?.role !== 'executive') return (
+  if (user?.role !== 'executive' && user?.role !== 'owner') return (
     <div className="h-screen bg-slate-950 flex items-center justify-center">
       <div className="text-center">
         <Crown className="w-12 h-12 mx-auto mb-4 text-slate-700" />
         <p className="text-slate-400 text-lg font-medium">Executive access required</p>
-        <p className="text-slate-600 text-sm mt-1">Only the executive role can access Revan.</p>
+        <p className="text-slate-600 text-sm mt-1">Only the owner or executive role can access Revan.</p>
       </div>
     </div>
   );

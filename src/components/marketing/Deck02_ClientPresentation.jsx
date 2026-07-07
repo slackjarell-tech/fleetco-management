@@ -138,6 +138,7 @@ export default function Deck02_ClientPresentation() {
             <div key={plan.name} className={`bg-white p-5 rounded-xl border-2 ${plan.highlighted ? 'border-amber-500' : 'border-slate-200'}`}>
               <div className="font-black text-slate-900">{plan.name}</div>
               <div className="text-2xl font-black text-amber-500 mt-2">{plan.price}</div>
+              {plan.priceSub && <div className="text-xs text-slate-500 mt-1">{plan.priceSub}</div>}
               <div className="text-xs font-bold text-slate-700 mt-2">{plan.fleetSize}</div>
               <div className="text-xs text-slate-500 mt-2">{plan.detail}</div>
             </div>

@@ -20,9 +20,9 @@ const ENTITY_TYPES = [
   'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder',
 ];
 
-const WRITE_ROLES = new Set(['executive', 'fleet_manager', 'fleet_coordinator', 'employee']);
-const ADMIN_ROLES = new Set(['executive', 'fleet_manager']);
-const SITE_ADMIN_ROLES = new Set(['executive']);
+const WRITE_ROLES = new Set(['owner', 'executive', 'fleet_manager', 'fleet_coordinator', 'employee']);
+const ADMIN_ROLES = new Set(['owner', 'executive', 'fleet_manager']);
+const SITE_ADMIN_ROLES = new Set(['owner', 'executive']);
 
 function canWrite(user) {
   return user && WRITE_ROLES.has(user.role);
@@ -43,7 +43,7 @@ function assertEntityType(type) {
 }
 
 function scopeCriteria(user, criteria = {}) {
-  if (!user?.customer_id || user.role === 'executive') return criteria;
+  if (!user?.customer_id || ['owner', 'executive'].includes(user.role)) return criteria;
   return { ...criteria, customer_id: user.customer_id };
 }
 
@@ -203,7 +203,7 @@ export function executeTool(user, name, args) {
       assertEntityType(args.entity_type);
       const item = getEntity(args.entity_type, args.id);
       if (!item) return { success: false, error: 'Not found' };
-      if (user?.customer_id && user.role !== 'executive' && item.customer_id && item.customer_id !== user.customer_id) {
+      if (user?.customer_id && !['owner', 'executive'].includes(user.role) && item.customer_id && item.customer_id !== user.customer_id) {
         return { success: false, error: 'Access denied' };
       }
       return { success: true, item };
@@ -213,7 +213,7 @@ export function executeTool(user, name, args) {
       if (!canWrite(user)) return { success: false, error: 'Your role cannot create records' };
       assertEntityType(args.entity_type);
       const data = { ...(args.data || {}) };
-      if (user?.customer_id && user.role !== 'executive' && !data.customer_id) {
+      if (user?.customer_id && !['owner', 'executive'].includes(user.role) && !data.customer_id) {
         data.customer_id = user.customer_id;
       }
       const created = createEntity(args.entity_type, data);
@@ -225,7 +225,7 @@ export function executeTool(user, name, args) {
       assertEntityType(args.entity_type);
       const existing = getEntity(args.entity_type, args.id);
       if (!existing) return { success: false, error: 'Not found' };
-      if (user?.customer_id && user.role !== 'executive' && existing.customer_id && existing.customer_id !== user.customer_id) {
+      if (user?.customer_id && !['owner', 'executive'].includes(user.role) && existing.customer_id && existing.customer_id !== user.customer_id) {
         return { success: false, error: 'Access denied' };
       }
       const updated = updateEntity(args.entity_type, args.id, args.data || {});
@@ -294,10 +294,10 @@ export function executeTool(user, name, args) {
 
 export function getToolsForUser(user, agentName) {
   // Revan executive: full tool suite including site settings, users, deletes
-  if (agentName === 'revan' && user?.role === 'executive') {
+  if (agentName === 'revan' && ['owner', 'executive'].includes(user?.role)) {
     return TOOL_DEFINITIONS;
   }
-  if (agentName === 'revan' && user?.role !== 'executive') {
+  if (agentName === 'revan' && !['owner', 'executive'].includes(user?.role)) {
     return TOOL_DEFINITIONS.filter((t) => ['get_dashboard_summary', 'list_records', 'get_record'].includes(t.function.name));
   }
   if (!canAdmin(user)) {

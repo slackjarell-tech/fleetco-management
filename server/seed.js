@@ -5,7 +5,22 @@ import {
 } from './db.js';
 import { seedDemoData } from './seedDemo.js';
 
+const OWNER_EMAIL = 'jarrell@fleetcomanagement.org';
+
 export function seedDatabase() {
+  // Owner login — JaRell Slack creates all FleetCo employees
+  const owner = findUserByEmail(OWNER_EMAIL);
+  if (!owner) {
+    const hash = bcrypt.hashSync('FleetCo2026!', 10);
+    createUser({
+      email: OWNER_EMAIL,
+      passwordHash: hash,
+      fullName: 'JaRell D. Slack',
+      role: 'owner',
+    });
+    console.log(`Seeded owner: ${OWNER_EMAIL} / FleetCo2026!`);
+  }
+
   const admin = findUserByEmail('admin@fleetco.com');
   if (!admin) {
     const hash = bcrypt.hashSync('admin123', 10);

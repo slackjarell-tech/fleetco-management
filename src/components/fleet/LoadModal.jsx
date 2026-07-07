@@ -6,9 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { X } from 'lucide-react';
 
-export default function LoadModal({ load, vehicles, users, onSave, onClose }) {
+export default function LoadModal({ load, vehicles, users, customers = [], onSave, onClose }) {
   const drivers = users.filter(u => u.role === 'driver');
-  const customers = users.filter(u => u.role === 'customer');
+  const customerOptions = customers.length > 0
+    ? customers.map((c) => ({ id: c.id, label: c.company_name || c.contact_name }))
+    : users.filter((u) => u.role === 'user').map((u) => ({ id: u.customer_id || u.id, label: u.full_name }));
 
   const [form, setForm] = useState({
     load_number: load?.load_number || '',
@@ -125,7 +127,7 @@ export default function LoadModal({ load, vehicles, users, onSave, onClose }) {
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Select customer" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={null}>None</SelectItem>
-                  {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>)}
+                  {customerOptions.map(c => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

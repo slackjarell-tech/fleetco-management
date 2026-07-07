@@ -161,7 +161,7 @@ export default function MarketingMaterials() {
                   {[
                     { name: 'Starter', price: '$299/mo', features: ['Up to 10 vehicles', 'Fuel tracking', 'Basic maintenance', 'Load board', 'Driver management'] },
                     { name: 'Growth', price: '$599/mo', features: ['Up to 50 vehicles', 'Advanced analytics', 'IFTA reporting', 'Vendor contracts', 'Parts inventory', 'DVIR inspections'] },
-                    { name: 'Enterprise', price: '$999/mo', features: ['Unlimited vehicles', 'Full platform access', 'Custom integrations', 'Dedicated support', 'Multi-customer portal', 'Executive dashboard'] },
+                    { name: 'Enterprise', price: 'Custom pricing', priceSub: 'Quote on request', features: ['Unlimited vehicles', 'Full platform access', 'Custom integrations', 'Dedicated support', 'Multi-customer portal', 'Executive dashboard'] },
                   ].map(({ name, price, features }) => (
                     <div key={name} className="border border-slate-200 rounded-lg p-2.5">
                       <div className="flex justify-between items-center mb-1.5">

@@ -4,6 +4,7 @@ import { DollarSign, Plus, Users, CheckCircle2, Clock, FileText, TrendingUp, Che
 import { Button } from '@/components/ui/button';
 import PayrollRunModal from '@/components/payroll/PayrollRunModal';
 import PayrollRecordRow from '@/components/payroll/PayrollRecordRow';
+import { isPlatformAdmin } from '@/lib/roles';
 
 const STATUS_COLORS = {
   draft: 'bg-slate-100 text-slate-600',
@@ -80,7 +81,7 @@ export default function Payroll() {
     setRecords(prev => prev.filter(r => r.id !== id));
   };
 
-  const isAdmin = ['admin', 'executive'].includes(user?.role);
+  const isAdmin = isPlatformAdmin(user?.role);
 
   const filtered = records.filter(r => {
     if (filterStatus !== 'all' && r.status !== filterStatus) return false;

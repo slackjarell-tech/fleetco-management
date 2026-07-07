@@ -281,11 +281,13 @@ export default function CompetitiveAnalysis() {
                 </tr>
               </thead>
               <tbody>
-                {FEATURE_CATEGORIES.map((cat, ci) => (
+                {FEATURE_CATEGORIES.map((cat, ci) => {
+                  const CatIcon = cat.icon;
+                  return (
                   <React.Fragment key={cat.category}>
                     <tr className="bg-slate-100">
                       <td colSpan={8} className="px-4 py-2.5 font-black text-slate-700 text-sm">
-                        <cat.icon className="w-4 h-4 inline mr-2 text-slate-500" />
+                        <CatIcon className="w-4 h-4 inline mr-2 text-slate-500" />
                         {cat.category}
                       </td>
                     </tr>
@@ -306,7 +308,8 @@ export default function CompetitiveAnalysis() {
                       </tr>
                     ))}
                   </React.Fragment>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

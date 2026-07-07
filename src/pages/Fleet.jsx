@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import VehicleModal from '@/components/fleet/VehicleModal';
 import VehicleDocuments from '@/components/fleet/VehicleDocuments';
 import VehicleHistory from '@/components/fleet/VehicleHistory';
+import { isFleetCoAdmin, filterVehiclesForUser } from '@/lib/roles';
 
 const STATUS_COLORS = {
   active: 'bg-green-100 text-green-700',
@@ -37,6 +38,7 @@ export default function Fleet() {
   const [user, setUser] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [users, setUsers] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('vehicles');
@@ -50,14 +52,15 @@ export default function Fleet() {
   useEffect(() => {
     api.auth.me().then(async (u) => {
       setUser(u);
-      const [vs, us] = await Promise.all([
+      const [vs, us, cs] = await Promise.all([
         api.entities.Vehicle.list('-created_date'),
         api.entities.User.list(),
+        api.entities.Customer.list(),
       ]);
-      const filtered = u?.role === 'customer' ? vs.filter(v => v.assigned_customer_id === u.id) :
-                       u?.role === 'driver' ? vs.filter(v => v.assigned_driver_id === u.id) : vs;
+      const filtered = filterVehiclesForUser(vs, u);
       setVehicles(filtered);
       setUsers(us);
+      setCustomers(cs);
       setLoading(false);
     });
   }, []);
@@ -80,7 +83,7 @@ export default function Fleet() {
     setEditVehicle(null);
   };
 
-  const isAdmin = ['admin', 'tech', 'executive'].includes(user?.role);
+  const isAdmin = isFleetCoAdmin(user?.role) || user?.role === 'tech';
   const canViewManuals = ['admin', 'tech', 'employee'].includes(user?.role);
   const getName = (id) => users.find(u => u.id === id)?.full_name || '—';
 
@@ -244,6 +247,7 @@ export default function Fleet() {
         <VehicleModal
           vehicle={editVehicle || { unit_type: defaultUnitType }}
           users={users}
+          customers={customers}
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditVehicle(null); }}
         />

@@ -3,6 +3,7 @@ import { api } from '@/api/apiClient';
 import { Users, DollarSign, TrendingUp, FileText, Fuel, Wrench, BarChart2, Crown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
 import ValuationTracker from '@/components/executive/ValuationTracker';
+import { isExecutiveView } from '@/lib/roles';
 
 const COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6'];
 
@@ -36,7 +37,7 @@ export default function ExecutiveDashboard() {
     const load = async () => {
       const u = await api.auth.me();
       setUser(u);
-      if (u?.role !== 'executive') { setLoading(false); return; }
+      if (!isExecutiveView(u?.role)) { setLoading(false); return; }
       const [users, invoices, fuelLogs, workOrders, loads, customers] = await Promise.all([
         api.entities.User.list(),
         api.entities.Invoice.list(),
@@ -57,7 +58,7 @@ export default function ExecutiveDashboard() {
     </div>
   );
 
-  if (user?.role !== 'executive') return (
+  if (!isExecutiveView(user?.role)) return (
     <div className="flex items-center justify-center h-64 bg-slate-950">
       <div className="text-center text-slate-400">
         <Crown className="w-10 h-10 mx-auto mb-3 opacity-30" />

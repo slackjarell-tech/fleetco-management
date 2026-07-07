@@ -11,6 +11,14 @@ import {
   listEntities,
   nowIso,
 } from './db.js';
+import {
+  canCreateFleetCoEmployees,
+  canManageCustomerTeam,
+  canProvisionCustomers,
+  isFleetCoInternal,
+  subscriptionAmount,
+  SUBSCRIPTION_PLANS,
+} from './roles.js';
 
 const SIM_ROUTES = [
   { name: 'I-80 Westbound', id: 'sim_driver_01', userName: '👤 Mike R. (Sim)', steps: [
@@ -48,6 +56,8 @@ export async function invokeFunction(name, body, user) {
       return upgradeUserRole(body, user);
     case 'createUserAccount':
       return createUserAccount(body, user);
+    case 'provisionCustomer':
+      return provisionCustomer(body, user);
     case 'simulateDrivers':
       return simulateDrivers(body);
     case 'predictFuelPrices':
@@ -69,7 +79,7 @@ export async function invokeFunction(name, body, user) {
     case 'refreshFuelPrices':
       return { success: true, message: 'Fuel prices refreshed (local mode)' };
     case 'seedDemoData': {
-      if (!user || user.role !== 'executive') throw new Error('Executive access required');
+      if (!user || !['owner', 'executive'].includes(user.role)) throw new Error('Owner or executive access required');
       const { seedDemoData, getDemoSeedSummary } = await import('./seedDemo.js');
       const created = seedDemoData();
       return {
@@ -159,18 +169,36 @@ function createUserAccount(body, user) {
   if (!email || !tempPassword || !role) {
     throw new Error('Email, tempPassword, and role are required');
   }
-  const allowedRoles = ['user', 'fleet_manager', 'fleet_coordinator', 'driver'];
-  if (!allowedRoles.includes(role)) {
-    throw new Error(`Role must be one of: ${allowedRoles.join(', ')}`);
-  }
-  if (user.role === 'fleet_manager' && role === 'fleet_manager') {
-    throw new Error('Fleet managers can only create user or coordinator accounts');
-  }
-  if (!['executive', 'fleet_manager'].includes(user.role)) {
-    throw new Error('Only executives and fleet managers can create accounts');
+
+  const internalRoles = ['executive', 'fleet_manager', 'fleet_coordinator'];
+  const customerRoles = ['user', 'driver'];
+
+  if (internalRoles.includes(role)) {
+    if (!canCreateFleetCoEmployees(user.role)) {
+      throw new Error('Only the owner (JaRell Slack) can create FleetCo employee accounts');
+    }
+    if (customerId) throw new Error('FleetCo employees are not linked to a customer account');
+  } else if (customerRoles.includes(role)) {
+    if (canManageCustomerTeam(user.role)) {
+      if (!user.customer_id) throw new Error('Your account is not linked to a customer organization');
+      if (customerId && customerId !== user.customer_id) {
+        throw new Error('You can only add team members to your own organization');
+      }
+    } else if (canProvisionCustomers(user.role) || user.role === 'owner') {
+      if (!customerId) throw new Error('customerId is required when creating customer portal users');
+    } else {
+      throw new Error('You do not have permission to create this account type');
+    }
+  } else if (role === 'owner') {
+    throw new Error('Owner accounts cannot be created through this form');
+  } else {
+    throw new Error(`Invalid role: ${role}`);
   }
 
-  const effectiveCustomerId = customerId || user.customer_id || null;
+  const effectiveCustomerId = internalRoles.includes(role)
+    ? null
+    : (customerId || user.customer_id || null);
+
   let existing = getUserRowByEmail(email);
   if (!existing) {
     const hash = bcrypt.hashSync(tempPassword, 10);
@@ -196,7 +224,7 @@ function createUserAccount(body, user) {
     role,
     customer_id: effectiveCustomerId,
     activated: false,
-    created_by: user.full_name || 'FleetCo Administration',
+    created_by: user.full_name || user.email,
     employee_number: employeeNumber || '',
   });
 
@@ -205,6 +233,80 @@ function createUserAccount(body, user) {
     success: true,
     email,
     message: `${email} account created. They can sign in with the temporary password.`,
+  };
+}
+
+function provisionCustomer(body, user) {
+  if (!user || !canProvisionCustomers(user.role)) {
+    throw new Error('Only FleetCo owner, executive, or fleet managers can add customers');
+  }
+
+  const {
+    customer: customerData,
+    subscription_plan,
+    subscription_term,
+    payment_collected,
+    tempPassword,
+    createLogin,
+  } = body;
+
+  if (!customerData?.company_name || !customerData?.email) {
+    throw new Error('Company name and contact email are required');
+  }
+  if (!payment_collected) {
+    throw new Error('Payment must be collected before activating a customer account');
+  }
+  if (!SUBSCRIPTION_PLANS[subscription_plan]) {
+    throw new Error('Valid subscription plan required (Starter or Growth)');
+  }
+  if (!['monthly', 'yearly'].includes(subscription_term)) {
+    throw new Error('Subscription term must be monthly or yearly');
+  }
+
+  const amount = subscriptionAmount(subscription_plan, subscription_term);
+  const ts = nowIso();
+
+  const customer = createEntity('Customer', {
+    ...customerData,
+    status: 'active',
+    subscription_plan,
+    subscription_term,
+    subscription_amount: amount,
+    payment_collected_at: ts,
+    subscription_status: 'active',
+    provisioned_by: user.email,
+  });
+
+  createEntity('Subscription', {
+    customer_id: customer.id,
+    plan: subscription_plan,
+    term: subscription_term,
+    amount,
+    status: 'active',
+    started_at: ts,
+    collected_by: user.email,
+  });
+
+  let loginMessage = '';
+  if (createLogin && tempPassword) {
+    createUserAccount(
+      {
+        email: customerData.email,
+        tempPassword,
+        role: 'user',
+        customerId: customer.id,
+      },
+      user
+    );
+    updateEntity('Customer', customer.id, { user_id: findUserByEmail(customerData.email)?.id });
+    loginMessage = ` Portal login created for ${customerData.email}.`;
+  }
+
+  return {
+    success: true,
+    customer,
+    subscription: { plan: subscription_plan, term: subscription_term, amount },
+    message: `Customer ${customerData.company_name} activated.${loginMessage}`,
   };
 }
 
@@ -317,11 +419,12 @@ function predictFuelPrices() {
   };
 }
 
-function createCheckout({ planName }) {
+function createCheckout({ planName, billingTerm = 'monthly' }) {
   const origin = process.env.APP_ORIGIN || 'http://localhost:5173';
+  const term = billingTerm === 'yearly' ? 'yearly' : 'monthly';
   return {
-    url: `${origin}/register?plan=${encodeURIComponent(planName || 'Standard')}`,
-    message: 'Stripe not configured — redirecting to registration',
+    url: `${origin}/register?plan=${encodeURIComponent(planName || 'Starter')}&term=${term}`,
+    message: 'Complete registration after selecting your plan',
   };
 }
 

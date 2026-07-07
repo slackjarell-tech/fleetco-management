@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/api/apiClient';
 import { Route, MapPin, Truck, User, Clock, TrendingUp, AlertCircle, Navigation } from 'lucide-react';
+import { isDeliveryStopComplete } from '@/lib/roles';
 
 const STATUS_COLORS = {
   pending: 'bg-slate-100 text-slate-600',
@@ -68,7 +69,7 @@ export default function RouteDashboard() {
       const driver = userMap[r.driver_id];
       const vehicle = vehicleMap[r.vehicle_id];
       const routeStops = (stops || []).filter(s => s.route_id === r.id);
-      const completedStops = routeStops.filter(s => s.status === 'completed').length;
+      const completedStops = routeStops.filter(s => isDeliveryStopComplete(s.status)).length;
       const driverLocation = liveDrivers.find(l => l.user_id === r.driver_id);
 
       return {
@@ -226,7 +227,7 @@ export default function RouteDashboard() {
                   {route.stops?.length > 0 && (
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <div className="text-xs text-slate-400">Next:</div>
-                      {route.stops.filter(s => s.status !== 'completed').slice(0, 3).map((stop, i) => (
+                      {route.stops.filter(s => !isDeliveryStopComplete(s.status)).slice(0, 3).map((stop, i) => (
                         <div key={stop.id} className="text-xs bg-slate-100 px-2 py-1 rounded flex items-center gap-1">
                           <span className="font-bold text-slate-600">#{stop.sequence}</span>
                           <span className="text-slate-500 truncate max-w-[150px]">{stop.recipient_name}</span>
@@ -251,7 +252,7 @@ export default function RouteDashboard() {
                     {(route.stops || []).map((stop, i) => (
                       <div key={stop.id} className="flex items-center gap-3 text-sm">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                          stop.status === 'completed' ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-600'
+                          isDeliveryStopComplete(stop.status) ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-600'
                         }`}>
                           {stop.sequence}
                         </div>
@@ -260,7 +261,7 @@ export default function RouteDashboard() {
                           <div className="text-xs text-slate-500">{stop.address}</div>
                         </div>
                         <div className="text-xs capitalize">
-                          {stop.status === 'completed' ? (
+                          {isDeliveryStopComplete(stop.status) ? (
                             <span className="text-green-600 font-bold">✓ Done</span>
                           ) : stop.status === 'failed' ? (
                             <span className="text-red-600 font-bold">✗ Failed</span>

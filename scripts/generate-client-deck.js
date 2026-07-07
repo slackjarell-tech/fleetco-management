@@ -191,13 +191,16 @@ async function main() {
   slide.addText('Simple Plans. Fast Onboarding.', { x: 0.6, y: 0.75, w: 9, h: 0.7, fontSize: 28, bold: true, color: NAVY });
   BRAND.pricing.forEach((plan, i) => {
     slide.addShape(pptx.shapes.ROUNDED_RECTANGLE, {
-      x: 0.6 + i * 3.15, y: 1.7, w: 2.95, h: 2.85,
+      x: 0.6 + i * 3.15, y: 1.7, w: 2.95, h: plan.priceSub ? 3.0 : 2.85,
       fill: { color: WHITE }, line: { color: plan.highlighted ? AMBER : 'E2E8F0', width: plan.highlighted ? 2 : 1 }, rectRadius: 0.08,
     });
     slide.addText(plan.name, { x: 0.75 + i * 3.15, y: 1.9, w: 2.7, h: 0.35, fontSize: 14, bold: true, color: NAVY });
-    slide.addText(plan.price, { x: 0.75 + i * 3.15, y: 2.3, w: 2.7, h: 0.5, fontSize: 20, bold: true, color: AMBER });
-    slide.addText(plan.fleetSize, { x: 0.75 + i * 3.15, y: 2.85, w: 2.7, h: 0.3, fontSize: 11, bold: true, color: NAVY });
-    slide.addText(plan.detail, { x: 0.75 + i * 3.15, y: 3.2, w: 2.7, h: 1.1, fontSize: 10, color: SLATE });
+    slide.addText(plan.price, { x: 0.75 + i * 3.15, y: 2.3, w: 2.7, h: 0.5, fontSize: plan.contactOnly ? 16 : 20, bold: true, color: AMBER });
+    if (plan.priceSub) {
+      slide.addText(plan.priceSub, { x: 0.75 + i * 3.15, y: 2.75, w: 2.7, h: 0.25, fontSize: 10, color: SLATE, italic: true });
+    }
+    slide.addText(plan.fleetSize, { x: 0.75 + i * 3.15, y: plan.priceSub ? 3.05 : 2.85, w: 2.7, h: 0.3, fontSize: 11, bold: true, color: NAVY });
+    slide.addText(plan.detail, { x: 0.75 + i * 3.15, y: plan.priceSub ? 3.35 : 3.2, w: 2.7, h: 1.1, fontSize: 10, color: SLATE });
   });
   slide.addText(`Schedule a free demo: ${BRAND.phone}  ·  ${BRAND.website}`, {
     x: 0.6, y: 4.85, w: 9, h: 0.4, fontSize: 13, color: NAVY, bold: true,

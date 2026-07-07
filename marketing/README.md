@@ -17,7 +17,7 @@ Topics covered:
 - Site Commander & Revan AI
 - ROI metrics
 - Customer segments
-- **Real pricing** ($299 / $599 / $999 per month — matches live site)
+- **Real pricing** (Starter $299 / Growth $599 · Enterprise custom quote)
 - Contact with **(360) 952-1249** and leadership names
 
 ## Demo data

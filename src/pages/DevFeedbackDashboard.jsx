@@ -5,6 +5,7 @@ import {
   Search, ChevronDown, ChevronUp, BarChart2, Star, Zap, Filter
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
+import { isPlatformAdmin } from '@/lib/roles';
 
 const CATEGORY_COLORS = {
   'Troubleshooting': '#ef4444',
@@ -115,7 +116,7 @@ export default function DevFeedbackDashboard() {
     </div>
   );
 
-  if (!['admin', 'executive'].includes(user?.role)) return (
+  if (!isPlatformAdmin(user?.role)) return (
     <div className="flex items-center justify-center h-64 text-slate-400">Admin access required.</div>
   );
 

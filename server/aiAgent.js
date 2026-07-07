@@ -30,7 +30,7 @@ Behavior:
 Entity types: Customer, Vehicle, WorkOrder, Load, Invoice, FuelLog, MaintenanceSchedule, Vendor, PartInventory, Inquiry, Message, Inspection, Incident, and others.`;
   }
 
-  const isExecutive = role === 'executive';
+  const isExecutive = ['owner', 'executive'].includes(role);
   return `You are Site Commander, an AI agent inside the FleetCo Management portal at fleetcomanagement.org.
 You work like Cursor for this website: you can READ fleet data and MAKE REAL CHANGES when the user asks.
 

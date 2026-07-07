@@ -8,6 +8,7 @@ import {
   ShieldCheck, MapPin, Clock, CreditCard, BoxSelect
 } from 'lucide-react';
 import ReportConfigModal from '@/components/reports/ReportConfigModal';
+import { isPlatformAdmin } from '@/lib/roles';
 
 // ─── Report Definitions ───────────────────────────────────────────────────────
 const REPORT_CATALOG = [
@@ -700,7 +701,7 @@ export default function Reports() {
     </div>
   );
 
-  if (!['admin', 'executive'].includes(user?.role)) {
+  if (!isPlatformAdmin(user?.role)) {
     return <div className="p-6 text-center text-slate-500">Reports are available to administrators only.</div>;
   }
 

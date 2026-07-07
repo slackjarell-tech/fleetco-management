@@ -11,33 +11,39 @@ const STATUS_COLORS = {
 };
 
 const ROLE_COLORS = {
+  owner: 'bg-amber-100 text-amber-800',
   executive: 'bg-yellow-100 text-yellow-800',
   fleet_manager: 'bg-blue-100 text-blue-700',
   fleet_coordinator: 'bg-emerald-100 text-emerald-700',
   user: 'bg-slate-100 text-slate-600',
+  driver: 'bg-purple-100 text-purple-700',
 };
 
 const ROLE_ICONS = {
+  owner: Crown,
   executive: Crown,
   fleet_manager: Shield,
   fleet_coordinator: ClipboardList,
   user: User,
+  driver: Truck,
 };
 
-const CUSTOMER_ROLES = ['user'];
+const FLEETCO_INTERNAL = ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'];
 
 const getAvailableRoles = (userRole) => {
-  if (userRole === 'executive') {
-    return ['user', 'fleet_manager', 'fleet_coordinator'];
+  if (userRole === 'owner') {
+    return ['executive', 'fleet_manager', 'fleet_coordinator'];
   }
-  if (userRole === 'fleet_manager') {
-    return ['user', 'fleet_coordinator'];
+  if (userRole === 'user') {
+    return ['user', 'driver'];
   }
   return [];
 };
 
+const canProvisionCustomers = (role) => ['owner', 'executive', 'fleet_manager'].includes(role);
+
 // ── Customers Tab ──
-function CustomersTab({ user, isInternal, fleetManagers, fleetCoordinators, allUsers }) {
+function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators, allUsers }) {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -61,15 +67,13 @@ function CustomersTab({ user, isInternal, fleetManagers, fleetCoordinators, allU
 
   useEffect(() => { loadCustomers(); }, []);
 
-  const handleSave = async (data, loginData) => {
+  const handleSave = async (data, loginData, subscriptionData) => {
     let customerId = editingCustomer?.id;
-    let createdCustomer = null;
+    setMessage('');
 
-    // Clean up assignment fields
     const cleanData = { ...data };
     if (!cleanData.assigned_manager_id) cleanData.assigned_manager_id = '';
     if (!cleanData.assigned_coordinator_id) cleanData.assigned_coordinator_id = '';
-    // fleet_size must be a number or null — input returns a string
     if (cleanData.fleet_size !== undefined && cleanData.fleet_size !== '') {
       cleanData.fleet_size = Number(cleanData.fleet_size);
     } else {
@@ -78,23 +82,21 @@ function CustomersTab({ user, isInternal, fleetManagers, fleetCoordinators, allU
 
     if (editingCustomer) {
       await api.entities.Customer.update(customerId, cleanData);
+      setMessage('Customer updated successfully.');
     } else {
-      createdCustomer = await api.entities.Customer.create(cleanData);
-      customerId = createdCustomer.id;
-    }
-
-    // Create portal login if requested
-    if (loginData && createdCustomer) {
       try {
-        const result = await api.functions.invoke('createUserAccount', {
-          email: data.email,
-          tempPassword: loginData.tempPassword,
-          role: loginData.loginRole,
-          customerId: createdCustomer.id,
+        const result = await api.functions.invoke('provisionCustomer', {
+          customer: cleanData,
+          subscription_plan: subscriptionData.subscription_plan,
+          subscription_term: subscriptionData.subscription_term,
+          payment_collected: subscriptionData.payment_collected,
+          createLogin: !!loginData,
+          tempPassword: loginData?.tempPassword || '',
         });
-        setMessage(`Account created! ${data.email} will receive a welcome email with login details and a setup email to set their password.`);
+        setMessage(result.message || 'Customer activated successfully.');
       } catch (err) {
-        setMessage(`Customer created but login failed: ${err?.response?.data?.error || 'Please create login manually from the Team tab.'}`);
+        setMessage(`Failed: ${err?.data?.error || err?.message || 'Could not activate customer'}`);
+        return;
       }
     }
 
@@ -182,7 +184,7 @@ function CustomersTab({ user, isInternal, fleetManagers, fleetCoordinators, allU
             <option value="prospect">Prospect</option>
           </select>
         </div>
-        {isInternal && (
+        {canAddCustomers && (
           <button
             onClick={() => { setEditingCustomer(null); setShowModal(true); }}
             className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-4 py-2.5 rounded-lg text-sm"
@@ -197,7 +199,7 @@ function CustomersTab({ user, isInternal, fleetManagers, fleetCoordinators, allU
         <div className="text-center py-16 text-slate-400">
           <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="font-medium">No customers found</p>
-          {isInternal && <p className="text-sm mt-1">Add your first customer to get started</p>}
+          {canAddCustomers && <p className="text-sm mt-1">Add your first customer to get started</p>}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -242,8 +244,19 @@ function CustomersTab({ user, isInternal, fleetManagers, fleetCoordinators, allU
                 {c.fleet_size && (
                   <div className="text-slate-500">Fleet: <strong>{c.fleet_size}</strong> vehicles</div>
                 )}
+                {c.subscription_plan && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-semibold capitalize">
+                      {c.subscription_plan}
+                    </span>
+                    <span className="text-slate-500 capitalize">
+                      {c.subscription_term || 'monthly'} · ${c.subscription_amount?.toLocaleString()}
+                      {c.subscription_term === 'yearly' ? '/yr' : '/mo'}
+                    </span>
+                  </div>
+                )}
               </div>
-              {isInternal && (c.assigned_manager_id || c.assigned_coordinator_id) && (
+              {canAddCustomers && (c.assigned_manager_id || c.assigned_coordinator_id) && (
                 <div className="space-y-1 text-xs text-slate-500 bg-slate-50 rounded-lg px-2.5 py-1.5 mb-3">
                   {c.assigned_manager_id && (
                     <div className="flex items-center gap-1.5">
@@ -262,7 +275,7 @@ function CustomersTab({ user, isInternal, fleetManagers, fleetCoordinators, allU
               {c.notes && (
                 <p className="text-xs text-slate-400 italic border-t border-slate-100 pt-2 mb-3 line-clamp-2">{c.notes}</p>
               )}
-              {isInternal && (
+              {canAddCustomers && (
                 <div className="flex gap-2 pt-2 border-t border-slate-100">
                   <button onClick={() => { setEditingCustomer(c); setShowModal(true); }}
                     className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold border border-slate-200 rounded-lg py-1.5 hover:bg-slate-50">
@@ -278,7 +291,7 @@ function CustomersTab({ user, isInternal, fleetManagers, fleetCoordinators, allU
                     className="flex items-center justify-center gap-1 text-xs font-semibold border border-amber-100 text-amber-600 rounded-lg px-3 py-1.5 hover:bg-amber-50">
                     <KeyRound className="w-3 h-3" />
                   </button>
-                  {user?.role === 'executive' && (
+                  {(user?.role === 'owner' || user?.role === 'executive') && (
                     <button onClick={() => handleDelete(c.id)}
                       className="flex items-center justify-center gap-1 text-xs font-semibold border border-red-100 text-red-500 rounded-lg px-3 py-1.5 hover:bg-red-50">
                       <Trash2 className="w-3 h-3" />
@@ -312,12 +325,12 @@ function CustomersTab({ user, isInternal, fleetManagers, fleetCoordinators, allU
 }
 
 // ── Team Tab ──
-function TeamTab({ user, isInternal, isFleetCoAdmin, isCustomerCreator, availableRoles }) {
+function TeamTab({ user, isOwner, isCustomerAdmin, canManageTeam, availableRoles }) {
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
   const [tempPassword, setTempPassword] = useState('');
-  const [inviteRole, setInviteRole] = useState('user');
+  const [inviteRole, setInviteRole] = useState(availableRoles[0] || 'user');
   const [inviteEmployeeNumber, setInviteEmployeeNumber] = useState('');
   const [inviting, setInviting] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState('');
@@ -325,10 +338,12 @@ function TeamTab({ user, isInternal, isFleetCoAdmin, isCustomerCreator, availabl
 
   const loadTeam = async () => {
     const users = await api.entities.User.list();
-    if (user?.role === 'user') {
+    if (isOwner) {
+      setTeamMembers(users.filter(m => FLEETCO_INTERNAL.includes(m.role)));
+    } else if (user?.role === 'user') {
       setTeamMembers(users.filter(m => m.customer_id === user.customer_id));
     } else {
-      setTeamMembers(users);
+      setTeamMembers([]);
     }
     setLoading(false);
   };
@@ -345,13 +360,13 @@ function TeamTab({ user, isInternal, isFleetCoAdmin, isCustomerCreator, availabl
       if (user?.customer_id) payload.customerId = user.customer_id;
       if (inviteEmployeeNumber) payload.employeeNumber = inviteEmployeeNumber;
       const result = await api.functions.invoke('createUserAccount', payload);
-      setInviteSuccess(result.data.message || `${inviteEmail} invited as ${inviteRole}.`);
+      setInviteSuccess(result.message || `${inviteEmail} invited as ${inviteRole}.`);
       setInviteEmail('');
       setTempPassword('');
       setInviteEmployeeNumber('');
       loadTeam();
     } catch (err) {
-      setInviteError(err?.response?.data?.error || err?.message || 'Failed to create account.');
+      setInviteError(err?.data?.error || err?.message || 'Failed to create account.');
     } finally {
       setInviting(false);
     }
@@ -415,11 +430,15 @@ function TeamTab({ user, isInternal, isFleetCoAdmin, isCustomerCreator, availabl
       </div>
 
       {/* Invite Panel */}
-      {isInternal && availableRoles.length > 0 && (
+      {canManageTeam && availableRoles.length > 0 && (
       <div className="bg-slate-900 rounded-2xl p-6">
-        <h2 className="text-white font-black text-base mb-1">Create New Account</h2>
+        <h2 className="text-white font-black text-base mb-1">
+          {isOwner ? 'Create FleetCo Employee' : 'Add Team Member'}
+        </h2>
         <p className="text-slate-400 text-sm mb-4">
-          Enter their email and a temp password. They'll receive a setup email from the platform to set their password.
+          {isOwner
+            ? 'Only you (owner) can create FleetCo employee accounts. Enter email and a temp password.'
+            : 'Add drivers and team members to your organization. They can sign in with the temp password you set.'}
         </p>
         <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
@@ -458,24 +477,33 @@ function TeamTab({ user, isInternal, isFleetCoAdmin, isCustomerCreator, availabl
 
         <div className="mt-5 pt-4 border-t border-slate-800">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="bg-amber-900/40 border border-amber-700/50 rounded-lg p-3">
-              <div className="text-amber-400 font-bold text-xs flex items-center gap-1.5">
-                Customer User <span className="text-[10px] bg-amber-500 text-slate-900 px-1.5 py-0.5 rounded-full font-black">PORTAL</span>
-              </div>
-              <div className="text-slate-400 text-xs mt-0.5">Portal access — fleet data, operations, reports</div>
-            </div>
-            <div className="bg-blue-900/40 border border-blue-700/50 rounded-lg p-3">
-              <div className="text-blue-400 font-bold text-xs flex items-center gap-1.5">
-                Fleet Manager <span className="text-[10px] bg-blue-500 text-slate-900 px-1.5 py-0.5 rounded-full font-black">INTERNAL</span>
-              </div>
-              <div className="text-slate-400 text-xs mt-0.5">Full access to assigned customers &amp; data</div>
-            </div>
-            <div className="bg-emerald-900/40 border border-emerald-700/50 rounded-lg p-3">
-              <div className="text-emerald-400 font-bold text-xs flex items-center gap-1.5">
-                Fleet Coordinator <span className="text-[10px] bg-emerald-500 text-slate-900 px-1.5 py-0.5 rounded-full font-black">INTERNAL</span>
-              </div>
-              <div className="text-slate-400 text-xs mt-0.5">View &amp; update assigned customer documents</div>
-            </div>
+            {isOwner ? (
+              <>
+                <div className="bg-yellow-900/40 border border-yellow-700/50 rounded-lg p-3">
+                  <div className="text-yellow-400 font-bold text-xs">Executive</div>
+                  <div className="text-slate-400 text-xs mt-0.5">Full platform access</div>
+                </div>
+                <div className="bg-blue-900/40 border border-blue-700/50 rounded-lg p-3">
+                  <div className="text-blue-400 font-bold text-xs">Fleet Manager</div>
+                  <div className="text-slate-400 text-xs mt-0.5">Manage customers &amp; operations</div>
+                </div>
+                <div className="bg-emerald-900/40 border border-emerald-700/50 rounded-lg p-3">
+                  <div className="text-emerald-400 font-bold text-xs">Fleet Coordinator</div>
+                  <div className="text-slate-400 text-xs mt-0.5">Support assigned customers</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="bg-amber-900/40 border border-amber-700/50 rounded-lg p-3">
+                  <div className="text-amber-400 font-bold text-xs">Portal User</div>
+                  <div className="text-slate-400 text-xs mt-0.5">Full portal access for your fleet</div>
+                </div>
+                <div className="bg-purple-900/40 border border-purple-700/50 rounded-lg p-3">
+                  <div className="text-purple-400 font-bold text-xs">Driver</div>
+                  <div className="text-slate-400 text-xs mt-0.5">Driver app &amp; route access</div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -484,7 +512,9 @@ function TeamTab({ user, isInternal, isFleetCoAdmin, isCustomerCreator, availabl
       {/* Members Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100">
-          <h2 className="font-black text-slate-900">All Users ({teamMembers.length})</h2>
+          <h2 className="font-black text-slate-900">
+            {isOwner ? 'FleetCo Team' : 'Your Team'} ({teamMembers.length})
+          </h2>
         </div>
         <div className="divide-y divide-slate-100">
           {teamMembers.map(m => {
@@ -510,7 +540,7 @@ function TeamTab({ user, isInternal, isFleetCoAdmin, isCustomerCreator, availabl
                     <RoleIcon className="w-3 h-3" />
                     {m.role}
                   </span>
-                  {m.id !== user?.id && isFleetCoAdmin && (
+                  {m.id !== user?.id && canManageTeam && (
                     <>
                       <select value={m.role} onChange={e => handleRoleChange(m.id, e.target.value)}
                         className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-400">
@@ -531,7 +561,7 @@ function TeamTab({ user, isInternal, isFleetCoAdmin, isCustomerCreator, availabl
                     className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
                     <KeyRound className="w-3.5 h-3.5" />
                   </button>
-                  {isFleetCoAdmin && m.id !== user?.id && (
+                  {canManageTeam && m.id !== user?.id && m.role !== 'owner' && (
                     <button title="Delete user" onClick={() => handleDeleteUser(m)}
                       className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                       <Trash2 className="w-3.5 h-3.5" />
@@ -574,9 +604,10 @@ export default function Customers() {
     </div>
   );
 
-  const isInternal = ['executive', 'fleet_manager', 'fleet_coordinator'].includes(user?.role);
-  const isFleetCoAdmin = user?.role === 'executive' || user?.role === 'fleet_manager';
-  const isCustomerCreator = CUSTOMER_ROLES.includes(user?.role);
+  const isInternal = FLEETCO_INTERNAL.includes(user?.role);
+  const isOwner = user?.role === 'owner';
+  const canAddCustomers = canProvisionCustomers(user?.role);
+  const showTeamTab = isOwner || user?.role === 'user';
   const availableRoles = getAvailableRoles(user?.role);
   const fleetManagers = allUsers.filter(u => u.role === 'fleet_manager');
   const fleetCoordinators = allUsers.filter(u => u.role === 'fleet_coordinator');
@@ -587,32 +618,46 @@ export default function Customers() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-900">Customers & Team</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Manage customer accounts, team members, and access</p>
+          <p className="text-slate-500 text-sm mt-0.5">
+            {isOwner
+              ? 'Add customers after payment · create FleetCo employees here'
+              : user?.role === 'user'
+                ? 'Manage your drivers and team members'
+                : 'Manage customer accounts and access'}
+          </p>
         </div>
       </div>
 
-      {/* Tabs - Team tab only visible to internal roles */}
+      {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
-        <button onClick={() => setTab('customers')}
-          className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${tab === 'customers' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-          <Building2 className="w-4 h-4 inline mr-1.5" />
-          Customers
-        </button>
-        {isInternal && (
+        {(isInternal || canAddCustomers) && (
+          <button onClick={() => setTab('customers')}
+            className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${tab === 'customers' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            <Building2 className="w-4 h-4 inline mr-1.5" />
+            Customers
+          </button>
+        )}
+        {showTeamTab && (
           <button onClick={() => setTab('team')}
             className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${tab === 'team' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
             <Users className="w-4 h-4 inline mr-1.5" />
-            Team & Access
+            {isOwner ? 'FleetCo Team' : 'My Team'}
           </button>
         )}
       </div>
 
       {/* Tab Content */}
-      {tab === 'customers' ? (
-        <CustomersTab user={user} isInternal={isInternal} fleetManagers={fleetManagers} fleetCoordinators={fleetCoordinators} allUsers={allUsers} />
-      ) : (
-        <TeamTab user={user} isInternal={isInternal} isFleetCoAdmin={isFleetCoAdmin} isCustomerCreator={isCustomerCreator} availableRoles={availableRoles} />
-      )}
+      {tab === 'customers' && (isInternal || canAddCustomers) ? (
+        <CustomersTab user={user} canAddCustomers={canAddCustomers} fleetManagers={fleetManagers} fleetCoordinators={fleetCoordinators} allUsers={allUsers} />
+      ) : showTeamTab ? (
+        <TeamTab
+          user={user}
+          isOwner={isOwner}
+          isCustomerAdmin={user?.role === 'user'}
+          canManageTeam={isOwner || user?.role === 'user'}
+          availableRoles={availableRoles}
+        />
+      ) : null}
     </div>
   );
 }

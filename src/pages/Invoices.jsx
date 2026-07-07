@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import InvoiceModal from '@/components/fleet/InvoiceModal';
 import InvoiceDetail from '@/components/fleet/InvoiceDetail';
+import { isFleetCoAdmin, filterByCustomerId } from '@/lib/roles';
 
 const STATUS_COLORS = {
   draft: 'bg-slate-100 text-slate-600',
@@ -20,6 +21,7 @@ export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [users, setUsers] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -36,15 +38,17 @@ export default function Invoices() {
 
   const fetchData = async (u) => {
     setLoading(true);
-    const [inv, vs, us] = await Promise.all([
+    const [inv, vs, us, cs] = await Promise.all([
       api.entities.Invoice.list('-created_date', 200),
       api.entities.Vehicle.list(),
       api.entities.User.list(),
+      api.entities.Customer.list(),
     ]);
-    const filtered = u?.role === 'customer' ? inv.filter(i => i.customer_id === u.id) : inv;
+    const filtered = filterByCustomerId(inv, u);
     setInvoices(filtered);
     setVehicles(vs);
     setUsers(us);
+    setCustomers(cs);
     setLoading(false);
   };
 
@@ -71,7 +75,7 @@ export default function Invoices() {
     alert(`Email notification sent to customer for Invoice #${inv.invoice_number}`);
   };
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'executive';
+  const isAdmin = isFleetCoAdmin(user?.role) || user?.role === 'admin';
   const getCustomerName = (id) => users.find(u => u.id === id)?.full_name || '—';
   const getVehicle = (id) => vehicles.find(v => v.id === id);
 
@@ -196,6 +200,7 @@ export default function Invoices() {
           invoice={editInvoice}
           vehicles={vehicles}
           users={users}
+          customers={customers}
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditInvoice(null); }}
         />

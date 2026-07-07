@@ -3,6 +3,7 @@ import { api } from '@/api/apiClient';
 import { Clock, LogIn, LogOut, Wrench, Play, Square, Timer, Calendar, User, ChevronDown, MapPin, Navigation, Camera } from 'lucide-react';
 import useDriverLocation from '@/hooks/useDriverLocation';
 import CameraCapture from '@/components/driver/CameraCapture';
+import { isPlatformAdmin } from '@/lib/roles';
 
 function formatDuration(minutes) {
   if (!minutes) return '0m';
@@ -46,7 +47,7 @@ export default function TimeClock() {
   const loadData = useCallback(async () => {
     const u = await api.auth.me();
     setUser(u);
-    const isAdmin = ['admin', 'executive'].includes(u?.role);
+    const isAdmin = isPlatformAdmin(u?.role);
 
     const [ents, wos, vehs, users] = await Promise.all([
       api.entities.TimeClockEntry.filter({ user_id: u.id }, '-clock_in', 200),
@@ -196,7 +197,7 @@ export default function TimeClock() {
   const todayWOMins = todayEntries.filter(e => e.entry_type === 'work_order' && e.duration_minutes).reduce((s, e) => s + e.duration_minutes, 0)
     + (activeWOEntry ? Math.round(elapsedMinutes(activeWOEntry.clock_in)) : 0);
 
-  const isAdmin = ['admin', 'executive'].includes(user?.role);
+  const isAdmin = isPlatformAdmin(user?.role);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">

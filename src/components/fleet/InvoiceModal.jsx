@@ -6,8 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { X, Plus, Trash2 } from 'lucide-react';
 
-export default function InvoiceModal({ invoice, vehicles, users, onSave, onClose }) {
-  const customers = users.filter(u => u.role === 'customer');
+export default function InvoiceModal({ invoice, vehicles, users, customers = [], onSave, onClose }) {
+  const customerOptions = customers.length > 0
+    ? customers.map((c) => ({ id: c.id, label: c.company_name || c.contact_name }))
+    : users.filter((u) => u.role === 'user').map((u) => ({ id: u.customer_id || u.id, label: u.full_name }));
   const [form, setForm] = useState({
     invoice_number: invoice?.invoice_number || `INV-${Date.now().toString().slice(-6)}`,
     type: invoice?.type || 'labor_and_parts',
@@ -69,7 +71,7 @@ export default function InvoiceModal({ invoice, vehicles, users, onSave, onClose
               <Select value={form.customer_id} onValueChange={v => set('customer_id', v)}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Select customer" /></SelectTrigger>
                 <SelectContent>
-                  {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>)}
+                  {customerOptions.map(c => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

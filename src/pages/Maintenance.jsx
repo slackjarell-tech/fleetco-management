@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '@/api/apiClient';
 import { Plus, Wrench, AlertTriangle, CheckCircle2, Clock, Search, Trash2, Calendar } from 'lucide-react';
 import MaintenanceModal from '@/components/maintenance/MaintenanceModal';
+import { isPlatformAdmin } from '@/lib/roles';
 
 const STATUS_STYLES = {
   scheduled: 'bg-blue-100 text-blue-700',
@@ -90,7 +91,7 @@ export default function Maintenance() {
           <h1 className="text-2xl font-black text-slate-900">Preventive Maintenance</h1>
           <p className="text-slate-500 text-sm mt-0.5">Schedule and track maintenance to avoid costly breakdowns</p>
         </div>
-        {(user?.role === 'admin' || user?.role === 'executive') && (
+        {isPlatformAdmin(user?.role) && (
           <button
             onClick={() => { setEditing(null); setShowModal(true); }}
             className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-4 py-2.5 rounded-lg text-sm"
@@ -167,7 +168,7 @@ export default function Maintenance() {
                 <span className={`px-2.5 py-1 rounded-full text-xs font-bold capitalize ${STATUS_STYLES[item.status] || 'bg-slate-100 text-slate-500'}`}>
                   {item.status?.replace('_', ' ') || 'scheduled'}
                 </span>
-                {(user?.role === 'admin' || user?.role === 'executive') && (
+                {isPlatformAdmin(user?.role) && (
                   <div className="flex gap-2">
                     {item.status !== 'completed' && (
                       <button onClick={() => handleComplete(item)} className="text-xs text-green-600 hover:text-green-700 font-medium border border-green-200 px-2 py-1 rounded">
