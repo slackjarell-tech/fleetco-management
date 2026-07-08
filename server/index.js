@@ -30,6 +30,7 @@ import { seedDatabase } from './seed.js';
 import { invokeFunction } from './functions.js';
 import { runAgent, simpleLLM } from './aiAgent.js';
 import { getBillingSnapshot } from './billing.js';
+import { bulkCreateEntities } from './bulkImport.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || 'fleet-pulse-dev-secret-change-in-production';
@@ -257,7 +258,7 @@ const ENTITY_NAMES = [
   'DeliveryStop', 'HOSLog', 'FuelStation', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
-  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User',
+  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
 ];
 
 function handleUserEntity(req, res, action) {
@@ -339,6 +340,20 @@ app.post('/api/entities/:type', requireAuth, (req, res) => {
   if (type === 'User') return handleUserEntity(req, res, 'create');
   const item = createEntity(type, req.body);
   res.status(201).json(item);
+});
+
+app.post('/api/entities/:type/bulk', requireAuth, (req, res) => {
+  const { type } = req.params;
+  if (!ENTITY_NAMES.includes(type)) return res.status(404).json({ error: 'Unknown entity' });
+  const records = req.body?.records;
+  if (!Array.isArray(records) || records.length === 0) {
+    return res.status(400).json({ error: 'records array required' });
+  }
+  if (records.length > 500) {
+    return res.status(400).json({ error: 'Maximum 500 records per import' });
+  }
+  const result = bulkCreateEntities(type, records, req.user);
+  res.status(result.created ? 201 : 400).json(result);
 });
 
 app.patch('/api/entities/:type/:id', requireAuth, (req, res) => {

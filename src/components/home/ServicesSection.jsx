@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wrench, MapPin, Fuel, FileText, ShieldCheck, Truck, Search, BarChart3 } from 'lucide-react';
+import { Wrench, MapPin, Fuel, FileText, ShieldCheck, Truck, Search, BarChart3, Warehouse } from 'lucide-react';
 
 const services = [
   {
@@ -36,6 +36,11 @@ const services = [
     icon: BarChart3,
     title: 'Fleet Analytics',
     description: 'Track total cost per unit and get insights to help you budget and optimize your fleet for the coming year.',
+  },
+  {
+    icon: Warehouse,
+    title: 'Yard Management (YMS)',
+    description: 'Design your own yard size and layout — docks, gates, parking spots — and track trailer placement live.',
   },
   {
     icon: Truck,

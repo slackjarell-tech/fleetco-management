@@ -50,6 +50,12 @@ export default function NavBar() {
               Platform Tour
             </button>
             <button
+              onClick={() => scrollTo('yard-management')}
+              className="text-slate-300 hover:text-amber-400 text-sm font-medium capitalize transition-colors"
+            >
+              Yard Management
+            </button>
+            <button
               onClick={() => scrollTo('services')}
               className="text-slate-300 hover:text-amber-400 text-sm font-medium capitalize transition-colors"
             >
@@ -89,6 +95,7 @@ export default function NavBar() {
       {open && (
         <div className="md:hidden bg-slate-900 border-t border-slate-700 px-4 py-4 space-y-3">
           <button onClick={() => scrollTo('platform-tour')} className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium capitalize py-2">Platform Tour</button>
+          <button onClick={() => scrollTo('yard-management')} className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium capitalize py-2">Yard Management</button>
           <button onClick={() => scrollTo('services')} className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium capitalize py-2">Services</button>
           <Link to="/about" className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium capitalize py-2" onClick={() => setOpen(false)}>About</Link>
           <Link to="/contact" className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium py-2" onClick={() => setOpen(false)}>Contact / Get a Quote</Link>

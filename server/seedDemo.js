@@ -242,6 +242,34 @@ export function seedDemoData() {
 
   createEntity('Incident', { title: 'Minor fender bender — parking lot', severity: 'low', status: 'closed', vehicle_id: vehicleRecords[1].id, date: dateOnly(-30), description: 'Backing incident at customer dock. No injuries.' });
 
+  const demoYard = createEntity('Yard', {
+    name: 'Lone Star Terminal',
+    customer_id: c1,
+    address: '8800 N Stemmons Fwy',
+    city: 'Dallas',
+    state: 'TX',
+    width_ft: 400,
+    length_ft: 300,
+    cell_size_ft: 25,
+    elements: [
+      { id: 'bld-main', type: 'building', label: 'Main Office', col: 10, row: 0, cols: 4, rows: 3, color: '#78716c' },
+      { id: 'dock-1', type: 'dock', label: 'Dock 1', col: 0, row: 0, cols: 2, rows: 1, color: '#3b82f6' },
+      { id: 'dock-2', type: 'dock', label: 'Dock 2', col: 3, row: 0, cols: 2, rows: 1, color: '#3b82f6' },
+      { id: 'gate-in', type: 'gate_in', label: 'Gate In', col: 15, row: 0, cols: 1, rows: 1, color: '#14b8a6' },
+      { id: 'park-1', type: 'parking_trailer', label: 'Trailer A1', col: 0, row: 2, cols: 2, rows: 3, color: '#16a34a' },
+      { id: 'park-2', type: 'parking', label: 'Spot A2', col: 3, row: 2, cols: 2, rows: 2, color: '#22c55e' },
+      { id: 'storage-1', type: 'storage', label: 'Storage Lane 1', col: 0, row: 10, cols: 8, rows: 1, color: '#6366f1' },
+    ],
+  });
+  createEntity('YardPlacement', {
+    yard_id: demoYard.id,
+    element_id: 'park-1',
+    vehicle_id: vehicleRecords[9].id,
+    customer_id: c1,
+    status: 'occupied',
+    checked_in_at: ts,
+  });
+
   console.log('Demo data seeded:', {
     customers: customers.length,
     vehicles: vehicleRecords.length,

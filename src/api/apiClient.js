@@ -62,6 +62,15 @@ function createEntityApi(entityName) {
       return result;
     },
 
+    async bulkCreate(records) {
+      const result = await apiFetch(`/entities/${entityName}/bulk`, {
+        method: 'POST',
+        body: JSON.stringify({ records }),
+      });
+      notify({ type: 'bulkCreate', data: result });
+      return result;
+    },
+
     async update(id, data) {
       const result = await apiFetch(`/entities/${entityName}/${id}`, {
         method: 'PATCH',
@@ -94,7 +103,7 @@ const ENTITY_NAMES = [
   'DeliveryStop', 'HOSLog', 'FuelStation', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
-  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User',
+  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
 ];
 
 const entities = {};

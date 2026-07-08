@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import HeroSection from '@/components/home/HeroSection';
 import ServicesSection from '@/components/home/ServicesSection';
 import PricingSection from '@/components/home/PricingSection';
+import YmsSection from '@/components/home/YmsSection';
 import InquiryForm from '@/components/home/InquiryForm';
 import FooterSection from '@/components/home/FooterSection';
 import NavBar from '@/components/home/NavBar';
@@ -39,6 +40,7 @@ export default function Home() {
       <HeroSection />
       <VideoPresentationSection />
       <ServicesSection />
+      <YmsSection />
       <PricingSection />
       <AboutSection />
       <TestimonialsSection />

@@ -6,13 +6,15 @@ import {
   BarChart2, ClipboardList, Building2, Users, ClipboardCheck, Wrench, UserCheck,
   Archive, Calendar, Cpu, Store, Bot, Crown, MessageCircle, Navigation, TrendingUp,
   Map, Route, DollarSign, Globe, Clock, ShieldCheck, AlertTriangle, Award, Lightbulb,
-  MapPin, Megaphone, Zap, Mail, ScanLine, Video,
+  MapPin, Megaphone, Zap, Mail, ScanLine, Video, Upload, Warehouse,
   ChevronDown, KeyRound
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
 import PaymentDueBanner from '@/components/billing/PaymentDueBanner';
 import CustomerPausedOverlay from '@/components/billing/CustomerPausedOverlay';
+import BulkCsvImport from '@/components/shared/BulkCsvImport';
+import { getBulkImportConfig } from '@/lib/bulkImportConfigs';
 
 const isInternalRole = (role) => {
   return ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(role);
@@ -40,6 +42,7 @@ const NAV_GROUPS = [
       { label: 'My Delivery Route', icon: Route, path: '/portal/my-route' },
       { label: 'Navigation', icon: Navigation, path: '/portal/navigation' },
       { label: 'Fleet Map', icon: Map, path: '/portal/fleet-map' },
+      { label: 'Yard Management', icon: Warehouse, path: '/portal/yard-management' },
     ]
   },
   {
@@ -122,7 +125,9 @@ export default function AppLayout() {
   const [user, setUser] = useState(null);
   const [open, setOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const location = useLocation();
+  const bulkConfig = getBulkImportConfig(location.pathname);
 
   // Track which groups are expanded
   const [expandedGroups, setExpandedGroups] = useState(() => ({}));
@@ -297,10 +302,44 @@ export default function AppLayout() {
           </div>
         </header>
         <PaymentDueBanner user={user} />
+        {bulkConfig && (
+          <div className="hidden lg:flex absolute top-4 right-6 z-20">
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-white shadow-sm border-slate-200 text-xs gap-1.5 font-semibold"
+              onClick={() => setShowBulkImport(true)}
+            >
+              <Upload className="w-3.5 h-3.5" /> Bulk Upload
+            </Button>
+          </div>
+        )}
         <main className="flex-1 relative">
           <CustomerPausedOverlay user={user} billing={user?.billing} />
+          {bulkConfig && (
+            <div className="lg:hidden px-4 pt-3">
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full text-xs gap-1.5 font-semibold"
+                onClick={() => setShowBulkImport(true)}
+              >
+                <Upload className="w-3.5 h-3.5" /> Bulk Upload CSV
+              </Button>
+            </div>
+          )}
           <Outlet />
         </main>
+        {showBulkImport && bulkConfig && (
+          <BulkCsvImport
+            config={bulkConfig}
+            onClose={() => setShowBulkImport(false)}
+            onSuccess={() => {
+              window.dispatchEvent(new CustomEvent('fleetco:bulk-import'));
+              window.location.reload();
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -50,6 +50,7 @@ import DriverPayrollSummary from './pages/DriverPayrollSummary';
 import ComplianceTracker from './pages/ComplianceTracker';
 import IncidentReports from './pages/IncidentReports';
 import FleetMap from './pages/FleetMap';
+import YardManagement from './pages/YardManagement';
 import DriverScorecard from './pages/DriverScorecard';
 import VehicleTCO from './pages/VehicleTCO';
 import DevFeedbackDashboard from './pages/DevFeedbackDashboard';
@@ -153,6 +154,7 @@ const AuthenticatedApp = () => {
           <Route path="compliance" element={<ComplianceTracker />} />
           <Route path="incidents" element={<IncidentReports />} />
           <Route path="fleet-map" element={<FleetMap />} />
+          <Route path="yard-management" element={<YardManagement />} />
           <Route path="scorecard" element={<DriverScorecard />} />
           <Route path="tco" element={<VehicleTCO />} />
           <Route path="dev-feedback" element={<DevFeedbackDashboard />} />
