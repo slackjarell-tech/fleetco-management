@@ -30,6 +30,13 @@ import { seedDatabase } from './seed.js';
 import { invokeFunction } from './functions.js';
 import { runAgent, simpleLLM } from './aiAgent.js';
 import { getBillingSnapshot } from './billing.js';
+import { getCustomerNotificationPrefs } from './notificationPreferences.js';
+import {
+  canListAllUsers,
+  canMutateUsers,
+  canDeleteUser,
+  canProvisionCustomers,
+} from './roles.js';
 import { bulkCreateEntities } from './bulkImport.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -88,6 +95,9 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.post('/api/auth/register', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Public registration is disabled. Contact your fleet administrator.' });
+  }
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
   if (getUserRowByEmail(email)) return res.status(409).json({ error: 'User already exists' });
@@ -131,6 +141,7 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
       user.billing = getBillingSnapshot(customer);
       user.system_paused = !!customer.system_paused;
       user.customer_name = customer.company_name;
+      user.notification_prefs = getCustomerNotificationPrefs(customer);
     }
   }
   res.json(user);
@@ -261,12 +272,23 @@ const ENTITY_NAMES = [
   'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
 ];
 
+function filterUsersForActor(actor, users) {
+  if (!actor) return [];
+  if (canListAllUsers(actor.role)) return users;
+  if (actor.customer_id) {
+    return users.filter((u) => u.customer_id === actor.customer_id);
+  }
+  return [];
+}
+
 function handleUserEntity(req, res, action) {
+  if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+
   const { sort, limit: limitStr } = req.query;
   const limit = limitStr ? parseInt(limitStr, 10) : undefined;
 
   if (action === 'list') {
-    let users = listUsers();
+    let users = filterUsersForActor(req.user, listUsers());
     if (sort) {
       const desc = sort.startsWith('-');
       const field = desc ? sort.slice(1) : sort;
@@ -281,31 +303,58 @@ function handleUserEntity(req, res, action) {
   }
 
   if (action === 'filter') {
-    return res.json(filterUsers(req.body.criteria || {}));
+    return res.json(filterUsersForActor(req.user, filterUsers(req.body.criteria || {})));
   }
 
   if (action === 'get') {
     const user = findUserById(req.params.id);
     if (!user) return res.status(404).json({ error: 'Not found' });
+    if (!filterUsersForActor(req.user, [user]).length) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     return res.json(user);
   }
 
   if (action === 'create') {
-    const { email, password, ...rest } = req.body;
+    if (!canMutateUsers(req.user)) return res.status(403).json({ error: 'Forbidden' });
+    const { email, password, customer_id, customerId, ...rest } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
     if (findUserByEmail(email)) return res.status(409).json({ error: 'User exists' });
+    const effectiveCustomerId = customer_id || customerId || (req.user.role === 'user' ? req.user.customer_id : null);
+    if (req.user.role === 'user' && effectiveCustomerId && effectiveCustomerId !== req.user.customer_id) {
+      return res.status(403).json({ error: 'You can only add users to your own organization' });
+    }
     const hash = bcrypt.hashSync(password || 'changeme123', 10);
-    const user = createUser({ email, passwordHash: hash, ...rest });
+    const user = createUser({
+      email,
+      passwordHash: hash,
+      customerId: effectiveCustomerId,
+      fullName: rest.full_name || rest.fullName,
+      role: rest.role,
+      employeeNumber: rest.employee_number || rest.employeeNumber,
+    });
     return res.status(201).json(user);
   }
 
   if (action === 'update') {
+    if (!canMutateUsers(req.user)) return res.status(403).json({ error: 'Forbidden' });
+    const target = findUserById(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Not found' });
+    if (!filterUsersForActor(req.user, [target]).length) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     const updated = updateUser(req.params.id, req.body);
     if (!updated) return res.status(404).json({ error: 'Not found' });
     return res.json(updated);
   }
 
   if (action === 'delete') {
+    const target = findUserById(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Not found' });
+    const customerRecord = target.customer_id ? getEntity('Customer', target.customer_id) : null;
+    if (!canDeleteUser(req.user, target, customerRecord)) {
+      return res.status(403).json({ error: 'You do not have permission to delete this user' });
+    }
     deleteUser(req.params.id);
     return res.json({ success: true });
   }
@@ -367,6 +416,9 @@ app.patch('/api/entities/:type/:id', requireAuth, (req, res) => {
 app.delete('/api/entities/:type/:id', requireAuth, (req, res) => {
   const { type, id } = req.params;
   if (type === 'User') { req.params.id = id; return handleUserEntity(req, res, 'delete'); }
+  if (type === 'Customer' && !canProvisionCustomers(req.user.role)) {
+    return res.status(403).json({ error: 'Only FleetCo staff can delete customer records' });
+  }
   deleteEntity(type, id);
   res.json({ success: true });
 });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { SUBSCRIPTION_PLANS, subscriptionAmount, formatPrice, yearlyMonthlyEquivalent } from '@/lib/subscriptions';
+import { NOTIFICATION_OPTIONS, DEFAULT_NOTIFICATION_PREFS } from '@/lib/notificationPreferences';
 
 export default function CustomerModal({ customer, fleetManagers, fleetCoordinators, onSave, onClose }) {
   const isEditing = !!customer;
@@ -15,7 +16,12 @@ export default function CustomerModal({ customer, fleetManagers, fleetCoordinato
   const [paymentCollected, setPaymentCollected] = useState(false);
   const [createLogin, setCreateLogin] = useState(true);
   const [tempPassword, setTempPassword] = useState('');
+  const [notificationPrefs, setNotificationPrefs] = useState({ ...DEFAULT_NOTIFICATION_PREFS });
   const [creating, setCreating] = useState(false);
+
+  const toggleNotificationPref = (key) => {
+    setNotificationPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const set = (f, v) => setForm(prev => ({ ...prev, [f]: v }));
 
@@ -29,7 +35,7 @@ export default function CustomerModal({ customer, fleetManagers, fleetCoordinato
       return;
     }
     setCreating(true);
-    const loginData = createLogin && !isEditing ? { tempPassword } : null;
+    const loginData = createLogin && !isEditing ? { tempPassword, notification_prefs: notificationPrefs } : null;
     const subscriptionData = !isEditing ? {
       subscription_plan: subscriptionPlan,
       subscription_term: subscriptionTerm,
@@ -215,12 +221,36 @@ export default function CustomerModal({ customer, fleetManagers, fleetCoordinato
                 <span className="text-sm font-semibold text-slate-700">Create portal login for this customer</span>
               </label>
               {createLogin && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">Temp Password *</label>
                     <input type="text" required={createLogin} value={tempPassword} onChange={e => setTempPassword(e.target.value)}
                       placeholder="e.g. Temp123!"
                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    A welcome email with login credentials will be sent automatically when the customer is activated
+                    (requires RESEND_API_KEY on the server).
+                  </p>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Default email notifications</h4>
+                    <p className="text-xs text-slate-500 mb-3">The customer can change these anytime under Notification Preferences in the portal.</p>
+                    <div className="space-y-2">
+                      {NOTIFICATION_OPTIONS.map((opt) => (
+                        <label key={opt.key} className="flex items-start gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!notificationPrefs[opt.key]}
+                            onChange={() => toggleNotificationPref(opt.key)}
+                            className="w-4 h-4 mt-0.5 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+                          />
+                          <span className="text-sm text-slate-700">
+                            <strong>{opt.label}</strong>
+                            <span className="block text-xs text-slate-500 font-normal">{opt.description}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                   <p className="text-xs text-slate-500">
                     The customer admin can sign in and add their own drivers and team members from the Team tab.

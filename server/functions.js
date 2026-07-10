@@ -35,6 +35,13 @@ import {
   reminderTypeForDays,
   REMINDER_THRESHOLDS,
 } from './billing.js';
+import {
+  normalizeNotificationPrefs,
+  getCustomerNotificationPrefs,
+  shouldSendCustomerNotification,
+  NOTIFICATION_TYPE_TO_PREF,
+} from './notificationPreferences.js';
+import { sendWelcomeSignupEmail } from './customerEmails.js';
 
 const SIM_ROUTES = [
   { name: 'I-80 Westbound', id: 'sim_driver_01', userName: '👤 Mike R. (Sim)', steps: [
@@ -76,6 +83,10 @@ export async function invokeFunction(name, body, user) {
       return provisionCustomer(body, user);
     case 'sendCustomerTestLogin':
       return sendCustomerTestLogin(body, user);
+    case 'getCustomerNotificationPrefs':
+      return getCustomerNotificationPrefsForUser(user);
+    case 'updateCustomerNotificationPrefs':
+      return updateCustomerNotificationPrefs(body, user);
     case 'getBillingAlerts':
       return getBillingAlerts(body, user);
     case 'recordCustomerPayment':
@@ -97,8 +108,7 @@ export async function invokeFunction(name, body, user) {
     case 'createCheckout':
       return createCheckout(body);
     case 'sendNotification':
-      console.log('[notification]', body);
-      return { success: true };
+      return sendNotification(body);
     case 'sendSystemEmail': {
       const { sendEmail } = await import('./email.js');
       const { to, subject, html, text } = body;
@@ -419,7 +429,7 @@ function createDomainEmail(body, user) {
   };
 }
 
-function provisionCustomer(body, user) {
+async function provisionCustomer(body, user) {
   if (!user || !canProvisionCustomers(user.role)) {
     throw new Error('Only FleetCo owner, executive, or fleet managers can add customers');
   }
@@ -449,6 +459,7 @@ function provisionCustomer(body, user) {
   const amount = subscriptionAmount(subscription_plan, subscription_term);
   const ts = nowIso();
   const nextDue = computeNextDueDate(ts, subscription_term);
+  const notificationPrefs = normalizeNotificationPrefs(body.notification_prefs);
 
   const customer = createEntity('Customer', {
     ...customerData,
@@ -463,6 +474,7 @@ function provisionCustomer(body, user) {
     payment_status: 'current',
     system_paused: false,
     provisioned_by: user.email,
+    notification_prefs: notificationPrefs,
   });
 
   createEntity('Subscription', {
@@ -476,6 +488,7 @@ function provisionCustomer(body, user) {
   });
 
   let loginMessage = '';
+  let welcomeEmail = null;
   if (createLogin && tempPassword) {
     createUserAccount(
       {
@@ -483,22 +496,42 @@ function provisionCustomer(body, user) {
         tempPassword,
         role: 'user',
         customerId: customer.id,
+        fullName: customerData.contact_name || customerData.company_name,
       },
       user
     );
-    updateEntity('Customer', customer.id, { user_id: findUserByEmail(customerData.email)?.id });
-    loginMessage = ` Portal login created for ${customerData.email}.`;
+    const portalEmail = customerData.email.trim().toLowerCase();
+    updateEntity('Customer', customer.id, {
+      user_id: findUserByEmail(portalEmail)?.id,
+      has_portal_login: true,
+      portal_login_email: portalEmail,
+    });
+    loginMessage = ` Portal login created for ${portalEmail}.`;
+
+    welcomeEmail = await sendWelcomeSignupEmail({
+      to: portalEmail,
+      companyName: customerData.company_name,
+      contactName: customerData.contact_name,
+      tempPassword,
+      notificationPrefs,
+    });
+    if (welcomeEmail.success) {
+      loginMessage += ' Welcome email sent.';
+    } else if (welcomeEmail.skipped) {
+      loginMessage += ' (Welcome email skipped — RESEND_API_KEY not configured.)';
+    }
   }
 
   return {
     success: true,
     customer,
     subscription: { plan: subscription_plan, term: subscription_term, amount },
+    welcomeEmail,
     message: `Customer ${customerData.company_name} activated.${loginMessage}`,
   };
 }
 
-function sendCustomerTestLogin(body, user) {
+async function sendCustomerTestLogin(body, user) {
   if (!user || !canProvisionCustomers(user.role)) {
     throw new Error('Only FleetCo owner, executive, or fleet managers can send customer test logins');
   }
@@ -526,6 +559,8 @@ function sendCustomerTestLogin(body, user) {
 
   updateEntity('Customer', customer.id, {
     user_id: findUserByEmail(email)?.id,
+    has_portal_login: true,
+    portal_login_email: email,
     status: customer.status === 'inactive' ? 'prospect' : customer.status,
   });
 
@@ -553,15 +588,136 @@ function sendCustomerTestLogin(body, user) {
 
   console.log(`[test login] ${email} for ${customer.company_name} by ${user.email}`);
 
+  const notificationPrefs = getCustomerNotificationPrefs(customer);
+  const welcomeEmail = await sendWelcomeSignupEmail({
+    to: email,
+    companyName: customer.company_name,
+    contactName: customer.contact_name,
+    tempPassword,
+    notificationPrefs,
+  });
+
+  let emailNote = '';
+  if (welcomeEmail.success) {
+    emailNote = ' Welcome email sent to the customer.';
+  } else if (welcomeEmail.skipped) {
+    emailNote = ' (Welcome email skipped — RESEND_API_KEY not configured.)';
+  }
+
   return {
     success: true,
     email,
     tempPassword,
     loginUrl,
     messageId: message.id,
-    message: `Test login ready for ${customer.contact_name || customer.company_name}. Credentials saved to customer messages — copy and send to the prospect.`,
+    welcomeEmail,
+    message: `Test login ready for ${customer.contact_name || customer.company_name}. Credentials saved to customer messages.${emailNote}`,
     credentialsText: credentialText,
   };
+}
+
+function getCustomerNotificationPrefsForUser(user) {
+  if (!user?.customer_id) {
+    throw new Error('Only customer portal users can view notification preferences');
+  }
+  const customer = getEntity('Customer', user.customer_id);
+  if (!customer) throw new Error('Customer organization not found');
+  return { success: true, notification_prefs: getCustomerNotificationPrefs(customer) };
+}
+
+function updateCustomerNotificationPrefs(body, user) {
+  if (!user?.customer_id) {
+    throw new Error('Only customer portal users can update notification preferences');
+  }
+  const customer = getEntity('Customer', user.customer_id);
+  if (!customer) throw new Error('Customer organization not found');
+
+  const prefs = normalizeNotificationPrefs({
+    ...getCustomerNotificationPrefs(customer),
+    ...(body.prefs || {}),
+  });
+  updateEntity('Customer', customer.id, { notification_prefs: prefs });
+  return { success: true, notification_prefs: prefs };
+}
+
+async function sendNotification(body) {
+  const { type, entityId } = body;
+  const prefKey = NOTIFICATION_TYPE_TO_PREF[type];
+  const { sendEmail } = await import('./email.js');
+
+  if (type === 'load_assigned') {
+    const load = getEntity('Load', entityId);
+    if (!load) throw new Error('Load not found');
+
+    let recipientEmail = null;
+    let recipientName = '';
+    let customer = load.customer_id ? getEntity('Customer', load.customer_id) : null;
+
+    if (load.assigned_driver_id) {
+      const driver = findUserById(load.assigned_driver_id);
+      if (driver?.email) {
+        recipientEmail = driver.email;
+        recipientName = driver.full_name || driver.email;
+        if (!customer && driver.customer_id) {
+          customer = getEntity('Customer', driver.customer_id);
+        }
+      }
+    }
+    if (!recipientEmail && customer?.email) {
+      recipientEmail = customer.email;
+      recipientName = customer.contact_name || customer.company_name;
+    }
+    if (!recipientEmail) {
+      return { success: true, skipped: true, reason: 'No recipient email found for this load' };
+    }
+    if (customer && prefKey && !shouldSendCustomerNotification(customer, prefKey)) {
+      return { success: true, skipped: true, reason: 'Customer opted out of load update emails' };
+    }
+
+    const route = `${load.origin_city || '?'}, ${load.origin_state || ''} → ${load.destination_city || '?'}, ${load.destination_state || ''}`.trim();
+    const subject = `Load ${load.load_number} — assignment update`;
+    const text = [
+      `Hi ${recipientName || 'there'},`,
+      '',
+      `Load ${load.load_number} has been updated.`,
+      `Route: ${route}`,
+      `Status: ${load.status || 'updated'}`,
+      '',
+      `View in portal: ${process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org'}/portal/load-board`,
+    ].join('\n');
+    const html = `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:640px"><p>${text.replace(/\n/g, '<br/>')}</p></div>`;
+    return sendEmail({ to: recipientEmail, subject, html, text });
+  }
+
+  if (type === 'invoice_sent') {
+    const invoice = getEntity('Invoice', entityId);
+    if (!invoice) throw new Error('Invoice not found');
+    const customer = invoice.customer_id ? getEntity('Customer', invoice.customer_id) : null;
+    if (!customer?.email) {
+      return { success: true, skipped: true, reason: 'Customer has no email on file' };
+    }
+    if (prefKey && !shouldSendCustomerNotification(customer, prefKey)) {
+      return { success: true, skipped: true, reason: 'Customer opted out of invoice notices' };
+    }
+
+    const amount = invoice.amount != null ? `$${Number(invoice.amount).toLocaleString()}` : '—';
+    const subject = `Invoice ${invoice.invoice_number} from FleetCo Management`;
+    const text = [
+      `Hi ${customer.contact_name || customer.company_name},`,
+      '',
+      `Invoice ${invoice.invoice_number} is ready.`,
+      `Amount: ${amount}`,
+      invoice.description ? `Description: ${invoice.description}` : '',
+      invoice.due_date ? `Due date: ${invoice.due_date}` : '',
+      '',
+      `View in portal: ${process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org'}/portal/invoices`,
+    ].filter(Boolean).join('\n');
+    const html = `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:640px"><p>${text.replace(/\n/g, '<br/>')}</p></div>`;
+    return sendEmail({ to: customer.email, subject, html, text });
+  }
+
+  console.log('[notification]', body);
+  return { success: true };
 }
 
 function customersForUser(user) {

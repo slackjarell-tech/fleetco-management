@@ -61,6 +61,7 @@ import ChangePassword from './pages/ChangePassword';
 import SetPassword from './pages/SetPassword';
 import ServiceTemplates from './pages/ServiceTemplates';
 import ModulePreferences from './pages/ModulePreferences';
+import NotificationPreferences from './pages/NotificationPreferences';
 import Advertisement from './pages/Advertisement';
 import MarketingGallery from './pages/MarketingGallery';
 import CompetitiveAnalysis from './pages/CompetitiveAnalysis';
@@ -161,6 +162,7 @@ const AuthenticatedApp = () => {
           <Route path="change-password" element={<ChangePassword />} />
           <Route path="service-templates" element={<ServiceTemplates />} />
           <Route path="module-preferences" element={<ModulePreferences />} />
+          <Route path="notification-preferences" element={<NotificationPreferences />} />
           <Route path="advertisement" element={<Advertisement />} />
           <Route path="marketing-gallery" element={<MarketingGallery />} />
           <Route path="competitive-analysis" element={<CompetitiveAnalysis />} />

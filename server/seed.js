@@ -10,6 +10,8 @@ import {
 } from './db.js';
 import { computeNextDueDate } from './billing.js';
 import { seedDemoData } from './seedDemo.js';
+import { repairCustomerPortalLogins } from './repairCustomerLogins.js';
+import { getStoreStats } from './db.js';
 
 const OWNER_EMAIL = 'jarrell@fleetcomanagement.org';
 
@@ -80,4 +82,18 @@ export function seedDatabase() {
       }
     }
   }
+
+  const repair = repairCustomerPortalLogins();
+  if (repair.repaired) {
+    console.log(`[seed] Restored ${repair.repaired} customer portal login(s) from saved credentials`);
+  }
+  if (repair.relinked) {
+    console.log(`[seed] Re-linked ${repair.relinked} customer portal account(s)`);
+  }
+
+  const stats = getStoreStats();
+  console.log(
+    `[datastore] ${stats.path} — ${stats.userCount} users, ${stats.customerCount} customers` +
+      (stats.backupExists ? ' (backup ok)' : ''),
+  );
 }

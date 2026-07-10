@@ -7,7 +7,7 @@ import {
   Archive, Calendar, Cpu, Store, Bot, Crown, MessageCircle, Navigation, TrendingUp,
   Map, Route, DollarSign, Globe, Clock, ShieldCheck, AlertTriangle, Award, Lightbulb,
   MapPin, Megaphone, Zap, Mail, ScanLine, Video, Upload, Warehouse,
-  ChevronDown, KeyRound
+  ChevronDown, KeyRound, Bell
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
@@ -274,6 +274,9 @@ export default function AppLayout() {
           </Link>
           <Link to="/portal/module-preferences" className="flex items-center gap-2 text-slate-400 hover:text-white text-sm px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors">
             <LayoutDashboard className="w-4 h-4" /> Module Preferences
+          </Link>
+          <Link to="/portal/notification-preferences" className="flex items-center gap-2 text-slate-400 hover:text-white text-sm px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors">
+            <Bell className="w-4 h-4" /> Notification Preferences
           </Link>
           <Link to="/portal/change-password" className="flex items-center gap-2 text-slate-400 hover:text-white text-sm px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors">
             <KeyRound className="w-4 h-4" /> Change Password

@@ -4,8 +4,9 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.join(__dirname, 'data');
+const dataDir = process.env.DATA_PATH || path.join(__dirname, 'data');
 const dbPath = path.join(dataDir, 'store.json');
+const backupPath = `${dbPath}.bak`;
 
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
@@ -48,14 +49,70 @@ export function updateSiteSettings(changes) {
 
 function loadStore() {
   if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, JSON.stringify(defaultStore, null, 2));
-    return structuredClone(defaultStore);
+    if (fs.existsSync(backupPath)) {
+      console.warn('[datastore] store.json missing — restoring from backup');
+      fs.copyFileSync(backupPath, dbPath);
+    } else {
+      fs.writeFileSync(dbPath, JSON.stringify(defaultStore, null, 2));
+      return structuredClone(defaultStore);
+    }
   }
-  return JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+    if (!Array.isArray(parsed.users) || !Array.isArray(parsed.entities)) {
+      throw new Error('Invalid store schema');
+    }
+    if (!parsed.otp_codes) parsed.otp_codes = {};
+    if (!parsed.site_settings) parsed.site_settings = {};
+    return parsed;
+  } catch (err) {
+    if (fs.existsSync(backupPath)) {
+      console.error('[datastore] Corrupt store.json — restoring backup:', err.message);
+      const backup = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
+      writeStoreFile(backup);
+      return backup;
+    }
+    throw new Error(`Database file corrupt and no backup available: ${err.message}`);
+  }
+}
+
+function writeStoreFile(store) {
+  const payload = JSON.stringify(store, null, 2);
+  const tmpPath = path.join(dataDir, `store.${process.pid}.${Date.now()}.tmp.json`);
+  fs.writeFileSync(tmpPath, payload, 'utf8');
+  if (fs.existsSync(dbPath)) {
+    try {
+      fs.copyFileSync(dbPath, backupPath);
+    } catch (copyErr) {
+      console.warn('[datastore] Could not write backup:', copyErr.message);
+    }
+    fs.unlinkSync(dbPath);
+  }
+  fs.renameSync(tmpPath, dbPath);
 }
 
 function saveStore(store) {
-  fs.writeFileSync(dbPath, JSON.stringify(store, null, 2));
+  writeStoreFile(store);
+}
+
+export function getStoreStats() {
+  let store;
+  try {
+    store = loadStore();
+  } catch {
+    store = defaultStore;
+  }
+  return {
+    path: dbPath,
+    dataDir,
+    userCount: store.users?.length ?? 0,
+    customerCount: store.entities?.filter((e) => e.entity_type === 'Customer').length ?? 0,
+    entityCount: store.entities?.length ?? 0,
+    fileExists: fs.existsSync(dbPath),
+    backupExists: fs.existsSync(backupPath),
+    lastModified: fs.existsSync(dbPath) ? fs.statSync(dbPath).mtime.toISOString() : null,
+  };
 }
 
 function withStore(mutator) {

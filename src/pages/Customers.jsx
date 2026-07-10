@@ -97,6 +97,7 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
           payment_collected: subscriptionData.payment_collected,
           createLogin: !!loginData,
           tempPassword: loginData?.tempPassword || '',
+          notification_prefs: loginData?.notification_prefs,
         });
         setMessage(result.message || 'Customer activated successfully.');
       } catch (err) {

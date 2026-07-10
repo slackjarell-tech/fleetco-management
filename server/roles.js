@@ -37,6 +37,29 @@ export function canManageCustomerTeam(role) {
   return role === 'user';
 }
 
+export function isInternalStaff(role) {
+  return FLEETCO_INTERNAL_ROLES.includes(role);
+}
+
+export function canListAllUsers(role) {
+  return isInternalStaff(role);
+}
+
+export function canMutateUsers(actor) {
+  return ['owner', 'executive', 'fleet_manager', 'fleet_coordinator', 'user'].includes(actor?.role);
+}
+
+export function canDeleteUser(actor, target, customerRecord) {
+  if (!actor || !target) return false;
+  if (['owner', 'executive', 'fleet_manager'].includes(actor.role)) return true;
+  if (actor.role === 'user' && target.customer_id === actor.customer_id) {
+    if (target.id === actor.id) return false;
+    if (customerRecord?.user_id === target.id) return false;
+    return ['user', 'driver'].includes(target.role);
+  }
+  return false;
+}
+
 export const FLEETCO_EMAIL_DOMAIN = 'fleetcomanagement.org';
 
 export function canManageDomainEmails(role) {
