@@ -1,21 +1,13 @@
 import { randomUUID } from 'crypto';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+import {
+  defaultStore,
+  getMemoryStore,
+  scheduleSave,
+  getStoreStats,
+  exportStoreSnapshot,
+} from './storePersist.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = process.env.DATA_PATH || path.join(__dirname, 'data');
-const dbPath = path.join(dataDir, 'store.json');
-const backupPath = `${dbPath}.bak`;
-
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-
-const defaultStore = {
-  users: [],
-  entities: [],
-  otp_codes: {},
-  site_settings: {},
-};
+export { getStoreStats, exportStoreSnapshot };
 
 export const DEFAULT_SITE_SETTINGS = {
   hero_badge: 'Dallas, TX — Serving Owner Operators Nationwide',
@@ -29,90 +21,12 @@ export const DEFAULT_SITE_SETTINGS = {
   company_location: 'Dallas, TX',
 };
 
-export function getSiteSettings() {
-  const store = loadStore();
-  return { ...DEFAULT_SITE_SETTINGS, ...(store.site_settings || {}) };
-}
-
-export function updateSiteSettings(changes) {
-  const allowed = Object.keys(DEFAULT_SITE_SETTINGS);
-  const patch = {};
-  for (const [key, value] of Object.entries(changes || {})) {
-    if (allowed.includes(key) && value != null) patch[key] = String(value);
-  }
-  if (!Object.keys(patch).length) return getSiteSettings();
-  withStore((store) => {
-    store.site_settings = { ...(store.site_settings || {}), ...patch };
-  });
-  return getSiteSettings();
-}
-
 function loadStore() {
-  if (!fs.existsSync(dbPath)) {
-    if (fs.existsSync(backupPath)) {
-      console.warn('[datastore] store.json missing — restoring from backup');
-      fs.copyFileSync(backupPath, dbPath);
-    } else {
-      fs.writeFileSync(dbPath, JSON.stringify(defaultStore, null, 2));
-      return structuredClone(defaultStore);
-    }
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-    if (!Array.isArray(parsed.users) || !Array.isArray(parsed.entities)) {
-      throw new Error('Invalid store schema');
-    }
-    if (!parsed.otp_codes) parsed.otp_codes = {};
-    if (!parsed.site_settings) parsed.site_settings = {};
-    return parsed;
-  } catch (err) {
-    if (fs.existsSync(backupPath)) {
-      console.error('[datastore] Corrupt store.json — restoring backup:', err.message);
-      const backup = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
-      writeStoreFile(backup);
-      return backup;
-    }
-    throw new Error(`Database file corrupt and no backup available: ${err.message}`);
-  }
-}
-
-function writeStoreFile(store) {
-  const payload = JSON.stringify(store, null, 2);
-  const tmpPath = path.join(dataDir, `store.${process.pid}.${Date.now()}.tmp.json`);
-  fs.writeFileSync(tmpPath, payload, 'utf8');
-  if (fs.existsSync(dbPath)) {
-    try {
-      fs.copyFileSync(dbPath, backupPath);
-    } catch (copyErr) {
-      console.warn('[datastore] Could not write backup:', copyErr.message);
-    }
-    fs.unlinkSync(dbPath);
-  }
-  fs.renameSync(tmpPath, dbPath);
+  return getMemoryStore();
 }
 
 function saveStore(store) {
-  writeStoreFile(store);
-}
-
-export function getStoreStats() {
-  let store;
-  try {
-    store = loadStore();
-  } catch {
-    store = defaultStore;
-  }
-  return {
-    path: dbPath,
-    dataDir,
-    userCount: store.users?.length ?? 0,
-    customerCount: store.entities?.filter((e) => e.entity_type === 'Customer').length ?? 0,
-    entityCount: store.entities?.length ?? 0,
-    fileExists: fs.existsSync(dbPath),
-    backupExists: fs.existsSync(backupPath),
-    lastModified: fs.existsSync(dbPath) ? fs.statSync(dbPath).mtime.toISOString() : null,
-  };
+  scheduleSave(store);
 }
 
 function withStore(mutator) {
@@ -258,7 +172,7 @@ export function filterEntities(entityType, criteria = {}, sort, limit) {
   const keys = Object.keys(criteria).filter((k) => criteria[k] !== undefined && criteria[k] !== '');
   if (keys.length) {
     items = items.filter((item) =>
-      keys.every((k) => item[k] === criteria[k] || String(item[k]) === String(criteria[k]))
+      keys.every((k) => item[k] === criteria[k] || String(item[k]) === String(criteria[k])),
     );
   }
   items = sortEntities(items, sort);

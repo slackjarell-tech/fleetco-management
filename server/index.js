@@ -25,6 +25,8 @@ import {
   updateEntity,
   updateUser,
   db,
+  getStoreStats,
+  exportStoreSnapshot,
 } from './db.js';
 import { seedDatabase } from './seed.js';
 import { invokeFunction } from './functions.js';
@@ -45,8 +47,6 @@ const PORT = process.env.PORT || 3001;
 
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-seedDatabase();
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
@@ -481,6 +481,22 @@ app.post('/api/integrations/llm', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/admin/datastore', requireAuth, (req, res) => {
+  if (!['owner', 'executive'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  res.json({ success: true, stats: getStoreStats() });
+});
+
+app.post('/api/admin/datastore/backup', requireAuth, (req, res) => {
+  if (!['owner', 'executive'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename="fleetco-backup-${Date.now()}.json"`);
+  res.json(exportStoreSnapshot());
+});
+
 // Production: serve built frontend + SPA fallback
 const distDir = path.join(__dirname, '..', 'dist');
 if (process.env.NODE_ENV === 'production' && fs.existsSync(distDir)) {
@@ -491,6 +507,26 @@ if (process.env.NODE_ENV === 'production' && fs.existsSync(distDir)) {
 }
 
 const siteUrl = process.env.APP_ORIGIN || `http://localhost:${PORT}`;
-app.listen(PORT, () => {
-  console.log(`Fleetco Management API running on ${siteUrl}`);
+
+async function startServer() {
+  const { initDatabase, flushDatabase } = await import('./storePersist.js');
+  await initDatabase();
+  seedDatabase();
+
+  const shutdown = async (signal) => {
+    console.log(`[shutdown] ${signal} — saving database…`);
+    await flushDatabase();
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
+  app.listen(PORT, () => {
+    console.log(`Fleetco Management API running on ${siteUrl}`);
+  });
+}
+
+startServer().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
