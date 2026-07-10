@@ -59,6 +59,8 @@ import SystemManual from './pages/SystemManual';
 import MarketingMaterials from './pages/MarketingMaterials';
 import ChangePassword from './pages/ChangePassword';
 import SetPassword from './pages/SetPassword';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import ServiceTemplates from './pages/ServiceTemplates';
 import ModulePreferences from './pages/ModulePreferences';
 import NotificationPreferences from './pages/NotificationPreferences';
@@ -96,6 +98,8 @@ const AuthenticatedApp = () => {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/set-password" element={<SetPassword />} />
 
       {/* FleetCo Driver mobile app — iOS / Android + mobile web */}

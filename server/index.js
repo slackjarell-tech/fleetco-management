@@ -162,18 +162,50 @@ app.post('/api/auth/change-password', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/api/auth/reset-password-request', (req, res) => {
+app.post('/api/auth/reset-password-request', async (req, res) => {
   const { email } = req.body;
-  const user = findUserByEmail(email);
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  const user = findUserByEmail(email.trim());
   if (user) {
     const token = jwt.sign({ email: user.email, type: 'reset' }, JWT_SECRET, { expiresIn: '1h' });
-    console.log(`[password reset for ${email}]: /reset-password?token=${token}`);
+    const appOrigin = (process.env.APP_ORIGIN || process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org').replace(/\/$/, '');
+    const resetUrl = `${appOrigin}/reset-password?token=${encodeURIComponent(token)}`;
+    console.log(`[password reset for ${user.email}]: ${resetUrl}`);
+
+    try {
+      const { sendPasswordResetEmail } = await import('./passwordResetEmails.js');
+      const emailResult = await sendPasswordResetEmail({
+        to: user.email,
+        fullName: user.full_name,
+        resetUrl,
+      });
+      if (emailResult.skipped) {
+        console.warn('[password reset] Email not sent — RESEND_API_KEY not configured. Use the link above manually.');
+      } else if (!emailResult.success) {
+        console.error('[password reset email failed]', emailResult.error, emailResult.hint || '');
+      }
+    } catch (err) {
+      console.error('[password reset email error]', err.message);
+    }
   }
-  res.json({ success: true, message: 'If the email exists, a reset link was sent (check server console in dev).' });
+
+  res.json({
+    success: true,
+    message: 'If an account exists with that email, a password reset link was sent.',
+  });
 });
 
 app.post('/api/auth/reset-password', (req, res) => {
   const { resetToken, newPassword } = req.body;
+  if (!resetToken || !newPassword) {
+    return res.status(400).json({ error: 'Reset token and new password are required' });
+  }
+  if (String(newPassword).length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
   try {
     const payload = jwt.verify(resetToken, JWT_SECRET);
     if (payload.type !== 'reset') throw new Error('Invalid token');
