@@ -42,6 +42,7 @@ import {
   NOTIFICATION_TYPE_TO_PREF,
 } from './notificationPreferences.js';
 import { sendWelcomeSignupEmail } from './customerEmails.js';
+import { getEmailConfigStatus, sendEmail as sendEmailDirect } from './email.js';
 
 const SIM_ROUTES = [
   { name: 'I-80 Westbound', id: 'sim_driver_01', userName: '👤 Mike R. (Sim)', steps: [
@@ -109,6 +110,10 @@ export async function invokeFunction(name, body, user) {
       return createCheckout(body);
     case 'sendNotification':
       return sendNotification(body);
+    case 'getEmailConfig':
+      return getEmailConfig(user);
+    case 'testEmailConfig':
+      return testEmailConfig(body, user);
     case 'sendSystemEmail': {
       const { sendEmail } = await import('./email.js');
       const { to, subject, html, text } = body;
@@ -518,7 +523,9 @@ async function provisionCustomer(body, user) {
     if (welcomeEmail.success) {
       loginMessage += ' Welcome email sent.';
     } else if (welcomeEmail.skipped) {
-      loginMessage += ' (Welcome email skipped — RESEND_API_KEY not configured.)';
+      loginMessage += ' (Welcome email skipped — RESEND_API_KEY not configured on server.)';
+    } else if (welcomeEmail.error) {
+      loginMessage += ` (Welcome email failed: ${welcomeEmail.error}${welcomeEmail.hint ? ` — ${welcomeEmail.hint}` : ''})`;
     }
   }
 
@@ -536,7 +543,7 @@ async function sendCustomerTestLogin(body, user) {
     throw new Error('Only FleetCo owner, executive, or fleet managers can send customer test logins');
   }
 
-  const { customerId, tempPassword: providedPassword } = body;
+  const { customerId, tempPassword: providedPassword, cc, bcc } = body;
   if (!customerId) throw new Error('customerId is required');
 
   const customer = getEntity('Customer', customerId);
@@ -591,6 +598,8 @@ async function sendCustomerTestLogin(body, user) {
   const notificationPrefs = getCustomerNotificationPrefs(customer);
   const welcomeEmail = await sendWelcomeSignupEmail({
     to: email,
+    cc,
+    bcc,
     companyName: customer.company_name,
     contactName: customer.contact_name,
     tempPassword,
@@ -601,7 +610,9 @@ async function sendCustomerTestLogin(body, user) {
   if (welcomeEmail.success) {
     emailNote = ' Welcome email sent to the customer.';
   } else if (welcomeEmail.skipped) {
-    emailNote = ' (Welcome email skipped — RESEND_API_KEY not configured.)';
+    emailNote = ' (Welcome email skipped — RESEND_API_KEY not configured on server.)';
+  } else if (welcomeEmail.error) {
+    emailNote = ` (Welcome email failed: ${welcomeEmail.error}${welcomeEmail.hint ? ` — ${welcomeEmail.hint}` : ''})`;
   }
 
   return {
@@ -718,6 +729,34 @@ async function sendNotification(body) {
 
   console.log('[notification]', body);
   return { success: true };
+}
+
+function getEmailConfig(user) {
+  if (!user || !['owner', 'executive'].includes(user.role)) {
+    throw new Error('Only owner or executive can view email configuration');
+  }
+  return { success: true, ...getEmailConfigStatus() };
+}
+
+async function testEmailConfig(body, user) {
+  if (!user || !['owner', 'executive'].includes(user.role)) {
+    throw new Error('Only owner or executive can send test emails');
+  }
+  const to = body.to || user.email;
+  if (!to) throw new Error('Recipient email required');
+
+  const result = await sendEmailDirect({
+    to,
+    subject: 'FleetCo Management — email test',
+    html: '<p>This is a test email from FleetCo Management. If you received it, your Resend API key and sender address are configured correctly.</p>',
+    text: 'This is a test email from FleetCo Management. If you received it, your Resend API key and sender address are configured correctly.',
+  });
+
+  return {
+    ...result,
+    config: getEmailConfigStatus(),
+    to,
+  };
 }
 
 function customersForUser(user) {

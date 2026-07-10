@@ -65,11 +65,13 @@ export function buildWelcomeEmailHtml({ companyName, contactName, email, tempPas
     </div>`;
 }
 
-export async function sendWelcomeSignupEmail({ to, companyName, contactName, tempPassword, notificationPrefs }) {
+export async function sendWelcomeSignupEmail({ to, companyName, contactName, tempPassword, notificationPrefs, cc, bcc }) {
   const html = buildWelcomeEmailHtml({ companyName, contactName, email: to, tempPassword, notificationPrefs });
   const text = buildWelcomeEmailText({ companyName, contactName, email: to, tempPassword, notificationPrefs });
   return sendEmail({
     to,
+    cc,
+    bcc,
     subject: `Welcome to FleetCo Management — your portal is ready`,
     html,
     text,
