@@ -52,11 +52,11 @@ export function buildCredentialsManifest(store) {
     } else if (user.password_hash) {
       entry.password = null;
       entry.password_source = 'bcrypt_hash';
-      entry.note = 'Password hash included in backup — logins work after restore. Plaintext not stored.',
+      entry.note = 'Password hash included in backup — logins work after restore. Plaintext not stored.';
     } else {
       entry.password = null;
       entry.password_source = 'unknown';
-      entry.note = 'No password on file',
+      entry.note = 'No password on file';
     }
 
     credentials.push(entry);

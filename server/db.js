@@ -21,6 +21,24 @@ export const DEFAULT_SITE_SETTINGS = {
   company_location: 'Dallas, TX',
 };
 
+export function getSiteSettings() {
+  const store = loadStore();
+  return { ...DEFAULT_SITE_SETTINGS, ...(store.site_settings || {}) };
+}
+
+export function updateSiteSettings(changes) {
+  const allowed = Object.keys(DEFAULT_SITE_SETTINGS);
+  const patch = {};
+  for (const [key, value] of Object.entries(changes || {})) {
+    if (allowed.includes(key) && value != null) patch[key] = String(value);
+  }
+  if (!Object.keys(patch).length) return getSiteSettings();
+  withStore((store) => {
+    store.site_settings = { ...(store.site_settings || {}), ...patch };
+  });
+  return getSiteSettings();
+}
+
 function loadStore() {
   return getMemoryStore();
 }
