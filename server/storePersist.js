@@ -55,11 +55,31 @@ function userCount(store) {
 let baselineCustomerCount = 0;
 let baselineUserCount = 0;
 
-function writeStoreFile(store) {
+function writeStoreFile(store, { allowShrink = false } = {}) {
   ensureDataDir();
-  const payload = JSON.stringify(store, null, 2);
+  let payload = store;
+
+  if (!allowShrink && fs.existsSync(dbPath)) {
+    try {
+      const onDisk = normalizeStore(JSON.parse(fs.readFileSync(dbPath, 'utf8')));
+      if (wouldShrinkData(onDisk, payload)) {
+        payload = mergeStorePreserveData(onDisk, payload);
+        memoryStore = payload;
+        const diskStats = countStats(onDisk);
+        const nextStats = countStats(payload);
+        console.warn(
+          `[datastore] Disk mirror merge — prevented data loss ` +
+            `(customers ${diskStats.customers}→${nextStats.customers}, entities ${diskStats.entities}→${nextStats.entities})`,
+        );
+      }
+    } catch (err) {
+      console.warn('[datastore] Could not read disk mirror before write:', err.message);
+    }
+  }
+
+  const serialized = JSON.stringify(payload, null, 2);
   const tmpPath = path.join(dataDir, `store.${process.pid}.${Date.now()}.tmp.json`);
-  fs.writeFileSync(tmpPath, payload, 'utf8');
+  fs.writeFileSync(tmpPath, serialized, 'utf8');
   if (fs.existsSync(dbPath)) {
     try {
       fs.copyFileSync(dbPath, backupPath);
@@ -69,6 +89,7 @@ function writeStoreFile(store) {
     fs.unlinkSync(dbPath);
   }
   fs.renameSync(tmpPath, dbPath);
+  return payload;
 }
 
 function loadFromFile() {
@@ -164,20 +185,32 @@ function isEmptyStore(store) {
 
 /**
  * Pick startup store for production Postgres.
- * Postgres wins whenever it already has users or entities — disk cannot replace it.
+ * Always union-merge Postgres + disk so customers on disk are never dropped
+ * just because Postgres still has owner/admin user rows.
  */
 function resolveProductionStore(pgSnapshot, pgHasRow, fileSnapshot) {
-  if (pgHasRow && !isEmptyStore(pgSnapshot)) {
+  if (pgHasRow && fileSnapshot) {
+    const merged = mergeStorePreserveData(pgSnapshot, fileSnapshot);
     const pgStats = countStats(pgSnapshot);
-    const fileStats = fileSnapshot ? countStats(fileSnapshot) : null;
-    if (
-      fileStats &&
-      (fileStats.users > pgStats.users || fileStats.customers > pgStats.customers)
-    ) {
+    const fileStats = countStats(fileSnapshot);
+    const mergedStats = countStats(merged);
+
+    if (mergedStats.customers > pgStats.customers || mergedStats.entities > pgStats.entities) {
       console.warn(
-        `[datastore] Keeping Postgres (users=${pgStats.users}, customers=${pgStats.customers}) — disk mirror is stale`,
+        `[datastore] Restored records from disk mirror ` +
+          `(customers pg=${pgStats.customers} disk=${fileStats.customers} merged=${mergedStats.customers})`,
+      );
+    } else if (mergedStats.customers > fileStats.customers) {
+      console.warn(
+        `[datastore] Postgres had more records than disk — merged startup store ` +
+          `(customers pg=${pgStats.customers} disk=${fileStats.customers})`,
       );
     }
+
+    return merged;
+  }
+
+  if (pgHasRow && !isEmptyStore(pgSnapshot)) {
     return pgSnapshot;
   }
 
@@ -219,8 +252,14 @@ export async function initDatabase() {
 
     memoryStore = resolveProductionStore(pgSnapshot, pgHasRow, fileSnapshot);
 
+    const pgStats = countStats(pgSnapshot);
+    const memStats = countStats(memoryStore);
     const shouldSeedPostgres =
-      !pgHasRow || customerCount(memoryStore) > customerCount(pgSnapshot);
+      !pgHasRow ||
+      memStats.customers > pgStats.customers ||
+      memStats.entities > pgStats.entities ||
+      memStats.users > pgStats.users;
+
     if (shouldSeedPostgres) {
       await persistToPostgres(memoryStore, { allowShrink: false });
     }
@@ -241,6 +280,13 @@ export async function initDatabase() {
   baselineCustomerCount = customerCount(memoryStore);
   baselineUserCount = userCount(memoryStore);
   logStats();
+
+  if (process.env.NODE_ENV === 'production' && baselineCustomerCount === 0) {
+    console.error(
+      '[datastore] WARNING: Production started with 0 customers. ' +
+        'Check Render Postgres (fleetco-db) and disk backup at store.json.bak',
+    );
+  }
 }
 
 export function getMemoryStore() {
@@ -253,13 +299,16 @@ export function getMemoryStore() {
 export function scheduleSave(store, { allowShrink = false } = {}) {
   memoryStore = store;
   try {
-    writeStoreFile(store);
+    const written = writeStoreFile(store, { allowShrink });
+    if (written !== store) {
+      memoryStore = written;
+    }
   } catch (err) {
     console.warn('[datastore] File mirror write failed:', err.message);
   }
   if (backend === 'postgres' && pool) {
     persistQueue = persistQueue
-      .then(() => persistToPostgres(store, { allowShrink }))
+      .then(() => persistToPostgres(memoryStore, { allowShrink }))
       .catch((err) => console.error('[datastore] Postgres persist failed:', err.message));
   }
 }
