@@ -9,7 +9,6 @@ import {
   canManageCustomerTeam,
   getAssignableCustomerRoles,
   customerRoleLabel,
-  isCustomerPortalUser,
   defaultSidebarModulesForRole,
   CUSTOMER_TEAM_ROLES,
 } from '@/lib/customerRoles';
