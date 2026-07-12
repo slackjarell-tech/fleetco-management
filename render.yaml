@@ -50,3 +50,9 @@ services:
       mountPath: /opt/render/project/src/server/data
       sizeGB: 1
     healthCheckPath: /api/public-settings
+
+# IMPORTANT — apply this Blueprint or manually configure on Render:
+# 1. Create/link PostgreSQL database "fleetco-db"
+# 2. Set DATABASE_URL on fleetco-management (from database Internal Connection String)
+# 3. Set JWT_SECRET, DATA_PATH, SEED_DEMO_DATA=false
+# Without DATABASE_URL the app runs file-only and data resets on redeploy (see Render logs).

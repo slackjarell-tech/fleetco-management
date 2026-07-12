@@ -92,24 +92,49 @@ function writeStoreFile(store, { allowShrink = false } = {}) {
   return payload;
 }
 
+function loadBackupSnapshot() {
+  if (!fs.existsSync(backupPath)) return null;
+  try {
+    return normalizeStore(JSON.parse(fs.readFileSync(backupPath, 'utf8')));
+  } catch (err) {
+    console.warn('[datastore] Could not read store.json.bak:', err.message);
+    return null;
+  }
+}
+
+function resolveFileStore(fileSnapshot) {
+  const backupSnapshot = loadBackupSnapshot();
+  let store = fileSnapshot || null;
+
+  if (store && backupSnapshot) {
+    const merged = mergeStorePreserveData(backupSnapshot, store);
+    const fileStats = countStats(store);
+    const mergedStats = countStats(merged);
+    if (mergedStats.customers > fileStats.customers || mergedStats.entities > fileStats.entities) {
+      console.warn(
+        `[datastore] Restored records from store.json.bak ` +
+          `(customers file=${fileStats.customers} merged=${mergedStats.customers})`,
+      );
+      store = merged;
+    }
+  } else if (!store && backupSnapshot && !isEmptyStore(backupSnapshot)) {
+    console.warn('[datastore] store.json missing/empty — restored from store.json.bak');
+    store = backupSnapshot;
+  }
+
+  return store || normalizeStore(defaultStore);
+}
+
 function loadFromFile() {
   ensureDataDir();
   if (!fs.existsSync(dbPath)) {
-    if (fs.existsSync(backupPath)) {
-      console.warn('[datastore] store.json missing — restoring from .bak');
-      fs.copyFileSync(backupPath, dbPath);
-    } else {
-      return null;
-    }
+    return null;
   }
   try {
     return normalizeStore(JSON.parse(fs.readFileSync(dbPath, 'utf8')));
   } catch (err) {
-    if (fs.existsSync(backupPath)) {
-      console.error('[datastore] Corrupt store.json — restoring .bak:', err.message);
-      return normalizeStore(JSON.parse(fs.readFileSync(backupPath, 'utf8')));
-    }
-    throw new Error(`Database file corrupt: ${err.message}`);
+    console.error('[datastore] Corrupt store.json:', err.message);
+    return null;
   }
 }
 
@@ -236,7 +261,8 @@ export async function initDatabase() {
 
   if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
     console.error(
-      '[datastore] WARNING: DATABASE_URL is not set in production — customer data may be lost on redeploy. Link Postgres in Render.',
+      '[datastore] CRITICAL: DATABASE_URL is not set in production. ' +
+        'Customer and team data WILL be lost on redeploy until Postgres (fleetco-db) is linked in Render Environment.',
     );
   }
 
@@ -271,8 +297,8 @@ export async function initDatabase() {
     }
   } else {
     backend = 'file';
-    memoryStore = fileSnapshot || normalizeStore(defaultStore);
-    if (!fileSnapshot) {
+    memoryStore = resolveFileStore(fileSnapshot);
+    if (!fileSnapshot || isEmptyStore(memoryStore)) {
       writeStoreFile(memoryStore);
     }
   }

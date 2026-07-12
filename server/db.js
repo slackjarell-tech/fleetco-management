@@ -262,5 +262,5 @@ export function updateEntity(entityType, id, data) {
 export function deleteEntity(entityType, id) {
   withStore((store) => {
     store.entities = store.entities.filter((e) => !(e.entity_type === entityType && e.id === id));
-  });
+  }, { allowShrink: true });
 }
