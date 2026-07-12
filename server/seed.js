@@ -4,6 +4,7 @@ import {
   createEntity,
   filterEntities,
   findUserByEmail,
+  getUserRowByEmail,
   updateEntity,
   updateUser,
   listEntities,
@@ -16,15 +17,20 @@ import { getStoreStats } from './db.js';
 
 const OWNER_EMAIL = 'jarell.slack@fleetcomanagement.org';
 const LEGACY_OWNER_EMAIL = 'jarrell@fleetcomanagement.org';
+const DEFAULT_OWNER_PASSWORD = 'FleetCo2026!';
 
 function migrateOwnerEmail() {
-  if (findUserByEmail(OWNER_EMAIL)) return;
+  const ownerRow = getUserRowByEmail(OWNER_EMAIL);
+  const legacyRow = getUserRowByEmail(LEGACY_OWNER_EMAIL);
+  if (!legacyRow) return;
 
-  const legacyOwner = findUserByEmail(LEGACY_OWNER_EMAIL);
-  if (!legacyOwner) return;
-
-  updateUser(legacyOwner.id, { email: OWNER_EMAIL });
-  console.log(`[seed] Migrated owner login: ${LEGACY_OWNER_EMAIL} → ${OWNER_EMAIL}`);
+  if (!ownerRow) {
+    updateUser(legacyRow.id, { email: OWNER_EMAIL, role: 'owner' });
+    console.log(`[seed] Migrated owner login: ${LEGACY_OWNER_EMAIL} → ${OWNER_EMAIL}`);
+  } else if (ownerRow.id !== legacyRow.id && !ownerRow.password_hash && legacyRow.password_hash) {
+    updateUser(ownerRow.id, { password_hash: legacyRow.password_hash, role: 'owner' });
+    console.log('[seed] Copied owner password hash from legacy login');
+  }
 
   const legacyMailbox = filterEntities('DomainEmail', { email: LEGACY_OWNER_EMAIL }, null, 1)[0];
   if (legacyMailbox) {
@@ -36,23 +42,42 @@ function migrateOwnerEmail() {
   }
 }
 
-export function seedDatabase() {
+/** Ensure owner exists with a usable password (supports one-time OWNER_BOOTSTRAP_PASSWORD reset). */
+function ensureOwnerLogin() {
   migrateOwnerEmail();
 
-  // Owner login — JaRell Slack creates all FleetCo employees
-  const owner = findUserByEmail(OWNER_EMAIL);
-  if (!owner) {
-    const hash = bcrypt.hashSync('FleetCo2026!', 10);
+  const bootstrapPassword = process.env.OWNER_BOOTSTRAP_PASSWORD?.trim();
+  let ownerRow = getUserRowByEmail(OWNER_EMAIL);
+  const legacyRow = getUserRowByEmail(LEGACY_OWNER_EMAIL);
+
+  if (!ownerRow) {
+    const password = bootstrapPassword || DEFAULT_OWNER_PASSWORD;
     createUser({
       email: OWNER_EMAIL,
-      passwordHash: hash,
+      passwordHash: bcrypt.hashSync(password, 10),
       fullName: 'JaRell D. Slack',
       role: 'owner',
     });
-    console.log(`Seeded owner: ${OWNER_EMAIL} / FleetCo2026!`);
+    console.log(`[seed] Seeded owner: ${OWNER_EMAIL}`);
+    ownerRow = getUserRowByEmail(OWNER_EMAIL);
+  } else {
+    const patch = {};
+    if (ownerRow.role !== 'owner') patch.role = 'owner';
+    if (bootstrapPassword) {
+      patch.password_hash = bcrypt.hashSync(bootstrapPassword, 10);
+      console.log('[seed] Owner password reset via OWNER_BOOTSTRAP_PASSWORD');
+    } else if (!ownerRow.password_hash) {
+      patch.password_hash = legacyRow?.password_hash || bcrypt.hashSync(DEFAULT_OWNER_PASSWORD, 10);
+      console.log('[seed] Restored missing owner password hash');
+    }
+    if (Object.keys(patch).length) updateUser(ownerRow.id, patch);
   }
 
-  const ownerUser = findUserByEmail(OWNER_EMAIL);
+  return findUserByEmail(OWNER_EMAIL);
+}
+
+export function seedDatabase() {
+  const ownerUser = ensureOwnerLogin();
   const ownerMailbox = filterEntities('DomainEmail', { email: OWNER_EMAIL }, null, 1)[0];
   if (!ownerMailbox && ownerUser) {
     createEntity('DomainEmail', {
