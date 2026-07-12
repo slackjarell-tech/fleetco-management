@@ -42,6 +42,7 @@ import {
   NOTIFICATION_TYPE_TO_PREF,
 } from './notificationPreferences.js';
 import { sendWelcomeSignupEmail } from './customerEmails.js';
+import { sendInquiryNotificationEmail } from './inquiryEmails.js';
 import { getEmailConfigStatus, sendEmail as sendEmailDirect } from './email.js';
 
 const SIM_ROUTES = [
@@ -195,7 +196,7 @@ async function decodeVin({ vin }) {
   return { vin: cleanVin, specs, recalls };
 }
 
-function submitInquiry(body) {
+async function submitInquiry(body) {
   const { name, email, message } = body;
   if (!name || !email || !message) {
     throw new Error('Name, email, and message are required.');
@@ -205,7 +206,22 @@ function submitInquiry(body) {
     status: 'new',
   });
   console.log('[inquiry received]', inquiry.id, email);
-  return { success: true, id: inquiry.id };
+
+  let notificationEmail = { success: false, skipped: true };
+  try {
+    notificationEmail = await sendInquiryNotificationEmail(inquiry);
+    if (!notificationEmail.success) {
+      console.warn('[inquiry email not sent]', inquiry.id, notificationEmail.error || notificationEmail.reason);
+    }
+  } catch (err) {
+    console.error('[inquiry email failed]', inquiry.id, err.message);
+  }
+
+  return {
+    success: true,
+    id: inquiry.id,
+    emailSent: !!notificationEmail.success,
+  };
 }
 
 function upgradeUserRole(body, user) {

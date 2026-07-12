@@ -66,7 +66,7 @@ async function getResend() {
   return resendClient;
 }
 
-export async function sendEmail({ to, subject, html, text, attachments = [], cc, bcc }) {
+export async function sendEmail({ to, subject, html, text, attachments = [], cc, bcc, replyTo }) {
   const resend = await getResend();
   if (!resend) {
     console.log('[email skipped — no RESEND_API_KEY]', { to, subject });
@@ -82,6 +82,7 @@ export async function sendEmail({ to, subject, html, text, attachments = [], cc,
     text: text || undefined,
   };
 
+  if (replyTo) payload.reply_to = replyTo;
   if (cc) payload.cc = Array.isArray(cc) ? cc : [cc];
   if (bcc) payload.bcc = Array.isArray(bcc) ? bcc : [bcc];
 
