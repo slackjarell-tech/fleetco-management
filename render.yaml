@@ -36,7 +36,12 @@ services:
         value: FleetCo Management <support@fleetcomanagement.org>
       - key: INQUIRY_TO
         value: support@fleetcomanagement.org
+      # Optional: set only when creating the owner account or if password_hash is missing.
+      # Remove after first login — it does NOT reset passwords on redeploy.
       - key: OWNER_BOOTSTRAP_PASSWORD
+        sync: false
+      # One-time only: set to "true" with OWNER_BOOTSTRAP_PASSWORD, deploy once, then remove both.
+      - key: OWNER_FORCE_PASSWORD_RESET
         sync: false
       - key: PUBLIC_APP_URL
         value: https://fleetcomanagement.org

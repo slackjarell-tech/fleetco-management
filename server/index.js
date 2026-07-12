@@ -415,7 +415,7 @@ function handleUserEntity(req, res, action) {
     if (!canDeleteUser(req.user, target, customerRecord)) {
       return res.status(403).json({ error: 'You do not have permission to delete this user' });
     }
-    deleteUser(req.params.id);
+    deleteUser(req.params.id, { force: true });
     return res.json({ success: true });
   }
 }
@@ -605,9 +605,14 @@ if (process.env.NODE_ENV === 'production' && fs.existsSync(distDir)) {
 const siteUrl = process.env.APP_ORIGIN || `http://localhost:${PORT}`;
 
 async function startServer() {
+  const { beginStartupPhase, endStartupPhase } = await import('./dataIntegrity.js');
   const { initDatabase, flushDatabase } = await import('./storePersist.js');
+
+  beginStartupPhase();
   await initDatabase();
   seedDatabase();
+  endStartupPhase();
+  console.log('[integrity] Startup complete — user passwords and records are protected on future deploys');
 
   const shutdown = async (signal) => {
     console.log(`[shutdown] ${signal} — saving database…`);

@@ -78,16 +78,13 @@ export function repairCustomerPortalLogins() {
     }
 
     if (customer.user_id || customer.has_portal_login) {
-      if (customer.user_id) {
-        updateEntity('Customer', customer.id, { user_id: null });
-      }
       broken.push({
         id: customer.id,
         company_name: customer.company_name,
         email,
       });
       console.warn(
-        `[repair] Missing portal user for ${customer.company_name} (${email}) — use Test Login to restore access`,
+        `[repair] Missing portal user for ${customer.company_name} (${email}) — use Test Login to restore access (customer record kept)`,
       );
     }
   }

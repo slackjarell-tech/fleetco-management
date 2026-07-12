@@ -1,9 +1,17 @@
 /**
  * Persistent store — PostgreSQL in production (survives redeploys), JSON file locally.
+ *
+ * Production rule: when Postgres has a row, it is the source of truth.
+ * The disk mirror is a backup only — never overwrite Postgres with a stale/empty file.
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  isStartupPhase,
+  mergeStorePreserveData,
+  wouldShrinkData,
+} from './dataIntegrity.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.DATA_PATH || path.join(__dirname, 'data');
@@ -36,26 +44,16 @@ function normalizeStore(raw) {
   };
 }
 
-function storeScore(store) {
-  const customers = store.entities?.filter((e) => e.entity_type === 'Customer').length ?? 0;
-  return (store.users?.length ?? 0) * 100 + (store.entities?.length ?? 0) + customers * 50;
-}
-
 function customerCount(store) {
-  return store.entities?.filter((e) => e.entity_type === 'Customer').length ?? 0;
+  return store?.entities?.filter((e) => e.entity_type === 'Customer').length ?? 0;
 }
 
-/** Prefer the snapshot with more customers; tie-break on overall score. */
-function chooseBestSnapshot(a, b) {
-  if (!a) return b;
-  if (!b) return a;
-  const ca = customerCount(a);
-  const cb = customerCount(b);
-  if (ca !== cb) return ca > cb ? a : b;
-  return storeScore(a) >= storeScore(b) ? a : b;
+function userCount(store) {
+  return store?.users?.length ?? 0;
 }
 
 let baselineCustomerCount = 0;
+let baselineUserCount = 0;
 
 function writeStoreFile(store) {
   ensureDataDir();
@@ -110,13 +108,46 @@ async function loadFromPostgres() {
   return { store: normalizeStore(res.rows[0].data), hasRow: true };
 }
 
-async function persistToPostgres(store) {
+async function persistToPostgres(store, { allowShrink = false } = {}) {
+  if (!pool) return;
+
+  const { store: existing, hasRow } = await loadFromPostgres();
+  let payload = store;
+
+  if (hasRow && isStartupPhase()) {
+    payload = mergeStorePreserveData(existing, store);
+    memoryStore = payload;
+  }
+
+  if (hasRow && !allowShrink) {
+    if (wouldShrinkData(existing, payload)) {
+      const ex = countStats(existing);
+      const nx = countStats(payload);
+      console.error(
+        `[datastore] BLOCKED Postgres write — would shrink data ` +
+          `(users ${ex.users}→${nx.users}, customers ${ex.customers}→${nx.customers}, entities ${ex.entities}→${nx.entities})`,
+      );
+      if (isStartupPhase()) {
+        memoryStore = existing;
+      }
+      return;
+    }
+  }
+
   await pool.query(
     `INSERT INTO app_store (id, data, updated_at)
      VALUES (1, $1::jsonb, NOW())
      ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
-    [JSON.stringify(store)],
+    [JSON.stringify(payload)],
   );
+}
+
+function countStats(store) {
+  return {
+    users: store?.users?.length ?? 0,
+    customers: store?.entities?.filter((e) => e.entity_type === 'Customer').length ?? 0,
+    entities: store?.entities?.length ?? 0,
+  };
 }
 
 function logStats() {
@@ -125,6 +156,46 @@ function logStats() {
     `[datastore] backend=${stats.backend} users=${stats.userCount} customers=${stats.customerCount} entities=${stats.entityCount}` +
       (stats.path ? ` mirror=${stats.path}` : ''),
   );
+}
+
+function isEmptyStore(store) {
+  return userCount(store) === 0 && (store?.entities?.length ?? 0) === 0;
+}
+
+/**
+ * Pick startup store for production Postgres.
+ * Postgres wins whenever it already has users or entities — disk cannot replace it.
+ */
+function resolveProductionStore(pgSnapshot, pgHasRow, fileSnapshot) {
+  if (pgHasRow && !isEmptyStore(pgSnapshot)) {
+    const pgStats = countStats(pgSnapshot);
+    const fileStats = fileSnapshot ? countStats(fileSnapshot) : null;
+    if (
+      fileStats &&
+      (fileStats.users > pgStats.users || fileStats.customers > pgStats.customers)
+    ) {
+      console.warn(
+        `[datastore] Keeping Postgres (users=${pgStats.users}, customers=${pgStats.customers}) — disk mirror is stale`,
+      );
+    }
+    return pgSnapshot;
+  }
+
+  if (pgHasRow && isEmptyStore(pgSnapshot) && fileSnapshot && !isEmptyStore(fileSnapshot)) {
+    console.warn('[datastore] Postgres empty — importing from disk mirror');
+    return fileSnapshot;
+  }
+
+  if (pgHasRow) {
+    return pgSnapshot;
+  }
+
+  if (fileSnapshot) {
+    console.warn('[datastore] Postgres empty — bootstrapping from disk mirror');
+    return fileSnapshot;
+  }
+
+  return normalizeStore(defaultStore);
 }
 
 export async function initDatabase() {
@@ -145,21 +216,15 @@ export async function initDatabase() {
     });
     await ensureSchema();
     const { store: pgSnapshot, hasRow: pgHasRow } = await loadFromPostgres();
-    const best = chooseBestSnapshot(fileSnapshot, pgSnapshot);
 
-    if (pgHasRow && customerCount(best) < customerCount(pgSnapshot)) {
-      console.warn('[datastore] Refusing to replace Postgres — keeping existing customer data');
-      memoryStore = pgSnapshot;
-    } else if (fileSnapshot && storeScore(fileSnapshot) > storeScore(pgSnapshot)) {
-      console.warn('[datastore] Local file has more data than Postgres — importing file snapshot into database');
-      memoryStore = fileSnapshot;
-    } else {
-      memoryStore = best;
+    memoryStore = resolveProductionStore(pgSnapshot, pgHasRow, fileSnapshot);
+
+    const shouldSeedPostgres =
+      !pgHasRow || customerCount(memoryStore) > customerCount(pgSnapshot);
+    if (shouldSeedPostgres) {
+      await persistToPostgres(memoryStore, { allowShrink: false });
     }
 
-    if (!pgHasRow || storeScore(memoryStore) > storeScore(pgSnapshot)) {
-      await persistToPostgres(memoryStore);
-    }
     try {
       writeStoreFile(memoryStore);
     } catch (err) {
@@ -174,6 +239,7 @@ export async function initDatabase() {
   }
 
   baselineCustomerCount = customerCount(memoryStore);
+  baselineUserCount = userCount(memoryStore);
   logStats();
 }
 
@@ -184,7 +250,7 @@ export function getMemoryStore() {
   return memoryStore;
 }
 
-export function scheduleSave(store) {
+export function scheduleSave(store, { allowShrink = false } = {}) {
   memoryStore = store;
   try {
     writeStoreFile(store);
@@ -193,17 +259,23 @@ export function scheduleSave(store) {
   }
   if (backend === 'postgres' && pool) {
     persistQueue = persistQueue
-      .then(() => persistToPostgres(store))
+      .then(() => persistToPostgres(store, { allowShrink }))
       .catch((err) => console.error('[datastore] Postgres persist failed:', err.message));
   }
 }
 
 export async function flushDatabase() {
   await persistQueue;
-  const current = customerCount(memoryStore || defaultStore);
-  if (baselineCustomerCount > 0 && current < baselineCustomerCount) {
-    console.warn(
-      `[datastore] Customer count dropped during this session (${baselineCustomerCount} → ${current})`,
+  const currentCustomers = customerCount(memoryStore || defaultStore);
+  const currentUsers = userCount(memoryStore || defaultStore);
+  if (baselineCustomerCount > 0 && currentCustomers < baselineCustomerCount) {
+    console.error(
+      `[datastore] Customer count dropped during session (${baselineCustomerCount} → ${currentCustomers})`,
+    );
+  }
+  if (baselineUserCount > 0 && currentUsers < baselineUserCount) {
+    console.error(
+      `[datastore] User count dropped during session (${baselineUserCount} → ${currentUsers})`,
     );
   }
 }
@@ -241,6 +313,7 @@ export async function importStoreSnapshot(raw) {
 
   memoryStore = store;
   baselineCustomerCount = customerCount(store);
+  baselineUserCount = userCount(store);
 
   try {
     writeStoreFile(store);
@@ -249,7 +322,7 @@ export async function importStoreSnapshot(raw) {
   }
 
   if (backend === 'postgres' && pool) {
-    await persistToPostgres(store);
+    await persistToPostgres(store, { allowShrink: true });
   }
 
   logStats();

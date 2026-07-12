@@ -22,15 +22,14 @@ function migrateCustomerRoles() {
   for (const u of listUsers()) {
     if (!u.customer_id || u.role !== 'user') continue;
     const row = getUserRowByEmail(u.email);
-    updateUser(u.id, {
-      role: 'customer_owner',
-      ...(!row?.sidebar_modules?.length
-        ? { sidebar_modules: defaultSidebarModulesForRole('customer_owner') }
-        : {}),
-    });
+    const patch = { role: 'customer_owner' };
+    if (!row?.sidebar_modules?.length) {
+      patch.sidebar_modules = defaultSidebarModulesForRole('customer_owner');
+    }
+    updateUser(u.id, patch);
     migrated += 1;
   }
-  if (migrated) console.log(`[seed] Migrated ${migrated} customer portal user(s) to customer_owner`);
+  if (migrated) console.log(`[seed] Migrated ${migrated} legacy user role(s) to customer_owner (passwords unchanged)`);
 }
 
 const OWNER_EMAIL = 'jarell.slack@fleetcomanagement.org';
@@ -60,11 +59,12 @@ function migrateOwnerEmail() {
   }
 }
 
-/** Ensure owner exists with a usable password (supports one-time OWNER_BOOTSTRAP_PASSWORD reset). */
+/** Ensure owner exists — never reset an existing password unless explicitly forced once. */
 function ensureOwnerLogin() {
   migrateOwnerEmail();
 
   const bootstrapPassword = process.env.OWNER_BOOTSTRAP_PASSWORD?.trim();
+  const forceReset = process.env.OWNER_FORCE_PASSWORD_RESET === 'true';
   let ownerRow = getUserRowByEmail(OWNER_EMAIL);
   const legacyRow = getUserRowByEmail(LEGACY_OWNER_EMAIL);
 
@@ -81,12 +81,17 @@ function ensureOwnerLogin() {
   } else {
     const patch = {};
     if (ownerRow.role !== 'owner') patch.role = 'owner';
-    if (bootstrapPassword) {
+    if (forceReset && bootstrapPassword) {
       patch.password_hash = bcrypt.hashSync(bootstrapPassword, 10);
-      console.log('[seed] Owner password reset via OWNER_BOOTSTRAP_PASSWORD');
+      console.log('[seed] Owner password reset via OWNER_FORCE_PASSWORD_RESET (one-time)');
+    } else if (bootstrapPassword && !ownerRow.password_hash) {
+      patch.password_hash = bcrypt.hashSync(bootstrapPassword, 10);
+      console.log('[seed] Set initial owner password from OWNER_BOOTSTRAP_PASSWORD');
     } else if (!ownerRow.password_hash) {
       patch.password_hash = legacyRow?.password_hash || bcrypt.hashSync(DEFAULT_OWNER_PASSWORD, 10);
       console.log('[seed] Restored missing owner password hash');
+    } else if (bootstrapPassword) {
+      console.log('[seed] Owner password unchanged — remove OWNER_BOOTSTRAP_PASSWORD from Render to avoid confusion');
     }
     if (Object.keys(patch).length) updateUser(ownerRow.id, patch);
   }

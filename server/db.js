@@ -6,6 +6,7 @@ import {
   getStoreStats,
   exportStoreSnapshot,
 } from './storePersist.js';
+import { assertUserDeleteAllowed, sanitizeUserPatch } from './dataIntegrity.js';
 
 export { getStoreStats, exportStoreSnapshot };
 
@@ -43,14 +44,14 @@ function loadStore() {
   return getMemoryStore();
 }
 
-function saveStore(store) {
-  scheduleSave(store);
+function saveStore(store, options) {
+  scheduleSave(store, options);
 }
 
-function withStore(mutator) {
+function withStore(mutator, options) {
   const store = loadStore();
   const result = mutator(store);
-  saveStore(store);
+  saveStore(store, options);
   return result;
 }
 
@@ -139,11 +140,15 @@ export function createUser({ email, passwordHash, fullName, role = 'user', custo
 
 export function updateUser(id, fields) {
   const allowed = ['email', 'full_name', 'role', 'customer_id', 'status', 'sidebar_modules', 'employee_number', 'password_hash'];
+  const safeFields = sanitizeUserPatch(id, fields, (userId) => {
+    const row = loadStore().users.find((u) => u.id === userId);
+    return row || null;
+  });
   let updated = null;
   withStore((store) => {
     const idx = store.users.findIndex((u) => u.id === id);
     if (idx === -1) return;
-    for (const [key, val] of Object.entries(fields)) {
+    for (const [key, val] of Object.entries(safeFields)) {
       if (!allowed.includes(key)) continue;
       store.users[idx][key] = key === 'email' ? String(val).toLowerCase() : val;
     }
@@ -153,10 +158,13 @@ export function updateUser(id, fields) {
   return updated;
 }
 
-export function deleteUser(id) {
+export function deleteUser(id, { force = false } = {}) {
+  if (!force && !assertUserDeleteAllowed(id, (userId) => loadStore().users.find((u) => u.id === userId) || null)) {
+    return;
+  }
   withStore((store) => {
     store.users = store.users.filter((u) => u.id !== id);
-  });
+  }, { allowShrink: true });
 }
 
 export function filterUsers(criteria = {}) {
