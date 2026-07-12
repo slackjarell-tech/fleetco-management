@@ -24,7 +24,7 @@ export function getEmailFromAddress() {
   if (process.env.RESEND_SANDBOX === 'true') {
     return SANDBOX_FROM;
   }
-  return configured || 'FleetCo Management <info@fleetcomanagement.org>';
+  return configured || 'FleetCo Management <support@fleetcomanagement.org>';
 }
 
 export function emailErrorHint(message = '') {

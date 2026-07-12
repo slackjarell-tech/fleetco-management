@@ -33,7 +33,7 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
-        value: FleetCo Management <info@fleetcomanagement.org>
+        value: FleetCo Management <support@fleetcomanagement.org>
       - key: PUBLIC_APP_URL
         value: https://fleetcomanagement.org
     disk:

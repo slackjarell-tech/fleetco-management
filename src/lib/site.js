@@ -4,7 +4,7 @@ export const SITE = {
   legalName: 'Fleetco Management LLC',
   domain: 'https://fleetcomanagement.org',
   url: import.meta.env.VITE_SITE_URL || 'https://fleetcomanagement.org',
-  email: 'info@fleetcomanagement.org',
+  email: 'support@fleetcomanagement.org',
   supportEmail: 'support@fleetcomanagement.org',
   phone: '(360) 952-1249',
   location: 'Dallas, TX',

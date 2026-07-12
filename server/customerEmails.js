@@ -34,7 +34,7 @@ export function buildWelcomeEmailText({ companyName, contactName, email, tempPas
     '',
     `Manage notification preferences anytime: ${PREFS_URL}`,
     '',
-    'FleetCo Management · (360) 952-1249 · info@fleetcomanagement.org',
+    'FleetCo Management · (360) 952-1249 · support@fleetcomanagement.org',
   ].join('\n');
 }
 
@@ -69,7 +69,7 @@ export function buildWelcomeEmailHtml({ companyName, contactName, email, tempPas
       </p>
       <p style="margin-top:24px;color:#64748B;font-size:14px">
         Fleetco Management LLC · (360) 952-1249 · Dallas, TX<br/>
-        <a href="mailto:info@fleetcomanagement.org">info@fleetcomanagement.org</a>
+        <a href="mailto:support@fleetcomanagement.org">support@fleetcomanagement.org</a>
       </p>
     </div>`;
 }

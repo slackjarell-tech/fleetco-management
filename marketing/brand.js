@@ -4,7 +4,7 @@ export const BRAND = {
   shortName: 'FleetCo Management',
   phone: '(360) 952-1249',
   phoneTel: '+13609521249',
-  email: 'info@fleetcomanagement.org',
+  email: 'support@fleetcomanagement.org',
   supportEmail: 'support@fleetcomanagement.org',
   website: 'fleetcomanagement.org',
   url: 'https://fleetcomanagement.org',

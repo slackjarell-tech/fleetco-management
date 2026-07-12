@@ -15,7 +15,7 @@ export function buildPasswordResetEmailHtml({ fullName, resetUrl }) {
       <p style="color:#64748B;font-size:13px;word-break:break-all">Or copy this link: ${resetUrl}</p>
       <p style="margin-top:24px;color:#64748B;font-size:14px">
         Fleetco Management LLC · (360) 952-1249<br/>
-        <a href="mailto:info@fleetcomanagement.org">info@fleetcomanagement.org</a>
+        <a href="mailto:support@fleetcomanagement.org">support@fleetcomanagement.org</a>
       </p>
     </div>`;
 }
@@ -31,7 +31,7 @@ export function buildPasswordResetEmailText({ fullName, resetUrl }) {
     '',
     'If you did not request this, you can ignore this email.',
     '',
-    'FleetCo Management · info@fleetcomanagement.org',
+    'FleetCo Management · support@fleetcomanagement.org',
   ].join('\n');
 }
 

@@ -234,8 +234,8 @@ export default function FleetOwnerLanding() {
           )}
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8 text-sm text-slate-500">
-            <a href="mailto:info@fleetcomanagement.com" className="flex items-center gap-2 hover:text-amber-600">
-              <Mail className="w-4 h-4" /> info@fleetcomanagement.com
+            <a href="mailto:support@fleetcomanagement.org" className="flex items-center gap-2 hover:text-amber-600">
+              <Mail className="w-4 h-4" /> support@fleetcomanagement.org
             </a>
             <a href="tel:+12145550100" className="flex items-center gap-2 hover:text-amber-600">
               <Phone className="w-4 h-4" /> (214) 555-0100
