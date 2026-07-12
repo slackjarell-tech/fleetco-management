@@ -1,5 +1,6 @@
 import React from 'react';
 import { CheckCircle } from 'lucide-react';
+import { HOME_IMAGES } from '@/lib/homeImages';
 
 const advantages = [
   'Dedicated Fleet Manager & Safety Coordinator per account',
@@ -21,7 +22,7 @@ export default function AboutSection() {
           <div className="relative">
             <div className="rounded-2xl overflow-hidden shadow-2xl">
               <img
-                src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&q=80"
+                src={HOME_IMAGES.about}
                 alt="Fleet trucks on highway"
                 className="w-full h-80 lg:h-96 object-cover"
               />

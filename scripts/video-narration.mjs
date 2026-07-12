@@ -1,7 +1,8 @@
 /** Narration script and scene list for the FleetCo client presentation video (~4–5 min). */
 
-export const VOICE = 'en-US-AriaNeural';
-export const PROSODY = { rate: '-4%', pitch: '+2Hz', volume: '+0%' };
+/** Jenny — warmer, more conversational than Aria for long-form narration. */
+export const VOICE = 'en-US-JennyNeural';
+export const PROSODY = { rate: '-13%', pitch: '-3Hz', volume: '+4%' };
 
 export const SCENES = [
   {
@@ -10,7 +11,8 @@ export const SCENES = [
     kicker: 'Client Presentation · 2026',
     title: 'FleetCo Management',
     body: 'Website · Executive Portal · Mobile Driver App',
-    narration: `Welcome to FleetCo Management — the complete fleet operations platform built for carriers who want one system for dispatch, maintenance, compliance, and driver communication. In the next few minutes, you'll see our public website, the executive portal, and the mobile driver app working together as one connected platform.`,
+    stockImage: 'heroHighway',
+    narration: `Welcome to FleetCo Management — the fleet operations platform built for carriers who want one connected system for dispatch, maintenance, compliance, and driver communication. Over the next few minutes, you'll see our public website, the executive portal, and the mobile driver app working together.`,
   },
   {
     id: 'website-home',
@@ -18,7 +20,8 @@ export const SCENES = [
     url: '/',
     scrollTo: '#platform-tour',
     caption: 'fleetcomanagement.org',
-    narration: `Our website at fleetcomanagement.org gives prospective clients a clear picture of who we are and what we deliver. From the homepage, visitors explore our platform tour, review services, and understand how FleetCo supports fleets of every size — from owner-operators to enterprise carriers.`,
+    stockImage: 'heroHighway',
+    narration: `Our website at fleetcomanagement.org gives prospective clients a clear picture of who we are and what we deliver. From the homepage, visitors explore the platform tour, review services, and see how FleetCo supports fleets of every size — from owner-operators to enterprise carriers.`,
   },
   {
     id: 'website-services',
@@ -26,7 +29,8 @@ export const SCENES = [
     url: '/',
     scrollTo: '#services',
     caption: 'Fleet management solutions',
-    narration: `The solutions section walks through real capabilities: fleet management, fuel optimization, safety and compliance, shop services, and dispatch support. Every section is designed to answer the questions fleet owners ask before they commit — what you get, how it works, and why it saves time and money on the road.`,
+    stockImage: 'fleetYard',
+    narration: `The solutions section walks through real capabilities: fleet management, fuel optimization, safety and compliance, shop services, and dispatch support. Every section answers the questions fleet owners ask before they commit — what you get, how it works, and how it saves time and money on the road.`,
   },
   {
     id: 'website-pricing',
@@ -34,6 +38,7 @@ export const SCENES = [
     url: '/',
     scrollTo: '#pricing',
     caption: 'Transparent monthly plans',
+    stockImage: 'logisticsDock',
     narration: `Transparent pricing removes the guesswork. Our Starter plan covers small fleets with monthly reporting and fuel optimization. Growth adds preventive maintenance scheduling and priority support. Enterprise clients receive custom integrations, telematics, and a dedicated account team — scoped to fleet size and operational needs.`,
   },
   {
@@ -41,13 +46,15 @@ export const SCENES = [
     type: 'portal',
     url: '/portal',
     caption: 'Executive command center',
-    narration: `Once you sign in, the FleetCo executive portal becomes your command center. Owners and fleet managers get a live dashboard with KPIs, alerts, and quick actions — everything needed to run daily operations without juggling spreadsheets, phone calls, and disconnected software tools.`,
+    stockImage: 'dispatch',
+    narration: `Once you sign in, the FleetCo executive portal becomes your command center. Owners and fleet managers get a live dashboard with KPIs, alerts, and quick actions — everything needed to run daily operations without juggling spreadsheets and disconnected tools.`,
   },
   {
     id: 'portal-customers',
     type: 'portal',
     url: '/portal/customers',
     caption: 'Customer & account management',
+    stockImage: 'fleetYard',
     narration: `Customer management keeps client relationships organized. Track accounts, contacts, contracts, and communication history in one place. Whether you manage your own fleet or provide management services to other carriers, every customer record stays connected to loads, invoices, and vehicles.`,
   },
   {
@@ -55,6 +62,7 @@ export const SCENES = [
     type: 'portal',
     url: '/portal/fleet',
     caption: 'Fleet assets & documents',
+    stockImage: 'semiClose',
     narration: `The fleet module is your asset registry. Every truck, trailer, and piece of equipment has documents, inspection history, preventive maintenance schedules, and status at a glance. Upload registrations, insurance, and DOT files so your team always has the right paperwork when it matters.`,
   },
   {
@@ -62,6 +70,7 @@ export const SCENES = [
     type: 'portal',
     url: '/portal/loads',
     caption: 'Dispatch & load board',
+    stockImage: 'logisticsDock',
     narration: `Dispatch and load management tie drivers to freight in real time. Create loads, assign drivers, track pickup and delivery milestones, and monitor status from the load board. Operations teams see exactly what's moving, what's delayed, and what needs attention before small issues become costly delays.`,
   },
   {
@@ -69,6 +78,7 @@ export const SCENES = [
     type: 'portal',
     url: '/portal/maintenance',
     caption: 'Work orders & PM schedules',
+    stockImage: 'semiClose',
     narration: `Maintenance and work orders keep vehicles road-ready. Schedule preventive maintenance, open repair orders, track parts and vendor costs, and close jobs with full documentation. Fleet managers reduce downtime by catching issues early — before they turn into breakdowns on the highway.`,
   },
   {
@@ -76,6 +86,7 @@ export const SCENES = [
     type: 'portal',
     url: '/portal/driver-media',
     caption: 'Driver media & field uploads',
+    stockImage: 'mobileField',
     narration: `When drivers capture dashcam footage, cabin video, or scans from the field, it flows directly into the customer portal. Managers review driver media, audit barcode scans, and verify compliance without waiting for someone to email files from a personal phone.`,
   },
   {
@@ -85,6 +96,7 @@ export const SCENES = [
     title: 'FleetCo Driver',
     body: 'iOS & Android · Built for life on the road',
     accent: '#38BDF8',
+    stockImage: 'driverRoad',
     narration: `Now meet the FleetCo Driver app — built for iOS and Android, and ready for the app stores. This is what your drivers use every day: time clock, GPS-aware tools, barcode scanning, dashcam capture, and a direct link back to the same portal you just saw.`,
   },
   {
@@ -92,6 +104,7 @@ export const SCENES = [
     type: 'driver',
     url: '/driver',
     caption: 'Driver home & daily workflow',
+    stockImage: 'mobileField',
     narration: `The driver home screen puts the day's work front and center. Assigned loads, fuel logs, and quick actions are designed for one-handed use on a phone. Drivers spend less time on paperwork and more time moving freight safely and on schedule.`,
   },
   {
@@ -99,6 +112,7 @@ export const SCENES = [
     type: 'driver',
     url: '/driver/dashcam',
     caption: 'Dashcam & media capture',
+    stockImage: 'driverRoad',
     narration: `Dashcam and media capture includes View Ahead time-lapse recording for road documentation, cabin capture for training and incident review, and b-roll for client updates. Drivers follow built-in setup guides, start a session with one tap, and stop when they're done — footage syncs back for managers to review.`,
   },
   {
@@ -106,6 +120,7 @@ export const SCENES = [
     type: 'driver',
     url: '/driver/scan',
     caption: 'Barcode scanning on the road',
+    stockImage: 'logisticsDock',
     narration: `Barcode scanning lets drivers confirm pickups, deliveries, and inventory without a separate scanner device. Point the camera, scan the code, and the record syncs to the portal instantly — reducing disputes and keeping chain-of-custody clear for every shipment.`,
   },
   {
@@ -113,6 +128,7 @@ export const SCENES = [
     type: 'driver',
     url: '/driver/clock',
     caption: 'Time clock & compliance tools',
+    stockImage: 'mobileField',
     narration: `The time clock tracks hours accurately for payroll and compliance. Along with route tools, HOS logs, inspections, fuel entries, and incident reporting, field teams get one login instead of five different apps — all tied to the same FleetCo platform.`,
   },
   {
@@ -121,6 +137,7 @@ export const SCENES = [
     kicker: 'Schedule a live demo',
     title: 'Move freight. We handle the rest.',
     body: 'fleetcomanagement.org · (360) 952-1249',
-    narration: `FleetCo Management brings your website, executive portal, and driver app together in one platform. Move freight — we handle the rest. Schedule a live demo today at fleetcomanagement.org, or call three six zero, nine five two, twelve forty-nine. We look forward to earning your business.`,
+    stockImage: 'heroHighway',
+    narration: `FleetCo Management brings your website, executive portal, and driver app together in one platform. Move freight — we handle the rest. Schedule a live demo today at fleetcomanagement.org, or call three six zero, nine five two, twelve forty-nine. We'd love to earn your business.`,
   },
 ];

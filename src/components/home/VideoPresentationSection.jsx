@@ -23,7 +23,7 @@ export default function VideoPresentationSection() {
             controls
             playsInline
             preload="metadata"
-            poster="/marketing/video-poster.svg"
+            poster="/marketing/video-poster.jpg"
           >
             <source src={CLIENT_VIDEO_URL} type="video/mp4" />
             Your browser does not support embedded video.

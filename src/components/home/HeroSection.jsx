@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { HOME_IMAGES } from '@/lib/homeImages';
 import { ChevronDown, Shield, Truck, Star, ArrowRight, Loader2, LogIn } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
@@ -53,7 +54,7 @@ export default function HeroSection() {
       <div
         className="absolute inset-0"
         style={{
-          backgroundImage: `url("https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=1800&q=85")`,
+          backgroundImage: `url("${HOME_IMAGES.hero}")`,
           backgroundSize: 'cover',
           backgroundPosition: 'center 40%',
         }}

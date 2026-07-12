@@ -12,6 +12,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { BRAND } from '../marketing/brand.js';
+import { STOCK } from '../marketing/stock-images.mjs';
 import { SCENES, VOICE, PROSODY } from './video-narration.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -21,6 +22,8 @@ const AUDIO_DIR = path.join(OUT_DIR, 'video-audio');
 const SEGMENTS_DIR = path.join(OUT_DIR, 'video-segments');
 const OUT_FILE = path.join(OUT_DIR, 'FleetCo-Client-Presentation.mp4');
 const PUBLIC_FILE = path.join(__dirname, '..', 'public', 'marketing', 'FleetCo-Client-Presentation.mp4');
+const POSTER_FILE = path.join(__dirname, '..', 'public', 'marketing', 'video-poster.jpg');
+const STOCK_DIR = path.join(OUT_DIR, 'video-stocks');
 const DOWNLOADS_FILE = path.join(process.env.USERPROFILE || '', 'Downloads', 'FleetCo-Client-Presentation.mp4');
 
 const BASE = process.env.SITE_URL || 'https://fleetcomanagement.org';
@@ -55,15 +58,22 @@ async function apiLogin(email, password) {
   return data.access_token;
 }
 
-function titleCardHtml({ kicker, title, body, accent = '#F59E0B' }) {
+function stockBgCss(stockUrl) {
+  if (!stockUrl) {
+    return 'background:radial-gradient(ellipse at 20% 20%,#1e293b 0%,#0F172A 55%,#020617 100%)';
+  }
+  return `background:linear-gradient(115deg,rgba(15,23,42,.92) 0%,rgba(15,23,42,.78) 45%,rgba(15,23,42,.55) 100%),url('${stockUrl}') center/cover no-repeat`;
+}
+
+function titleCardHtml({ kicker, title, body, accent = '#F59E0B', stockUrl = null }) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{width:1920px;height:1080px;background:radial-gradient(ellipse at 20% 20%,#1e293b 0%,#0F172A 55%,#020617 100%);color:#fff;font-family:Segoe UI,Arial,sans-serif;display:flex;flex-direction:column;justify-content:center;padding:120px}
-    .bar{width:8px;height:120px;background:${accent};position:absolute;left:80px;top:480px;border-radius:4px}
+    body{width:1920px;height:1080px;${stockBgCss(stockUrl)};color:#fff;font-family:Segoe UI,Arial,sans-serif;display:flex;flex-direction:column;justify-content:center;padding:120px 120px 120px 140px;position:relative}
+    .bar{width:8px;height:120px;background:${accent};position:absolute;left:80px;top:480px;border-radius:4px;box-shadow:0 0 24px ${accent}88}
     .kicker{color:${accent};font-size:28px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:24px}
-    h1{font-size:72px;font-weight:900;line-height:1.05;max-width:1400px}
-    p{font-size:32px;color:#94A3B8;margin-top:32px;max-width:1200px;line-height:1.4}
-    .foot{position:absolute;bottom:80px;left:120px;color:#64748B;font-size:22px}
+    h1{font-size:72px;font-weight:900;line-height:1.05;max-width:1400px;text-shadow:0 4px 24px rgba(0,0,0,.45)}
+    p{font-size:32px;color:#E2E8F0;margin-top:32px;max-width:1200px;line-height:1.4;text-shadow:0 2px 12px rgba(0,0,0,.35)}
+    .foot{position:absolute;bottom:80px;left:120px;color:#CBD5E1;font-size:22px}
   </style></head><body>
     <div class="bar"></div>
     ${kicker ? `<div class="kicker">${kicker}</div>` : ''}
@@ -73,10 +83,10 @@ function titleCardHtml({ kicker, title, body, accent = '#F59E0B' }) {
   </body></html>`;
 }
 
-function phoneFrameHtml(dataUrl, caption) {
+function phoneFrameHtml(dataUrl, caption, stockUrl = null) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{width:1920px;height:1080px;background:radial-gradient(ellipse at 70% 30%,#1e293b 0%,#0F172A 60%,#020617 100%);display:flex;align-items:center;justify-content:center;font-family:Segoe UI,Arial,sans-serif;position:relative}
+    body{width:1920px;height:1080px;${stockBgCss(stockUrl)};display:flex;align-items:center;justify-content:center;font-family:Segoe UI,Arial,sans-serif;position:relative}
     .badge{position:absolute;top:72px;right:100px;background:#38BDF8;color:#0F172A;padding:14px 28px;border-radius:999px;font-weight:800;font-size:22px;letter-spacing:.04em}
     .wrap{display:flex;align-items:center;gap:80px;padding:0 100px;width:100%}
     .phone{width:420px;flex-shrink:0;height:860px;background:linear-gradient(145deg,#334155,#0f172a);border-radius:52px;padding:16px;box-shadow:0 50px 100px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.08);border:2px solid #475569}
@@ -100,10 +110,10 @@ function phoneFrameHtml(dataUrl, caption) {
   </body></html>`;
 }
 
-function desktopFrameHtml(dataUrl, caption) {
+function desktopFrameHtml(dataUrl, caption, stockUrl = null) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{width:1920px;height:1080px;background:radial-gradient(ellipse at 30% 40%,#1e293b 0%,#0F172A 55%,#020617 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Segoe UI,Arial,sans-serif;padding:48px 80px 64px}
+    body{width:1920px;height:1080px;${stockBgCss(stockUrl)};display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Segoe UI,Arial,sans-serif;padding:48px 80px 64px}
     .browser{width:100%;max-width:1680px;background:#1e293b;border-radius:16px;overflow:hidden;box-shadow:0 40px 80px rgba(0,0,0,.45);border:1px solid #334155}
     .chrome{height:44px;background:#0f172a;display:flex;align-items:center;padding:0 16px;gap:8px;border-bottom:1px solid #334155}
     .dot{width:12px;height:12px;border-radius:50%}.r{background:#ef4444}.y{background:#eab308}.g{background:#22c55e}
@@ -124,6 +134,28 @@ async function synthesizeNarration(text, outPath) {
   const result = await tts.synthesize();
   const audioBuffer = Buffer.from(await result.audio.arrayBuffer());
   fs.writeFileSync(outPath, audioBuffer);
+}
+
+async function downloadStockImages() {
+  fs.mkdirSync(STOCK_DIR, { recursive: true });
+  const local = {};
+  for (const [key, url] of Object.entries(STOCK)) {
+    const file = path.join(STOCK_DIR, `${key}.jpg`);
+    if (!fs.existsSync(file)) {
+      console.log(`  · Stock image: ${key}`);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Failed to download stock ${key}: ${res.status}`);
+      fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+    }
+    local[key] = `file:///${file.replace(/\\/g, '/')}`;
+  }
+  return local;
+}
+
+function resolveStockUrl(scene, stockLocal) {
+  const key = scene.stockImage;
+  if (!key || !stockLocal[key]) return null;
+  return stockLocal[key];
 }
 
 function getAudioDurationSec(file) {
@@ -209,13 +241,29 @@ async function captureLivePage(page, { url, token, mobile, scrollTo }) {
     await page.evaluate(() => window.scrollTo(0, 0));
   }
 
-  await new Promise((r) => setTimeout(r, 2000));
+  await page.evaluate(async () => {
+    const imgs = [...document.images];
+    await Promise.all(
+      imgs.map((img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise((resolve) => {
+              img.onload = resolve;
+              img.onerror = resolve;
+            }),
+      ),
+    );
+  });
+
+  await new Promise((r) => setTimeout(r, 2500));
   return page.screenshot({ type: 'png', fullPage: false });
 }
 
-async function captureScene(page, scene, tokens) {
+async function captureScene(page, scene, tokens, stockLocal) {
+  const stockUrl = resolveStockUrl(scene, stockLocal);
+
   if (scene.type === 'title') {
-    const html = titleCardHtml(scene);
+    const html = titleCardHtml({ ...scene, stockUrl });
     return shotHtml(page, html);
   }
 
@@ -229,7 +277,9 @@ async function captureScene(page, scene, tokens) {
   });
 
   const dataUrl = `data:image/png;base64,${raw.toString('base64')}`;
-  const html = mobile ? phoneFrameHtml(dataUrl, scene.caption) : desktopFrameHtml(dataUrl, scene.caption);
+  const html = mobile
+    ? phoneFrameHtml(dataUrl, scene.caption, stockUrl)
+    : desktopFrameHtml(dataUrl, scene.caption, stockUrl);
   return shotHtml(page, html);
 }
 
@@ -312,6 +362,9 @@ async function main() {
   console.log(`Target: ${SCENES.length} scenes · ~4–5 minutes`);
   console.log(`Site: ${BASE}\n`);
 
+  console.log('Downloading stock imagery…');
+  const stockLocal = await downloadStockImages();
+
   console.log('Authenticating…');
   const tokens = {
     owner: await apiLogin(ACCOUNTS.owner.email, ACCOUNTS.owner.password),
@@ -342,8 +395,11 @@ async function main() {
     totalSec += segmentDur;
 
     console.log('  · Capturing screen…');
-    const png = await captureScene(page, scene, tokens);
+    const png = await captureScene(page, scene, tokens, stockLocal);
     fs.writeFileSync(framePath, png);
+    if (scene.id === 'intro') {
+      fs.copyFileSync(framePath, POSTER_FILE.replace('.jpg', '.png'));
+    }
 
     console.log(`  · Encoding segment (${segmentDur.toFixed(1)}s)…`);
     buildSegment(framePath, audioPath, segmentDur, segmentPath);
@@ -355,6 +411,15 @@ async function main() {
   console.log('\nMerging segments…');
   concatSegments(segmentPaths, OUT_FILE);
   fs.copyFileSync(OUT_FILE, PUBLIC_FILE);
+
+  const posterPng = POSTER_FILE.replace('.jpg', '.png');
+  if (fs.existsSync(posterPng)) {
+    execFileSync(
+      FFMPEG,
+      ['-y', '-i', posterPng, '-vf', 'scale=1920:1080', '-q:v', '2', POSTER_FILE],
+      { stdio: 'ignore' },
+    );
+  }
   try {
     fs.copyFileSync(OUT_FILE, DOWNLOADS_FILE);
   } catch {
