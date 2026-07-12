@@ -115,7 +115,7 @@ export function getUserRowByEmail(email) {
   return loadStore().users.find((u) => u.email.toLowerCase() === email.toLowerCase()) || null;
 }
 
-export function createUser({ email, passwordHash, fullName, role = 'user', customerId, employeeNumber }) {
+export function createUser({ email, passwordHash, fullName, role = 'user', customerId, employeeNumber, sidebarModules }) {
   const id = newId();
   const ts = nowIso();
   const user = {
@@ -127,6 +127,7 @@ export function createUser({ email, passwordHash, fullName, role = 'user', custo
     customer_id: customerId || null,
     employee_number: employeeNumber || null,
     status: 'active',
+    sidebar_modules: sidebarModules || null,
     created_date: ts,
     updated_date: ts,
   };

@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { isCustomerTeamRole, normalizeCustomerRole } from './customerRoles.js';
 import {
   createUser,
   filterEntities,
@@ -35,7 +36,7 @@ export function repairCustomerPortalLogins() {
       if (customer.user_id !== user.id) {
         customerPatch.user_id = user.id;
       }
-      if (!customer.has_portal_login && ['user', 'driver'].includes(user.role)) {
+      if (!customer.has_portal_login && isCustomerTeamRole(user.role)) {
         customerPatch.has_portal_login = true;
         customerPatch.portal_login_email = email;
       }
@@ -43,7 +44,7 @@ export function repairCustomerPortalLogins() {
         updateEntity('Customer', customer.id, customerPatch);
         relinked += 1;
       }
-      if (user.customer_id !== customer.id && user.role === 'user') {
+      if (user.customer_id !== customer.id && isCustomerTeamRole(user.role)) {
         updateUser(user.id, { customer_id: customer.id });
       }
       continue;
@@ -57,12 +58,13 @@ export function repairCustomerPortalLogins() {
       filterEntities('PendingAccount', { email, customer_id: customer.id }, null, 1)[0] ||
       filterEntities('PendingAccount', { email, activated: false }, null, 1)[0];
 
-    if (pending?.temp_password && pending.role === 'user') {
+    if (pending?.temp_password && isCustomerTeamRole(pending.role)) {
+      const role = normalizeCustomerRole(pending.role);
       const created = createUser({
         email,
         passwordHash: bcrypt.hashSync(pending.temp_password, 10),
         fullName: customer.contact_name || customer.company_name,
-        role: 'user',
+        role,
         customerId: customer.id,
       });
       updateEntity('Customer', customer.id, {

@@ -8,12 +8,30 @@ import {
   updateEntity,
   updateUser,
   listEntities,
+  listUsers,
   nowIso,
 } from './db.js';
 import { computeNextDueDate } from './billing.js';
 import { seedDemoData } from './seedDemo.js';
 import { repairCustomerPortalLogins } from './repairCustomerLogins.js';
 import { getStoreStats } from './db.js';
+import { defaultSidebarModulesForRole } from './customerRoles.js';
+
+function migrateCustomerRoles() {
+  let migrated = 0;
+  for (const u of listUsers()) {
+    if (!u.customer_id || u.role !== 'user') continue;
+    const row = getUserRowByEmail(u.email);
+    updateUser(u.id, {
+      role: 'customer_owner',
+      ...(!row?.sidebar_modules?.length
+        ? { sidebar_modules: defaultSidebarModulesForRole('customer_owner') }
+        : {}),
+    });
+    migrated += 1;
+  }
+  if (migrated) console.log(`[seed] Migrated ${migrated} customer portal user(s) to customer_owner`);
+}
 
 const OWNER_EMAIL = 'jarell.slack@fleetcomanagement.org';
 const LEGACY_OWNER_EMAIL = 'jarrell@fleetcomanagement.org';
@@ -77,6 +95,7 @@ function ensureOwnerLogin() {
 }
 
 export function seedDatabase() {
+  migrateCustomerRoles();
   const ownerUser = ensureOwnerLogin();
   const ownerMailbox = filterEntities('DomainEmail', { email: OWNER_EMAIL }, null, 1)[0];
   if (!ownerMailbox && ownerUser) {

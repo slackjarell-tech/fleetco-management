@@ -17,6 +17,11 @@ import {
 import {
   canCreateFleetCoEmployees,
   canManageCustomerTeam,
+  canAssignCustomerRole,
+  CUSTOMER_TEAM_ROLES,
+  CUSTOMER_LEGACY_ROLE,
+  defaultSidebarModulesForRole,
+  normalizeCustomerRole,
   canProvisionCustomers,
   isFleetCoInternal,
   subscriptionAmount,
@@ -294,7 +299,7 @@ async function createUserAccount(body, user) {
   }
 
   const internalRoles = ['executive', 'fleet_manager', 'fleet_coordinator'];
-  const customerRoles = ['user', 'driver'];
+  const customerRoles = [...CUSTOMER_TEAM_ROLES, CUSTOMER_LEGACY_ROLE];
 
   let normalizedEmail = email.trim().toLowerCase();
 
@@ -309,6 +314,9 @@ async function createUserAccount(body, user) {
       if (!user.customer_id) throw new Error('Your account is not linked to a customer organization');
       if (customerId && customerId !== user.customer_id) {
         throw new Error('You can only add team members to your own organization');
+      }
+      if (!canAssignCustomerRole(user.role, role)) {
+        throw new Error(`You cannot assign the ${role} role`);
       }
     } else if (canProvisionCustomers(user.role) || user.role === 'owner') {
       if (!customerId) throw new Error('customerId is required when creating customer portal users');
@@ -326,6 +334,7 @@ async function createUserAccount(body, user) {
     : (customerId || user.customer_id || null);
 
   let existing = getUserRowByEmail(normalizedEmail);
+  const sidebarModules = body.sidebar_modules || defaultSidebarModulesForRole(role);
   if (!existing) {
     const hash = bcrypt.hashSync(tempPassword, 10);
     createUser({
@@ -335,6 +344,7 @@ async function createUserAccount(body, user) {
       customerId: effectiveCustomerId,
       employeeNumber,
       fullName,
+      sidebarModules,
     });
   } else {
     updateUser(existing.id, {
@@ -342,6 +352,7 @@ async function createUserAccount(body, user) {
       customer_id: effectiveCustomerId,
       employee_number: employeeNumber,
       password_hash: bcrypt.hashSync(tempPassword, 10),
+      sidebar_modules: sidebarModules,
       ...(fullName ? { full_name: fullName } : {}),
     });
   }
@@ -557,7 +568,7 @@ async function provisionCustomer(body, user) {
       {
         email: customerData.email,
         tempPassword,
-        role: 'user',
+        role: 'customer_owner',
         customerId: customer.id,
         fullName: customerData.contact_name || customerData.company_name,
         sendWelcomeEmail: false,
@@ -616,7 +627,7 @@ async function sendCustomerTestLogin(body, user) {
     {
       email,
       tempPassword,
-      role: 'user',
+      role: 'customer_owner',
       customerId: customer.id,
       fullName: customer.contact_name || customer.company_name,
       sendWelcomeEmail: false,
@@ -716,7 +727,7 @@ async function sendCustomerWelcomeEmail(body, user) {
       {
         email: portalEmail,
         tempPassword,
-        role: 'user',
+        role: 'customer_owner',
         customerId: customer.id,
         fullName: customer.contact_name || customer.company_name,
         sendWelcomeEmail: false,
@@ -728,7 +739,7 @@ async function sendCustomerWelcomeEmail(body, user) {
       {
         email: portalEmail,
         tempPassword,
-        role: 'user',
+        role: 'customer_owner',
         customerId: customer.id,
         fullName: customer.contact_name || customer.company_name,
         sendWelcomeEmail: false,

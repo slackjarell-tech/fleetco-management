@@ -10,7 +10,7 @@ export default function LoadModal({ load, vehicles, users, customers = [], onSav
   const drivers = users.filter(u => u.role === 'driver');
   const customerOptions = customers.length > 0
     ? customers.map((c) => ({ id: c.id, label: c.company_name || c.contact_name }))
-    : users.filter((u) => u.role === 'user').map((u) => ({ id: u.customer_id || u.id, label: u.full_name }));
+    : users.filter((u) => u.customer_id).map((u) => ({ id: u.customer_id || u.id, label: u.full_name }));
 
   const [form, setForm] = useState({
     load_number: load?.load_number || '',

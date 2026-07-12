@@ -5,6 +5,14 @@ import CustomerModal from '@/components/admin/CustomerModal';
 import CustomerMessagePanel from '@/components/admin/CustomerMessagePanel';
 import { FLEETCO_EMAIL_DOMAIN, normalizeFleetCoEmail } from '@/lib/domain';
 import { getBillingSnapshot, formatCountdown, formatDueDate, billingStatusColor } from '@/lib/billing';
+import {
+  canManageCustomerTeam,
+  getAssignableCustomerRoles,
+  customerRoleLabel,
+  isCustomerPortalUser,
+  defaultSidebarModulesForRole,
+  CUSTOMER_TEAM_ROLES,
+} from '@/lib/customerRoles';
 
 const STATUS_COLORS = {
   active: 'bg-green-100 text-green-700',
@@ -17,7 +25,12 @@ const ROLE_COLORS = {
   executive: 'bg-yellow-100 text-yellow-800',
   fleet_manager: 'bg-blue-100 text-blue-700',
   fleet_coordinator: 'bg-emerald-100 text-emerald-700',
-  user: 'bg-slate-100 text-slate-600',
+  customer_owner: 'bg-amber-100 text-amber-800',
+  customer_hr: 'bg-rose-100 text-rose-700',
+  customer_fleet_manager: 'bg-blue-100 text-blue-700',
+  customer_fleet_coordinator: 'bg-emerald-100 text-emerald-700',
+  customer_parts_manager: 'bg-orange-100 text-orange-700',
+  user: 'bg-amber-100 text-amber-800',
   driver: 'bg-purple-100 text-purple-700',
 };
 
@@ -26,7 +39,12 @@ const ROLE_ICONS = {
   executive: Crown,
   fleet_manager: Shield,
   fleet_coordinator: ClipboardList,
-  user: User,
+  customer_owner: Crown,
+  customer_hr: Users,
+  customer_fleet_manager: Shield,
+  customer_fleet_coordinator: ClipboardList,
+  customer_parts_manager: Wrench,
+  user: Crown,
   driver: Truck,
 };
 
@@ -36,8 +54,8 @@ const getAvailableRoles = (userRole) => {
   if (userRole === 'owner') {
     return ['executive', 'fleet_manager', 'fleet_coordinator'];
   }
-  if (userRole === 'user') {
-    return ['user', 'driver'];
+  if (canManageCustomerTeam(userRole)) {
+    return getAssignableCustomerRoles(userRole);
   }
   return [];
 };
@@ -508,7 +526,7 @@ function TeamTab({ user, isOwner, isCustomerAdmin, canManageTeam, availableRoles
     const users = await api.entities.User.list();
     if (isOwner) {
       setTeamMembers(users.filter(m => FLEETCO_INTERNAL.includes(m.role)));
-    } else if (user?.role === 'user') {
+    } else if (canManageCustomerTeam(user?.role) && user?.customer_id) {
       setTeamMembers(users.filter(m => m.customer_id === user.customer_id));
     } else {
       setTeamMembers([]);
@@ -544,7 +562,10 @@ function TeamTab({ user, isOwner, isCustomerAdmin, canManageTeam, availableRoles
   };
 
   const handleRoleChange = async (memberId, newRole) => {
-    await api.entities.User.update(memberId, { role: newRole });
+    await api.entities.User.update(memberId, {
+      role: newRole,
+      sidebar_modules: defaultSidebarModulesForRole(newRole),
+    });
     loadTeam();
   };
 
@@ -594,7 +615,7 @@ function TeamTab({ user, isOwner, isCustomerAdmin, canManageTeam, availableRoles
                 <Icon className={`w-4 h-4 ${textColor}`} />
               </div>
               <div className="text-xl font-black text-slate-900">{count}</div>
-              <div className="text-xs text-slate-500 capitalize">{role.replace(/_/g, ' ')}</div>
+              <div className="text-xs text-slate-500 capitalize">{customerRoleLabel(role)}</div>
             </div>
           );
         })}
@@ -609,7 +630,7 @@ function TeamTab({ user, isOwner, isCustomerAdmin, canManageTeam, availableRoles
         <p className="text-slate-400 text-sm mb-4">
           {isOwner
             ? `Create FleetCo employees with @${FLEETCO_EMAIL_DOMAIN} addresses and portal access.`
-            : 'Add drivers and team members to your organization. They can sign in with the temp password you set.'}
+            : 'Add team members and assign roles. Owner, HR, and Fleet Manager can control portal access.'}
         </p>
         <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3 flex-wrap">
           {isOwner ? (
@@ -644,7 +665,7 @@ function TeamTab({ user, isOwner, isCustomerAdmin, canManageTeam, availableRoles
           <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}
             className="bg-white text-slate-700 rounded-lg px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-amber-400">
             {availableRoles.map(r => (
-              <option key={r} value={r}>{r.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+              <option key={r} value={r}>{customerRoleLabel(r)}</option>
             ))}
           </select>
           <input type="text" value={inviteEmployeeNumber} onChange={e => setInviteEmployeeNumber(e.target.value)}
@@ -682,14 +703,30 @@ function TeamTab({ user, isOwner, isCustomerAdmin, canManageTeam, availableRoles
               </>
             ) : (
               <>
-                <div className="bg-amber-900/40 border border-amber-700/50 rounded-lg p-3">
-                  <div className="text-amber-400 font-bold text-xs">Portal User</div>
-                  <div className="text-slate-400 text-xs mt-0.5">Full portal access for your fleet</div>
-                </div>
-                <div className="bg-purple-900/40 border border-purple-700/50 rounded-lg p-3">
-                  <div className="text-purple-400 font-bold text-xs">Driver</div>
-                  <div className="text-slate-400 text-xs mt-0.5">Driver app &amp; route access</div>
-                </div>
+                {CUSTOMER_TEAM_ROLES.map((roleKey) => {
+                  const colors = {
+                    customer_owner: 'bg-amber-900/40 border-amber-700/50 text-amber-400',
+                    customer_hr: 'bg-rose-900/40 border-rose-700/50 text-rose-400',
+                    customer_fleet_manager: 'bg-blue-900/40 border-blue-700/50 text-blue-400',
+                    customer_fleet_coordinator: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-400',
+                    customer_parts_manager: 'bg-orange-900/40 border-orange-700/50 text-orange-400',
+                    driver: 'bg-purple-900/40 border-purple-700/50 text-purple-400',
+                  };
+                  const descriptions = {
+                    customer_owner: 'Company admin — full portal access',
+                    customer_hr: 'HR — drivers, payroll, compliance',
+                    customer_fleet_manager: 'Fleet Manager — operations & fleet',
+                    customer_fleet_coordinator: 'Coordinator — routes & dispatch',
+                    customer_parts_manager: 'Parts Manager — inventory & vendors',
+                    driver: 'Driver — routes & mobile app',
+                  };
+                  return (
+                    <div key={roleKey} className={`border rounded-lg p-3 ${colors[roleKey]?.split(' ').slice(0, 2).join(' ') || 'bg-slate-800 border-slate-700'}`}>
+                      <div className={`font-bold text-xs ${colors[roleKey]?.split(' ')[2] || 'text-slate-300'}`}>{customerRoleLabel(roleKey)}</div>
+                      <div className="text-slate-400 text-xs mt-0.5">{descriptions[roleKey]}</div>
+                    </div>
+                  );
+                })}
               </>
             )}
           </div>
@@ -726,14 +763,14 @@ function TeamTab({ user, isOwner, isCustomerAdmin, canManageTeam, availableRoles
                 <div className="flex items-center gap-2">
                   <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold capitalize ${ROLE_COLORS[m.role] || 'bg-slate-100 text-slate-500'}`}>
                     <RoleIcon className="w-3 h-3" />
-                    {m.role}
+                    {customerRoleLabel(m.role)}
                   </span>
                   {m.id !== user?.id && canManageTeam && (
                     <>
                       <select value={m.role} onChange={e => handleRoleChange(m.id, e.target.value)}
                         className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-400">
-                        {availableRoles.map(r => (
-                          <option key={r} value={r}>{r.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+                        {[...new Set([m.role, ...availableRoles])].map(r => (
+                          <option key={r} value={r}>{customerRoleLabel(r)}</option>
                         ))}
                       </select>
                       <button
@@ -795,7 +832,7 @@ export default function Customers() {
   const isInternal = FLEETCO_INTERNAL.includes(user?.role);
   const isOwner = user?.role === 'owner';
   const canAddCustomers = canProvisionCustomers(user?.role);
-  const showTeamTab = isOwner || user?.role === 'user';
+  const showTeamTab = isOwner || canManageCustomerTeam(user?.role);
   const availableRoles = getAvailableRoles(user?.role);
   const fleetManagers = allUsers.filter(u => u.role === 'fleet_manager');
   const fleetCoordinators = allUsers.filter(u => u.role === 'fleet_coordinator');
@@ -809,8 +846,8 @@ export default function Customers() {
           <p className="text-slate-500 text-sm mt-0.5">
             {isOwner
               ? 'Add customers after payment · create FleetCo employees here'
-              : user?.role === 'user'
-                ? 'Manage your drivers and team members'
+              : canManageCustomerTeam(user?.role)
+                ? 'Manage your company team, roles, and portal access'
                 : 'Manage customer accounts and access'}
           </p>
         </div>
@@ -841,8 +878,8 @@ export default function Customers() {
         <TeamTab
           user={user}
           isOwner={isOwner}
-          isCustomerAdmin={user?.role === 'user'}
-          canManageTeam={isOwner || user?.role === 'user'}
+          isCustomerAdmin={canManageCustomerTeam(user?.role)}
+          canManageTeam={isOwner || canManageCustomerTeam(user?.role)}
           availableRoles={availableRoles}
         />
       ) : null}

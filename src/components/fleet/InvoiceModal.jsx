@@ -9,7 +9,7 @@ import { X, Plus, Trash2 } from 'lucide-react';
 export default function InvoiceModal({ invoice, vehicles, users, customers = [], onSave, onClose }) {
   const customerOptions = customers.length > 0
     ? customers.map((c) => ({ id: c.id, label: c.company_name || c.contact_name }))
-    : users.filter((u) => u.role === 'user').map((u) => ({ id: u.customer_id || u.id, label: u.full_name }));
+    : users.filter((u) => u.customer_id).map((u) => ({ id: u.customer_id || u.id, label: u.full_name }));
   const [form, setForm] = useState({
     invoice_number: invoice?.invoice_number || `INV-${Date.now().toString().slice(-6)}`,
     type: invoice?.type || 'labor_and_parts',

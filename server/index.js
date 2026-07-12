@@ -38,6 +38,7 @@ import {
   canMutateUsers,
   canDeleteUser,
   canProvisionCustomers,
+  canManageCustomerTeam,
   canManageDatastore,
 } from './roles.js';
 import { bulkCreateEntities } from './bulkImport.js';
@@ -379,8 +380,8 @@ function handleUserEntity(req, res, action) {
     const { email, password, customer_id, customerId, ...rest } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
     if (findUserByEmail(email)) return res.status(409).json({ error: 'User exists' });
-    const effectiveCustomerId = customer_id || customerId || (req.user.role === 'user' ? req.user.customer_id : null);
-    if (req.user.role === 'user' && effectiveCustomerId && effectiveCustomerId !== req.user.customer_id) {
+    const effectiveCustomerId = customer_id || customerId || (canManageCustomerTeam(req.user.role) ? req.user.customer_id : null);
+    if (canManageCustomerTeam(req.user.role) && effectiveCustomerId && effectiveCustomerId !== req.user.customer_id) {
       return res.status(403).json({ error: 'You can only add users to your own organization' });
     }
     const hash = bcrypt.hashSync(password || 'changeme123', 10);

@@ -20,6 +20,8 @@ const isInternalRole = (role) => {
   return ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(role);
 };
 
+import { canManageCustomerTeam } from '@/lib/customerRoles';
+
 const isFleetCoAdmin = (role) => ['owner', 'executive', 'fleet_manager'].includes(role);
 
 const NAV_GROUPS = [
@@ -216,6 +218,10 @@ export default function AppLayout() {
                 if (item.path === '/portal/dev-feedback') return false;
                 return true;
               }
+              // Customer team managers see My Team (same route, different label in UI)
+              if (item.path === '/portal/customers' && canManageCustomerTeam(user?.role) && user?.customer_id) {
+                return true;
+              }
               // Customer users cannot see internal-only pages
               if (item.path === '/portal/executive') return false;
               if (item.path === '/portal/advertisement') return false;
@@ -260,7 +266,9 @@ export default function AppLayout() {
                           }`}
                         >
                           <item.icon className="w-3.5 h-3.5 flex-shrink-0" />
-                          {item.label}
+                          {item.path === '/portal/customers' && canManageCustomerTeam(user?.role) && user?.customer_id
+                            ? 'My Team'
+                            : item.label}
                         </Link>
                       );
                     })}

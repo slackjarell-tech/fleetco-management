@@ -16,7 +16,28 @@ export function subscriptionAmount(planName, term) {
 }
 
 export const FLEETCO_INTERNAL_ROLES = ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'];
-export const CUSTOMER_TEAM_ROLES = ['user', 'driver'];
+
+export {
+  CUSTOMER_TEAM_ROLES,
+  CUSTOMER_LEGACY_ROLE,
+  CUSTOMER_ASSIGN_ROLES,
+  isCustomerTeamRole,
+  isCustomerPortalUserRecord,
+  canAssignCustomerRole,
+  getAssignableCustomerRoles,
+  defaultSidebarModulesForRole,
+  normalizeCustomerRole,
+  customerRoleLabel,
+} from './customerRoles.js';
+
+import {
+  CUSTOMER_TEAM_ROLES,
+  CUSTOMER_LEGACY_ROLE,
+  isCustomerTeamRole,
+  isCustomerPortalUserRecord,
+  getAssignableCustomerRoles,
+  normalizeCustomerRole,
+} from './customerRoles.js';
 
 /** Senior Leadership Team — can grant @fleetcomanagement.org email access */
 export const SLT_ROLES = ['owner', 'executive', 'fleet_manager'];
@@ -34,7 +55,26 @@ export function canProvisionCustomers(role) {
 }
 
 export function canManageCustomerTeam(role) {
-  return role === 'user';
+  if (!role) return false;
+  const normalized = normalizeCustomerRole(role);
+  return ['customer_owner', 'customer_hr', 'customer_fleet_manager'].includes(normalized) || role === CUSTOMER_LEGACY_ROLE;
+}
+
+export function canMutateUsers(actor) {
+  if (!actor) return false;
+  if (['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(actor.role)) return true;
+  return canManageCustomerTeam(actor.role);
+}
+
+export function canDeleteUser(actor, target, customerRecord) {
+  if (!actor || !target) return false;
+  if (['owner', 'executive', 'fleet_manager'].includes(actor.role)) return true;
+  if (canManageCustomerTeam(actor.role) && target.customer_id === actor.customer_id) {
+    if (target.id === actor.id) return false;
+    if (customerRecord?.user_id === target.id) return false;
+    return isCustomerTeamRole(target.role);
+  }
+  return false;
 }
 
 export function isInternalStaff(role) {
@@ -43,21 +83,6 @@ export function isInternalStaff(role) {
 
 export function canListAllUsers(role) {
   return isInternalStaff(role);
-}
-
-export function canMutateUsers(actor) {
-  return ['owner', 'executive', 'fleet_manager', 'fleet_coordinator', 'user'].includes(actor?.role);
-}
-
-export function canDeleteUser(actor, target, customerRecord) {
-  if (!actor || !target) return false;
-  if (['owner', 'executive', 'fleet_manager'].includes(actor.role)) return true;
-  if (actor.role === 'user' && target.customer_id === actor.customer_id) {
-    if (target.id === actor.id) return false;
-    if (customerRecord?.user_id === target.id) return false;
-    return ['user', 'driver'].includes(target.role);
-  }
-  return false;
 }
 
 export const FLEETCO_EMAIL_DOMAIN = 'fleetcomanagement.org';
