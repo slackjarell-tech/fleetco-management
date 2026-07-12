@@ -38,8 +38,16 @@ import {
   canMutateUsers,
   canDeleteUser,
   canProvisionCustomers,
+  canManageDatastore,
 } from './roles.js';
 import { bulkCreateEntities } from './bulkImport.js';
+import {
+  buildFullBackup,
+  buildCredentialsManifest,
+  restoreFromBackup,
+  validateBackup,
+} from './datastoreBackup.js';
+import { userMustChangePassword, activatePendingAccount } from './authHelpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || 'fleet-pulse-dev-secret-change-in-production';
@@ -50,7 +58,7 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 app.use('/uploads', express.static(uploadsDir));
 
 const upload = multer({ dest: uploadsDir });
@@ -84,14 +92,22 @@ app.use(authMiddleware);
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
 app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
+  const email = (req.body.email || '').trim().toLowerCase();
+  const { password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
   const row = getUserRowByEmail(email);
-  if (!row || !bcrypt.compareSync(password, row.password_hash)) {
+  if (!row || !row.password_hash || !bcrypt.compareSync(password, row.password_hash)) {
     return res.status(401).json({ error: 'Invalid email or password' });
+  }
+  if (row.status === 'suspended') {
+    return res.status(403).json({ error: 'This account is suspended. Contact your fleet administrator.' });
   }
   const user = findUserById(row.id);
   const token = signToken(user.id);
-  res.json({ access_token: token, user });
+  const mustChangePassword = userMustChangePassword(email);
+  res.json({ access_token: token, user, must_change_password: mustChangePassword });
 });
 
 app.post('/api/auth/register', (req, res) => {
@@ -134,7 +150,7 @@ app.post('/api/auth/resend-otp', (req, res) => {
 });
 
 app.get('/api/auth/me', requireAuth, (req, res) => {
-  const user = { ...req.user };
+  const user = { ...req.user, must_change_password: userMustChangePassword(req.user.email) };
   if (user.customer_id) {
     const customer = getEntity('Customer', user.customer_id);
     if (customer) {
@@ -154,12 +170,22 @@ app.patch('/api/auth/me', requireAuth, (req, res) => {
 
 app.post('/api/auth/change-password', requireAuth, (req, res) => {
   const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current and new password are required' });
+  }
+  if (String(newPassword).length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  }
   const row = getUserRowByEmail(req.user.email);
-  if (!bcrypt.compareSync(currentPassword, row.password_hash)) {
+  if (!row || !bcrypt.compareSync(currentPassword, row.password_hash)) {
     return res.status(400).json({ error: 'Current password is incorrect' });
   }
+  if (bcrypt.compareSync(newPassword, row.password_hash)) {
+    return res.status(400).json({ error: 'New password must be different from your current password' });
+  }
   updateUser(req.user.id, { password_hash: bcrypt.hashSync(newPassword, 10) });
-  res.json({ success: true });
+  activatePendingAccount(req.user.email);
+  res.json({ success: true, must_change_password: false });
 });
 
 app.post('/api/auth/reset-password-request', async (req, res) => {
@@ -212,6 +238,7 @@ app.post('/api/auth/reset-password', (req, res) => {
     const user = findUserByEmail(payload.email);
     if (!user) throw new Error('User not found');
     updateUser(user.id, { password_hash: bcrypt.hashSync(newPassword, 10) });
+    activatePendingAccount(user.email);
     res.json({ success: true });
   } catch {
     res.status(400).json({ error: 'Invalid or expired reset token' });
@@ -457,6 +484,18 @@ app.delete('/api/entities/:type/:id', requireAuth, (req, res) => {
 
 // ─── Functions & Integrations ───────────────────────────────────────────────
 
+app.post('/api/customers/welcome-email', requireAuth, async (req, res) => {
+  if (!canProvisionCustomers(req.user.role)) {
+    return res.status(403).json({ error: 'Only FleetCo staff can send customer welcome emails' });
+  }
+  try {
+    const result = await invokeFunction('sendCustomerWelcomeEmail', req.body, req.user);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/functions/:name', authMiddleware, async (req, res) => {
   try {
     const result = await invokeFunction(req.params.name, req.body, req.user);
@@ -482,15 +521,71 @@ app.post('/api/integrations/llm', requireAuth, async (req, res) => {
 });
 
 app.get('/api/admin/datastore', requireAuth, (req, res) => {
-  if (!['owner', 'executive'].includes(req.user.role)) {
-    return res.status(403).json({ error: 'Forbidden' });
+  if (!canManageDatastore(req.user.role)) {
+    return res.status(403).json({ error: 'Executive or SLT access required' });
   }
   res.json({ success: true, stats: getStoreStats() });
 });
 
+app.get('/api/admin/datastore/export', requireAuth, (req, res) => {
+  if (!canManageDatastore(req.user.role)) {
+    return res.status(403).json({ error: 'Executive or SLT access required' });
+  }
+  const backup = buildFullBackup(req.user);
+  const filename = `fleetco-full-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.json(backup);
+});
+
+app.get('/api/admin/datastore/credentials', requireAuth, (req, res) => {
+  if (!canManageDatastore(req.user.role)) {
+    return res.status(403).json({ error: 'Executive or SLT access required' });
+  }
+  res.json({
+    success: true,
+    credentials: buildCredentialsManifest(exportStoreSnapshot()),
+  });
+});
+
+app.post('/api/admin/datastore/import', requireAuth, async (req, res) => {
+  if (!canManageDatastore(req.user.role)) {
+    return res.status(403).json({ error: 'Executive or SLT access required' });
+  }
+  if (req.body?.confirm !== true) {
+    return res.status(400).json({
+      error: 'Send { "confirm": true, "backup": { ... } } to replace all data with the backup file',
+    });
+  }
+  const payload = req.body.backup || req.body;
+  try {
+    const result = await restoreFromBackup(payload);
+    const { repairCustomerPortalLogins } = await import('./repairCustomerLogins.js');
+    const repair = repairCustomerPortalLogins();
+    const { flushDatabase } = await import('./storePersist.js');
+    await flushDatabase();
+    res.json({ ...result, repair });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/datastore/validate', requireAuth, (req, res) => {
+  if (!canManageDatastore(req.user.role)) {
+    return res.status(403).json({ error: 'Executive or SLT access required' });
+  }
+  try {
+    const payload = req.body.backup || req.body;
+    res.json({ success: true, ...validateBackup(payload) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/** @deprecated use GET /api/admin/datastore/export */
 app.post('/api/admin/datastore/backup', requireAuth, (req, res) => {
-  if (!['owner', 'executive'].includes(req.user.role)) {
-    return res.status(403).json({ error: 'Forbidden' });
+  if (!canManageDatastore(req.user.role)) {
+    return res.status(403).json({ error: 'Executive or SLT access required' });
   }
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Disposition', `attachment; filename="fleetco-backup-${Date.now()}.json"`);

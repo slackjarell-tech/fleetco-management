@@ -15,6 +15,10 @@ export function canManageDomainEmails(role) {
   return isSLT(role);
 }
 
+export function canManageDatastore(role) {
+  return isSLT(role);
+}
+
 export function isPlatformAdmin(role) {
   return PLATFORM_ADMIN_ROLES.includes(role);
 }

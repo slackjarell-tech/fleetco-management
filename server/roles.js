@@ -70,6 +70,11 @@ export function canGrantEmployeeEmailAccess(role) {
   return SLT_ROLES.includes(role);
 }
 
+/** Full datastore export/import — executives and SLT only */
+export function canManageDatastore(role) {
+  return SLT_ROLES.includes(role);
+}
+
 export function normalizeFleetCoEmail(input) {
   if (!input || typeof input !== 'string') return null;
   const trimmed = input.trim().toLowerCase();

@@ -7,7 +7,7 @@ import {
   Archive, Calendar, Cpu, Store, Bot, Crown, MessageCircle, Navigation, TrendingUp,
   Map, Route, DollarSign, Globe, Clock, ShieldCheck, AlertTriangle, Award, Lightbulb,
   MapPin, Megaphone, Zap, Mail, ScanLine, Video, Upload, Warehouse,
-  ChevronDown, KeyRound, Bell
+  ChevronDown, KeyRound, Bell, Database
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
@@ -110,6 +110,7 @@ const NAV_GROUPS = [
     items: [
       { label: 'Customers & Team', icon: Building2, path: '/portal/customers' },
       { label: 'Company Emails', icon: Mail, path: '/portal/domain-emails', sltOnly: true },
+      { label: 'Data Backup', icon: Database, path: '/portal/data-backup', sltOnly: true },
       { label: 'Messages', icon: MessageCircle, path: '/portal/messages' },
       { label: 'Site Commander AI', icon: Bot, path: '/portal/assistant' },
       { label: 'Revan', icon: Zap, path: '/portal/revan' },
@@ -136,6 +137,9 @@ export default function AppLayout() {
     api.auth.me().catch(() => null).then(u => {
       setUser(u);
       setAuthChecked(true);
+      if (u?.must_change_password && !window.location.pathname.startsWith('/set-password')) {
+        window.location.href = '/set-password';
+      }
     });
   }, []);
 

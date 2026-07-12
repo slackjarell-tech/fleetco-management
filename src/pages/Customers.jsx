@@ -55,6 +55,7 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
   const [message, setMessage] = useState('');
   const [messageCustomer, setMessageCustomer] = useState(null);
   const [sendingLoginId, setSendingLoginId] = useState(null);
+  const [sendingWelcomeId, setSendingWelcomeId] = useState(null);
   const [copiedLoginId, setCopiedLoginId] = useState(null);
   const [billingActionId, setBillingActionId] = useState(null);
 
@@ -126,6 +127,24 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
     }
     await api.auth.resetPasswordRequest(email);
     alert(`Password reset link sent to ${email}`);
+  };
+
+  const handleSendWelcomeEmail = async (customer) => {
+    if (!customer.email) {
+      alert('Add an email to this customer before sending a welcome email.');
+      return;
+    }
+    setSendingWelcomeId(customer.id);
+    setMessage('');
+    try {
+      const result = await api.admin.sendCustomerWelcomeEmail({ customerId: customer.id });
+      setMessage(result.message || `Welcome email sent to ${customer.email}`);
+      loadCustomers();
+    } catch (err) {
+      setMessage(`Failed: ${err?.data?.error || err?.message || 'Could not send welcome email'}`);
+    } finally {
+      setSendingWelcomeId(null);
+    }
   };
 
   const handleSendTestLogin = async (customer) => {
@@ -400,6 +419,19 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
                   <button onClick={() => { setEditingCustomer(c); setShowModal(true); }}
                     className="flex-1 min-w-[72px] flex items-center justify-center gap-1 text-xs font-semibold border border-slate-200 rounded-lg py-1.5 hover:bg-slate-50">
                     <Edit className="w-3 h-3" /> Edit
+                  </button>
+                  <button
+                    onClick={() => handleSendWelcomeEmail(c)}
+                    disabled={sendingWelcomeId === c.id || !c.email}
+                    title="Send welcome email with portal login and temporary password"
+                    className="flex-1 min-w-[96px] flex items-center justify-center gap-1 text-xs font-semibold border border-blue-100 text-blue-700 rounded-lg py-1.5 hover:bg-blue-50 disabled:opacity-50"
+                  >
+                    {sendingWelcomeId === c.id ? (
+                      <span className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Mail className="w-3 h-3" />
+                    )}
+                    Welcome email
                   </button>
                   <button
                     onClick={() => handleSendTestLogin(c)}

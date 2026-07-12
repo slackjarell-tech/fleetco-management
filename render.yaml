@@ -24,6 +24,8 @@ services:
         fromDatabase:
           name: fleetco-db
           property: connectionString
+      - key: SEED_DEMO_DATA
+        value: "false"
       - key: DATA_PATH
         value: /opt/render/project/src/server/data
       - key: GROQ_API_KEY

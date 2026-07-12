@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, Shield, Truck, Star, ArrowRight, Loader2 } from 'lucide-react';
+import { ChevronDown, Shield, Truck, Star, ArrowRight, Loader2, LogIn } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
+import PortalLoginForm from '@/components/auth/PortalLoginForm';
 
 const DEFAULTS = {
   hero_badge: 'Dallas, TX — Serving Owner Operators Nationwide',
@@ -89,7 +90,7 @@ export default function HeroSection() {
                 {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Processing...</> : <>Subscribe & Get Started <ArrowRight className="w-5 h-5" /></>}
               </button>
               <Link
-                to="/portal"
+                to="/login"
                 className="border-2 border-slate-500 hover:border-amber-400 text-white hover:text-amber-400 font-semibold text-lg px-8 py-4 rounded-lg transition-all flex items-center justify-center gap-2"
               >
                 Client Portal
@@ -111,26 +112,20 @@ export default function HeroSection() {
             </div>
           </div>
 
-          {/* Right: Stats card */}
+          {/* Right: Client portal sign-in */}
           <div className="hidden lg:block">
             <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8">
-              <div className="text-amber-400 font-bold text-sm tracking-widest uppercase mb-6">Why FleetCo?</div>
-              <div className="space-y-6">
-                {[
-                  { value: '50+', label: 'Owner Operators Served', sub: 'Across the United States' },
-                  { value: '$2K+', label: 'Avg Savings Per Unit', sub: 'Per year on fuel & parts' },
-                  { value: '24/7', label: 'Emergency Support', sub: 'Breakdown & towing coordination' },
-                  { value: '100%', label: 'Documentation Accuracy', sub: 'Tax-ready records every time' },
-                ].map(s => (
-                  <div key={s.label} className="flex items-center gap-4 border-b border-white/10 pb-5 last:border-0 last:pb-0">
-                    <div className="text-3xl font-black text-amber-400 w-20 flex-shrink-0">{s.value}</div>
-                    <div>
-                      <div className="text-white font-semibold text-sm">{s.label}</div>
-                      <div className="text-slate-400 text-xs">{s.sub}</div>
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm tracking-widest uppercase mb-2">
+                <LogIn className="w-4 h-4" />
+                Client Portal
               </div>
+              <p className="text-slate-300 text-sm mb-6">
+                Sign in with the email and temporary password from your welcome message. You'll set a new password on first login.
+              </p>
+              <PortalLoginForm variant="hero" compact submitLabel="Sign In" />
+              <p className="text-xs text-slate-500 mt-4 text-center">
+                <Link to="/forgot-password" className="text-amber-400/90 hover:underline">Forgot password?</Link>
+              </p>
             </div>
           </div>
         </div>

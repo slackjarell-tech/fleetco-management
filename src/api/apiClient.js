@@ -125,7 +125,7 @@ const auth = {
   async loginViaEmailPassword(email, password) {
     const result = await apiFetch('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
     });
     setToken(result.access_token);
     return result;
@@ -264,6 +264,43 @@ const agents = {
   },
 };
 
-export const api = { auth, entities, functions, integrations, agents };
+export const api = { auth, entities, functions, integrations, agents, admin: {
+  async getDatastoreStats() {
+    return apiFetch('/admin/datastore');
+  },
+  async exportFullBackup() {
+    const API_ROOT = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
+    const token = getToken();
+    const res = await fetch(`${API_ROOT}/api/admin/datastore/export`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Export failed');
+    }
+    return res.json();
+  },
+  async getCredentials() {
+    return apiFetch('/admin/datastore/credentials');
+  },
+  async validateBackup(backup) {
+    return apiFetch('/admin/datastore/validate', {
+      method: 'POST',
+      body: JSON.stringify({ backup }),
+    });
+  },
+  async importBackup(backup) {
+    return apiFetch('/admin/datastore/import', {
+      method: 'POST',
+      body: JSON.stringify({ confirm: true, backup }),
+    });
+  },
+  async sendCustomerWelcomeEmail(payload) {
+    return apiFetch('/customers/welcome-email', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+} };
 
 export { getToken, setToken };

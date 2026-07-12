@@ -71,6 +71,7 @@ import Revan from './pages/Revan';
 import EldPortal from './pages/EldPortal';
 import RouteDashboard from './pages/RouteDashboard';
 import DomainEmails from './pages/DomainEmails';
+import DataBackup from './pages/DataBackup';
 import DriverMobileLayout from './components/mobile/DriverMobileLayout';
 import DriverMobileHome from './pages/driver/DriverMobileHome';
 import DriverScan from './pages/driver/DriverScan';
@@ -100,7 +101,6 @@ const AuthenticatedApp = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/set-password" element={<SetPassword />} />
 
       {/* FleetCo Driver mobile app — iOS / Android + mobile web */}
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login?app=driver" replace />} />}>
@@ -122,6 +122,7 @@ const AuthenticatedApp = () => {
       </Route>
 
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+        <Route path="/set-password" element={<SetPassword />} />
         <Route path="/portal" element={<AppLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="loads" element={<LoadBoard />} />
@@ -173,6 +174,7 @@ const AuthenticatedApp = () => {
           <Route path="revan" element={<Revan />} />
           <Route path="eld" element={<EldPortal />} />
           <Route path="domain-emails" element={<DomainEmails />} />
+          <Route path="data-backup" element={<DataBackup />} />
           <Route path="driver-scans" element={<DriverScans />} />
           <Route path="driver-media" element={<DriverMedia />} />
         </Route>

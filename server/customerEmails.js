@@ -3,6 +3,7 @@ import { NOTIFICATION_PREF_LABELS } from './notificationPreferences.js';
 
 const APP_URL = (process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org').replace(/\/$/, '');
 const LOGIN_URL = `${APP_URL}/login`;
+const SET_PASSWORD_URL = `${APP_URL}/set-password`;
 const PREFS_URL = `${APP_URL}/portal/notification-preferences`;
 
 function enabledPrefLines(prefs) {
@@ -24,6 +25,8 @@ export function buildWelcomeEmailText({ companyName, contactName, email, tempPas
     `Temporary password: ${tempPassword}`,
     '',
     'Please sign in and change your password after your first login.',
+    `Sign in: ${LOGIN_URL}`,
+    `After signing in you will be asked to set a new password at: ${SET_PASSWORD_URL}`,
     'From there you can add drivers and team members under Customers & Team → My Team.',
     '',
     'Email notifications enabled for your account:',
@@ -50,6 +53,12 @@ export function buildWelcomeEmailHtml({ companyName, contactName, email, tempPas
         <p style="margin:0"><strong>Temporary password:</strong> <code style="background:#FFF7ED;padding:2px 6px;border-radius:4px">${tempPassword}</code></p>
       </div>
       <p>Please sign in and <strong>change your password</strong> after your first login. From there you can add drivers and team members under <em>Customers &amp; Team → My Team</em>.</p>
+      <p style="margin-top:16px">
+        <a href="${LOGIN_URL}" style="display:inline-block;background:#F59E0B;color:#0F172A;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px;margin-right:8px">
+          Sign in to portal
+        </a>
+      </p>
+      <p style="color:#64748B;font-size:14px;margin-top:12px">On first login you'll be prompted to set a permanent password before accessing your dashboard.</p>
       <h3 style="color:#F59E0B;margin-bottom:8px">Your notification settings</h3>
       <p style="margin-top:0;color:#64748B;font-size:14px">You'll receive email for the items below. You can change these anytime in the portal.</p>
       <ul style="padding-left:20px">${prefList}</ul>

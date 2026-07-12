@@ -77,7 +77,7 @@ export default function NavBar() {
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Get Started'}
             </button>
             <Link
-              to="/portal"
+              to="/login"
               className="flex items-center gap-1.5 border border-slate-600 hover:border-amber-400 text-slate-300 hover:text-amber-400 text-sm font-medium px-4 py-2 rounded transition-colors"
             >
               <LogIn className="w-4 h-4" /> Client Portal
@@ -109,7 +109,7 @@ export default function NavBar() {
           <Link to="/overview" className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium py-2">
             Investors / Overview
           </Link>
-          <Link to="/portal" className="w-full flex items-center justify-center gap-2 border border-slate-600 text-slate-300 text-sm font-medium px-4 py-2 rounded">
+          <Link to="/login" className="w-full flex items-center justify-center gap-2 border border-slate-600 text-slate-300 text-sm font-medium px-4 py-2 rounded">
             <LogIn className="w-4 h-4" /> Client Portal
           </Link>
         </div>

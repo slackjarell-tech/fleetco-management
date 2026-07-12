@@ -10,34 +10,35 @@ export default function SetPassword() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [done, setDone] = useState(false);
-  const [pendingId, setPendingId] = useState(null);
 
   useEffect(() => {
-    api.auth.me().then(async u => {
+    api.auth.me().then((u) => {
       if (!u) {
         navigate('/login');
         return;
       }
+      if (!u.must_change_password) {
+        window.location.href = '/portal';
+        return;
+      }
       setUser(u);
-      try {
-        const pending = await api.entities.PendingAccount.filter({ email: u.email, activated: false });
-        if (pending.length > 0) setPendingId(pending[0].id);
-      } catch (_) {}
       setLoading(false);
     }).catch(() => navigate('/login'));
   }, [navigate]);
 
   const handleSuccess = async () => {
-    if (pendingId) {
-      try { await api.entities.PendingAccount.update(pendingId, { activated: true }); } catch (_) {}
-    }
     setDone(true);
-    setTimeout(() => { window.location.href = '/portal'; }, 2000);
+    let destination = '/portal';
+    try {
+      const me = await api.auth.me();
+      if (me?.role === 'driver') destination = '/driver';
+    } catch (_) {}
+    setTimeout(() => { window.location.href = destination; }, 2000);
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[60vh] bg-slate-900">
         <Loader2 className="w-6 h-6 text-amber-500 animate-spin" />
       </div>
     );
@@ -57,16 +58,17 @@ export default function SetPassword() {
   return (
     <AuthLayout
       title="Set Your New Password"
-      subtitle="Choose a permanent password for your account"
+      subtitle="Use your temporary password, then choose a permanent one"
     >
       <div className="mb-4 p-3 rounded-lg bg-amber-900/20 border border-amber-800/30 text-amber-400 text-sm flex items-start gap-2">
         <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
-        <span>For security, you must set a new password before accessing the portal.</span>
+        <span>For security, you must set a new password before accessing the portal. Enter the temporary password from your welcome email as the current password.</span>
       </div>
       <ChangePasswordForm
         userId={user?.id}
         onSuccess={handleSuccess}
-        submitLabel="Set New Password"
+        submitLabel="Set New Password & Continue"
+        variant="dark"
       />
     </AuthLayout>
   );

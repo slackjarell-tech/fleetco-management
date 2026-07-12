@@ -59,9 +59,14 @@ export function seedDatabase() {
     console.log('Seeded admin user: admin@fleetco.com / admin123');
   }
 
-  // Full demo dataset for client presentations (skips if customers already exist)
-  if (seedDemoData()) {
+  // Demo data only in dev, or when SEED_DEMO_DATA=true — never auto-seed production on deploy
+  const allowDemoSeed =
+    process.env.SEED_DEMO_DATA === 'true' ||
+    (process.env.NODE_ENV !== 'production' && process.env.SEED_DEMO_DATA !== 'false');
+  if (allowDemoSeed && seedDemoData()) {
     console.log('Demo fleet data ready for client presentations');
+  } else if (process.env.NODE_ENV === 'production' && filterEntities('Customer').length === 0) {
+    console.log('[seed] Production startup — skipping demo customers (add real customers in the portal)');
   }
 
   // Backfill manager assignment on demo customers (fixes blank Customers tab for fleet managers)

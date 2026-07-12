@@ -84,6 +84,8 @@ export async function invokeFunction(name, body, user) {
       return provisionCustomer(body, user);
     case 'sendCustomerTestLogin':
       return sendCustomerTestLogin(body, user);
+    case 'sendCustomerWelcomeEmail':
+      return sendCustomerWelcomeEmail(body, user);
     case 'getCustomerNotificationPrefs':
       return getCustomerNotificationPrefsForUser(user);
     case 'updateCustomerNotificationPrefs':
@@ -266,9 +268,9 @@ function provisionInternalPortalUser({ email, tempPassword, role, employeeNumber
   return findUserByEmail(normalizedEmail);
 }
 
-function createUserAccount(body, user) {
+async function createUserAccount(body, user) {
   if (!user) throw new Error('Unauthorized');
-  const { email, tempPassword, role, customerId, employeeNumber, fullName } = body;
+  const { email, tempPassword, role, customerId, employeeNumber, fullName, sendWelcomeEmail } = body;
   if (!email || !tempPassword || !role) {
     throw new Error('Email, tempPassword, and role are required');
   }
@@ -326,21 +328,59 @@ function createUserAccount(body, user) {
     });
   }
 
+  const portalUser = findUserByEmail(normalizedEmail);
+
+  // Replace any prior pending row so temp password stays current
+  for (const old of filterEntities('PendingAccount', { email: normalizedEmail })) {
+    deleteEntity('PendingAccount', old.id);
+  }
+
   createEntity('PendingAccount', {
     email: normalizedEmail,
     temp_password: tempPassword,
     role,
     customer_id: effectiveCustomerId,
+    user_id: portalUser?.id || null,
     activated: false,
     created_by: user.full_name || user.email,
     employee_number: employeeNumber || '',
   });
 
   console.log(`[account created] ${normalizedEmail} role=${role}`);
+
+  let welcomeEmail = null;
+  const shouldSendWelcome =
+    sendWelcomeEmail !== false &&
+    customerRoles.includes(role) &&
+    effectiveCustomerId;
+  if (shouldSendWelcome) {
+    const customer = getEntity('Customer', effectiveCustomerId);
+    if (customer) {
+      welcomeEmail = await sendWelcomeSignupEmail({
+        to: normalizedEmail,
+        companyName: customer.company_name,
+        contactName: fullName || customer.contact_name,
+        tempPassword,
+        notificationPrefs: getCustomerNotificationPrefs(customer),
+      });
+    }
+  }
+
+  let emailNote = '';
+  if (welcomeEmail?.success) {
+    emailNote = ' Welcome email sent.';
+  } else if (welcomeEmail?.skipped) {
+    emailNote = ' (Welcome email skipped — RESEND_API_KEY not configured on server.)';
+  } else if (welcomeEmail?.error) {
+    emailNote = ` (Welcome email failed: ${welcomeEmail.error}${welcomeEmail.hint ? ` — ${welcomeEmail.hint}` : ''})`;
+  }
+
   return {
     success: true,
     email: normalizedEmail,
-    message: `${normalizedEmail} account created. They can sign in with the temporary password.`,
+    user_id: portalUser?.id,
+    welcomeEmail,
+    message: `${normalizedEmail} account created. They can sign in with the temporary password and will be asked to set a new password on first login.${emailNote}`,
   };
 }
 
@@ -495,13 +535,14 @@ async function provisionCustomer(body, user) {
   let loginMessage = '';
   let welcomeEmail = null;
   if (createLogin && tempPassword) {
-    createUserAccount(
+    await createUserAccount(
       {
         email: customerData.email,
         tempPassword,
         role: 'user',
         customerId: customer.id,
         fullName: customerData.contact_name || customerData.company_name,
+        sendWelcomeEmail: false,
       },
       user
     );
@@ -553,13 +594,14 @@ async function sendCustomerTestLogin(body, user) {
   const tempPassword = providedPassword || `Fleet${Math.random().toString(36).slice(2, 8)}!`;
   const email = customer.email.trim().toLowerCase();
 
-  createUserAccount(
+  await createUserAccount(
     {
       email,
       tempPassword,
       role: 'user',
       customerId: customer.id,
       fullName: customer.contact_name || customer.company_name,
+      sendWelcomeEmail: false,
     },
     user
   );
@@ -624,6 +666,91 @@ async function sendCustomerTestLogin(body, user) {
     welcomeEmail,
     message: `Test login ready for ${customer.contact_name || customer.company_name}. Credentials saved to customer messages.${emailNote}`,
     credentialsText: credentialText,
+  };
+}
+
+async function sendCustomerWelcomeEmail(body, user) {
+  if (!user || !canProvisionCustomers(user.role)) {
+    throw new Error('Only FleetCo owner, executive, or fleet managers can send customer welcome emails');
+  }
+
+  const { customerId, email: emailInput, tempPassword: providedPassword, cc, bcc, resetPassword } = body;
+  let customer = customerId ? getEntity('Customer', customerId) : null;
+  if (!customer && emailInput) {
+    customer = filterEntities('Customer', { email: emailInput.trim().toLowerCase() }, null, 1)[0];
+  }
+  if (!customer) throw new Error('Customer not found');
+  if (!customer.email) throw new Error('Customer has no email on file');
+
+  const portalEmail = customer.email.trim().toLowerCase();
+  let tempPassword = providedPassword;
+
+  const pending = filterEntities('PendingAccount', { email: portalEmail, activated: false }, null, 1)[0]
+    || filterEntities('PendingAccount', { email: portalEmail }, null, 1)[0];
+
+  if (!tempPassword && pending?.temp_password && !resetPassword) {
+    tempPassword = pending.temp_password;
+  }
+
+  if (!tempPassword || resetPassword) {
+    tempPassword = tempPassword || `Fleet${Math.random().toString(36).slice(2, 8)}!`;
+    await createUserAccount(
+      {
+        email: portalEmail,
+        tempPassword,
+        role: 'user',
+        customerId: customer.id,
+        fullName: customer.contact_name || customer.company_name,
+        sendWelcomeEmail: false,
+      },
+      user
+    );
+  } else if (!findUserByEmail(portalEmail)) {
+    await createUserAccount(
+      {
+        email: portalEmail,
+        tempPassword,
+        role: 'user',
+        customerId: customer.id,
+        fullName: customer.contact_name || customer.company_name,
+        sendWelcomeEmail: false,
+      },
+      user
+    );
+  }
+
+  updateEntity('Customer', customer.id, {
+    user_id: findUserByEmail(portalEmail)?.id,
+    has_portal_login: true,
+    portal_login_email: portalEmail,
+  });
+
+  const notificationPrefs = getCustomerNotificationPrefs(customer);
+  const welcomeEmail = await sendWelcomeSignupEmail({
+    to: portalEmail,
+    cc,
+    bcc,
+    companyName: customer.company_name,
+    contactName: customer.contact_name,
+    tempPassword,
+    notificationPrefs,
+  });
+
+  let message = `Welcome email processed for ${customer.company_name}.`;
+  if (welcomeEmail.success) {
+    message = `Welcome email sent to ${portalEmail} with login credentials.`;
+  } else if (welcomeEmail.skipped) {
+    message += ' (Email skipped — RESEND_API_KEY not configured on server.)';
+  } else if (welcomeEmail.error) {
+    message += ` (Email failed: ${welcomeEmail.error}${welcomeEmail.hint ? ` — ${welcomeEmail.hint}` : ''})`;
+  }
+
+  return {
+    success: true,
+    email: portalEmail,
+    tempPassword,
+    welcomeEmail,
+    message,
   };
 }
 

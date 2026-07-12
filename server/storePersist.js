@@ -41,6 +41,22 @@ function storeScore(store) {
   return (store.users?.length ?? 0) * 100 + (store.entities?.length ?? 0) + customers * 50;
 }
 
+function customerCount(store) {
+  return store.entities?.filter((e) => e.entity_type === 'Customer').length ?? 0;
+}
+
+/** Prefer the snapshot with more customers; tie-break on overall score. */
+function chooseBestSnapshot(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  const ca = customerCount(a);
+  const cb = customerCount(b);
+  if (ca !== cb) return ca > cb ? a : b;
+  return storeScore(a) >= storeScore(b) ? a : b;
+}
+
+let baselineCustomerCount = 0;
+
 function writeStoreFile(store) {
   ensureDataDir();
   const payload = JSON.stringify(store, null, 2);
@@ -90,8 +106,8 @@ async function ensureSchema() {
 
 async function loadFromPostgres() {
   const res = await pool.query('SELECT data FROM app_store WHERE id = 1');
-  if (!res.rows.length) return normalizeStore(defaultStore);
-  return normalizeStore(res.rows[0].data);
+  if (!res.rows.length) return { store: normalizeStore(defaultStore), hasRow: false };
+  return { store: normalizeStore(res.rows[0].data), hasRow: true };
 }
 
 async function persistToPostgres(store) {
@@ -114,6 +130,12 @@ function logStats() {
 export async function initDatabase() {
   const fileSnapshot = loadFromFile();
 
+  if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+    console.error(
+      '[datastore] WARNING: DATABASE_URL is not set in production — customer data may be lost on redeploy. Link Postgres in Render.',
+    );
+  }
+
   if (process.env.DATABASE_URL) {
     backend = 'postgres';
     const pg = await import('pg');
@@ -122,16 +144,22 @@ export async function initDatabase() {
       ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false },
     });
     await ensureSchema();
-    const pgSnapshot = await loadFromPostgres();
+    const { store: pgSnapshot, hasRow: pgHasRow } = await loadFromPostgres();
+    const best = chooseBestSnapshot(fileSnapshot, pgSnapshot);
 
-    if (fileSnapshot && storeScore(fileSnapshot) > storeScore(pgSnapshot)) {
+    if (pgHasRow && customerCount(best) < customerCount(pgSnapshot)) {
+      console.warn('[datastore] Refusing to replace Postgres — keeping existing customer data');
+      memoryStore = pgSnapshot;
+    } else if (fileSnapshot && storeScore(fileSnapshot) > storeScore(pgSnapshot)) {
       console.warn('[datastore] Local file has more data than Postgres — importing file snapshot into database');
       memoryStore = fileSnapshot;
     } else {
-      memoryStore = pgSnapshot;
+      memoryStore = best;
     }
 
-    await persistToPostgres(memoryStore);
+    if (!pgHasRow || storeScore(memoryStore) > storeScore(pgSnapshot)) {
+      await persistToPostgres(memoryStore);
+    }
     try {
       writeStoreFile(memoryStore);
     } catch (err) {
@@ -145,6 +173,7 @@ export async function initDatabase() {
     }
   }
 
+  baselineCustomerCount = customerCount(memoryStore);
   logStats();
 }
 
@@ -171,6 +200,12 @@ export function scheduleSave(store) {
 
 export async function flushDatabase() {
   await persistQueue;
+  const current = customerCount(memoryStore || defaultStore);
+  if (baselineCustomerCount > 0 && current < baselineCustomerCount) {
+    console.warn(
+      `[datastore] Customer count dropped during this session (${baselineCustomerCount} → ${current})`,
+    );
+  }
 }
 
 export function getStoreStats() {
@@ -191,4 +226,32 @@ export function getStoreStats() {
 
 export function exportStoreSnapshot() {
   return structuredClone(getMemoryStore());
+}
+
+export async function importStoreSnapshot(raw) {
+  const store =
+    raw?.users !== undefined
+      ? {
+          users: Array.isArray(raw.users) ? raw.users : [],
+          entities: Array.isArray(raw.entities) ? raw.entities : [],
+          otp_codes: raw.otp_codes && typeof raw.otp_codes === 'object' ? raw.otp_codes : {},
+          site_settings: raw.site_settings && typeof raw.site_settings === 'object' ? raw.site_settings : {},
+        }
+      : normalizeStore(raw);
+
+  memoryStore = store;
+  baselineCustomerCount = customerCount(store);
+
+  try {
+    writeStoreFile(store);
+  } catch (err) {
+    console.warn('[datastore] Could not write restored store to disk:', err.message);
+  }
+
+  if (backend === 'postgres' && pool) {
+    await persistToPostgres(store);
+  }
+
+  logStats();
+  return getStoreStats();
 }
