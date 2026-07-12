@@ -172,11 +172,6 @@ const auth = {
     window.location.href = url;
   },
 
-  loginWithProvider(_provider, redirectPath) {
-    alert('Google sign-in is not configured. Use email/password login.');
-    if (redirectPath) window.location.href = '/login';
-  },
-
   async changePassword({ currentPassword, newPassword }) {
     return apiFetch('/auth/change-password', {
       method: 'POST',

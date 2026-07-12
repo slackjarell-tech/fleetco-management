@@ -143,11 +143,13 @@ export async function invokeFunction(name, body, user) {
     case 'seedDemoData': {
       if (!user || !['owner', 'executive'].includes(user.role)) throw new Error('Owner or executive access required');
       const { seedDemoData, getDemoSeedSummary } = await import('./seedDemo.js');
-      const created = seedDemoData();
+      const created = seedDemoData(body);
       return {
         success: true,
-        created,
-        message: created ? 'Demo data seeded successfully' : 'Demo data already exists',
+        created: !!created,
+        message: created
+          ? (body?.fillGaps ? 'Demo gap data added for system test' : 'Demo data seeded successfully')
+          : 'Demo data already exists — pass fillGaps: true to add missing records',
         summary: getDemoSeedSummary(),
       };
     }

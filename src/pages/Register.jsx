@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Mail, Lock, Loader2 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
-import GoogleIcon from "@/components/GoogleIcon";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -82,10 +81,6 @@ export default function Register() {
     }
   };
 
-  const handleGoogle = () => {
-    api.auth.loginWithProvider("google", "/portal");
-  };
-
   if (showOtp) {
     return (
       <AuthLayout
@@ -139,24 +134,6 @@ export default function Register() {
         </>
       }
     >
-      <Button
-        variant="outline"
-        className="w-full h-11 text-sm font-medium mb-5 bg-slate-700 border-slate-600 text-white hover:bg-slate-600 hover:text-white"
-        onClick={handleGoogle}
-      >
-        <GoogleIcon className="w-4 h-4 mr-2" />
-        Continue with Google
-      </Button>
-
-      <div className="relative mb-5">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-600" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-slate-800 px-3 text-slate-500">or register with email</span>
-        </div>
-      </div>
-
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-900/30 border border-red-800/50 text-red-400 text-sm">
           {error}

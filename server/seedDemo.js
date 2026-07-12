@@ -27,9 +27,25 @@ function ensureUser(email, { fullName, role, password = 'demo123' }) {
   return createUser({ email, passwordHash: hash, fullName, role });
 }
 
-export function seedDemoData() {
-  if (filterEntities('Customer').length > 0) return false;
+export function seedDemoData(options = {}) {
+  const fillGaps = options?.fillGaps === true;
+  const hasCustomers = filterEntities('Customer').length > 0;
 
+  if (!hasCustomers) {
+    seedCoreDemoData();
+    seedGapDemoEntities();
+    return true;
+  }
+
+  if (fillGaps) {
+    seedGapDemoEntities();
+    return true;
+  }
+
+  return false;
+}
+
+function seedCoreDemoData() {
   console.log('Seeding demo fleet data for client presentations...');
 
   const manager = ensureUser('manager@fleetco.com', {
@@ -270,24 +286,286 @@ export function seedDemoData() {
     checked_in_at: ts,
   });
 
-  console.log('Demo data seeded:', {
+  console.log('Demo core data seeded:', {
     customers: customers.length,
     vehicles: vehicleRecords.length,
     workOrders: workOrders.length,
     loads: loads.length,
     demoLogins: 'manager@fleetco.com / demo123, driver1@fleetco.com / demo123',
   });
+}
 
-  return true;
+function entityCount(type) {
+  return filterEntities(type).length;
+}
+
+/** Populate any entity types that are still empty — for full system testing. */
+function seedGapDemoEntities() {
+  const customers = listEntities('Customer');
+  const vehicles = listEntities('Vehicle');
+  const truck = vehicles.find((v) => v.unit_type === 'truck') || vehicles[0];
+  const customer = customers[0];
+  const driver = findUserByEmail('driver1@fleetco.com');
+  const manager = findUserByEmail('manager@fleetco.com');
+  const ts = nowIso();
+
+  if (!truck || !customer) {
+    console.warn('[seed] Skipping gap entities — need at least one customer and vehicle');
+    return;
+  }
+
+  console.log('[seed] Filling demo data gaps for system test...');
+
+  if (entityCount('Inspection') === 0) {
+    createEntity('Inspection', {
+      vehicle_id: truck.id,
+      inspection_type: 'Pre-Trip',
+      inspection_date: dateOnly(0),
+      inspector_name: driver?.full_name || 'Mike Rodriguez',
+      driver_id: driver?.id,
+      odometer: truck.odometer || 125000,
+      status: 'passed',
+      defects_found: false,
+      defects_corrected: true,
+      vehicle_condition_satisfactory: true,
+      driver_signature_confirmed: true,
+      items_checked: [
+        { item: 'Brakes', result: 'ok' },
+        { item: 'Tires', result: 'ok' },
+        { item: 'Lights', result: 'ok' },
+      ],
+    });
+  }
+
+  if (entityCount('DiagnosticCode') === 0) {
+    createEntity('DiagnosticCode', {
+      vehicle_id: truck.id,
+      code: 'P20EE',
+      description: 'DEF quality sensor — intermittent fault',
+      severity: 'warning',
+      status: 'monitoring',
+      scan_date: dateOnly(-1),
+      system: 'Engine / Emissions',
+    });
+    createEntity('DiagnosticCode', {
+      vehicle_id: truck.id,
+      code: 'C0031',
+      description: 'Left front wheel speed sensor',
+      severity: 'critical',
+      status: 'active',
+      scan_date: dateOnly(0),
+      system: 'ABS',
+    });
+  }
+
+  if (entityCount('DeliveryRoute') === 0) {
+    const route = createEntity('DeliveryRoute', {
+      name: 'Dallas Metro — Demo Route A',
+      route_date: dateOnly(0),
+      status: 'in_progress',
+      driver_id: driver?.id,
+      vehicle_id: truck.id,
+      customer_id: customer.id,
+      total_stops: 3,
+      completed_stops: 1,
+    });
+    if (entityCount('DeliveryStop') === 0) {
+      [
+        { stop_number: 1, recipient_name: 'ABC Warehouse', address: '1200 Commerce St', city: 'Dallas', state: 'TX', zip: '75201', status: 'delivered', phone: '(214) 555-0101' },
+        { stop_number: 2, recipient_name: 'Metro Parts Co', address: '4500 Industrial Blvd', city: 'Irving', state: 'TX', zip: '75061', status: 'pending', phone: '(972) 555-0102' },
+        { stop_number: 3, recipient_name: 'Southside Distribution', address: '800 E Jefferson Blvd', city: 'Dallas', state: 'TX', zip: '75203', status: 'pending', phone: '(214) 555-0103' },
+      ].forEach((stop) => createEntity('DeliveryStop', { ...stop, route_id: route.id }));
+    }
+  }
+
+  if (entityCount('ServiceTemplate') === 0) {
+    createEntity('ServiceTemplate', {
+      name: 'PM-A — 25K Mile Service',
+      repair_type: 'Preventive Maintenance',
+      estimated_labor_hours: 3.5,
+      notes: 'Standard oil change, filters, inspection points',
+      tasks: [
+        { sequence: 1, description: 'Drain oil and replace filter', estimated_minutes: 45 },
+        { sequence: 2, description: 'Inspect belts and hoses', estimated_minutes: 30 },
+        { sequence: 3, description: 'Grease fittings', estimated_minutes: 60 },
+      ],
+    });
+  }
+
+  if (entityCount('ScreeningRecord') === 0 && driver) {
+    createEntity('ScreeningRecord', {
+      driver_id: driver.id,
+      driver_name: driver.full_name,
+      screening_type: 'DOT Drug Test',
+      status: 'passed',
+      test_date: dateOnly(-90),
+      expiry_date: dateOnly(275),
+      provider: 'Quest Diagnostics',
+    });
+  }
+
+  if (entityCount('PayrollRecord') === 0 && driver) {
+    createEntity('PayrollRecord', {
+      driver_id: driver.id,
+      driver_name: driver.full_name,
+      pay_period_start: dateOnly(-14),
+      pay_period_end: dateOnly(-1),
+      gross_pay: 2850,
+      deductions: 420,
+      net_pay: 2430,
+      status: 'paid',
+      miles: 3200,
+      loads_completed: 8,
+    });
+  }
+
+  if (entityCount('TimeClockEntry') === 0 && driver) {
+    createEntity('TimeClockEntry', {
+      user_id: driver.id,
+      employee_name: driver.full_name,
+      clock_in: daysAgo(0).replace(/T.*/, 'T06:30:00.000Z'),
+      clock_out: null,
+      status: 'clocked_in',
+      notes: 'Pre-trip inspection complete',
+    });
+  }
+
+  if (entityCount('VehicleDocument') === 0) {
+    createEntity('VehicleDocument', {
+      vehicle_id: truck.id,
+      document_type: 'Registration',
+      title: 'TX Registration — 2026',
+      expiry_date: dateOnly(180),
+      status: 'current',
+      file_url: '/uploads/demo-registration.pdf',
+    });
+    createEntity('VehicleDocument', {
+      vehicle_id: truck.id,
+      document_type: 'Insurance',
+      title: 'Liability Certificate',
+      expiry_date: dateOnly(90),
+      status: 'current',
+      file_url: '/uploads/demo-insurance.pdf',
+    });
+  }
+
+  if (entityCount('DriverLocation') === 0 && driver) {
+    createEntity('DriverLocation', {
+      driver_id: driver.id,
+      driver_name: driver.full_name,
+      vehicle_id: truck.id,
+      lat: 32.7767,
+      lng: -96.797,
+      speed_mph: 62,
+      heading: 180,
+      timestamp: ts,
+      status: 'driving',
+    });
+  }
+
+  if (entityCount('BarcodeScan') === 0 && driver) {
+    createEntity('BarcodeScan', {
+      driver_id: driver.id,
+      barcode: 'PKG-DEMO-88421',
+      scan_type: 'delivery_confirm',
+      location: 'Dallas, TX',
+      lat: 32.78,
+      lng: -96.8,
+      timestamp: ts,
+      notes: 'Demo delivery scan',
+    });
+  }
+
+  if (entityCount('Subscription') === 0 && customer) {
+    createEntity('Subscription', {
+      customer_id: customer.id,
+      plan_name: customer.subscription_plan || 'Growth',
+      billing_term: 'monthly',
+      amount: customer.subscription_amount || 599,
+      status: 'active',
+      started_at: daysAgo(60),
+      next_billing_at: customer.next_payment_due_at || ts,
+    });
+  }
+
+  if (entityCount('PaymentReminder') === 0 && customer) {
+    createEntity('PaymentReminder', {
+      customer_id: customer.id,
+      customer_name: customer.company_name,
+      amount_due: customer.subscription_amount || 599,
+      due_date: dateOnly(7),
+      status: 'scheduled',
+      channel: 'email',
+    });
+  }
+
+  if (entityCount('UsageFeedback') === 0) {
+    createEntity('UsageFeedback', {
+      user_email: manager?.email || 'manager@fleetco.com',
+      page: '/portal/workorders',
+      rating: 5,
+      comment: 'Work order flow is smooth — demo feedback entry',
+      category: 'feature',
+      status: 'new',
+    });
+  }
+
+  if (entityCount('DomainEmail') === 0) {
+    createEntity('DomainEmail', {
+      email: 'dispatch@fleetcomanagement.org',
+      local_part: 'dispatch',
+      display_name: 'FleetCo Dispatch',
+      mailbox_type: 'employee',
+      status: 'active',
+      portal_role: 'fleet_coordinator',
+      has_portal_access: true,
+      created_by: 'jarell.slack@fleetcomanagement.org',
+      provisioned_at: ts,
+    });
+  }
+
+  if (entityCount('DashcamSession') === 0 && driver) {
+    const session = createEntity('DashcamSession', {
+      driver_id: driver.id,
+      vehicle_id: truck.id,
+      mode: 'view_ahead',
+      status: 'completed',
+      started_at: daysAgo(1),
+      ended_at: daysAgo(1),
+      frame_count: 2,
+      mount_notes: 'Below rearview mirror',
+    });
+    if (entityCount('DashcamFrame') === 0) {
+      createEntity('DashcamFrame', {
+        session_id: session.id,
+        captured_at: daysAgo(1),
+        image_url: '/uploads/demo-dashcam-frame.jpg',
+        notes: 'Demo frame — highway view',
+      });
+    }
+  }
+
+  console.log('[seed] Gap fill complete');
 }
 
 export function getDemoSeedSummary() {
+  const entityTypes = [
+    'Customer', 'Vehicle', 'WorkOrder', 'Load', 'Invoice', 'Inspection',
+    'DiagnosticCode', 'DeliveryRoute', 'DeliveryStop', 'FuelLog', 'FuelStation',
+    'HOSLog', 'Incident', 'Inquiry', 'MaintenanceSchedule', 'Message',
+    'PartInventory', 'PayrollRecord', 'ScreeningRecord', 'ServiceTemplate',
+    'Subscription', 'UsageFeedback', 'VehicleDocument', 'Vendor', 'TimeClockEntry',
+    'DriverLocation', 'BarcodeScan', 'DomainEmail', 'PaymentReminder',
+    'DashcamSession', 'DashcamFrame', 'Yard', 'YardPlacement',
+  ];
+  const counts = Object.fromEntries(entityTypes.map((t) => [t, entityCount(t)]));
   return {
-    customers: listEntities('Customer').length,
-    vehicles: listEntities('Vehicle').length,
-    workOrders: listEntities('WorkOrder').length,
-    loads: listEntities('Load').length,
-    invoices: listEntities('Invoice').length,
-    seeded: filterEntities('Customer').length > 0,
+    ...counts,
+    customers: counts.Customer,
+    vehicles: counts.Vehicle,
+    workOrders: counts.WorkOrder,
+    loads: counts.Load,
+    invoices: counts.Invoice,
+    seeded: counts.Customer > 0,
   };
 }
