@@ -30,7 +30,7 @@ const FPS = 30;
 const AUDIO_PAD_SEC = 0.6;
 
 const ACCOUNTS = {
-  owner: { email: 'jarrell@fleetcomanagement.org', password: 'FleetCo2026!' },
+  owner: { email: 'jarell.slack@fleetcomanagement.org', password: 'FleetCo2026!' },
   driver: { email: 'driver1@fleetco.com', password: 'demo123' },
 };
 

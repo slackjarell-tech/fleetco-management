@@ -55,7 +55,7 @@ async function main() {
   push('server_health', true);
 
   // 2. Owner login
-  const owner = await login('jarrell@fleetcomanagement.org', 'FleetCo2026!');
+  const owner = await login('jarell.slack@fleetcomanagement.org', 'FleetCo2026!');
   if (!owner.token) {
     push('owner_login', false, { error: owner.error });
     console.log(JSON.stringify(report, null, 2));

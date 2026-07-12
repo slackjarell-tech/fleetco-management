@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const BASE = process.env.BASE_URL || 'https://fleetcomanagement.org';
-const OWNER_EMAIL = process.env.OWNER_EMAIL || 'jarrell@fleetcomanagement.org';
+const OWNER_EMAIL = process.env.OWNER_EMAIL || 'jarell.slack@fleetcomanagement.org';
 const OWNER_PASSWORD = process.env.OWNER_PASSWORD || 'FleetCo2026!';
 
 function loadEnvFile() {

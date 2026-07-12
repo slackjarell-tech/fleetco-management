@@ -35,7 +35,7 @@ loadEnvFile();
 const args = process.argv.slice(2);
 const sendOnly = args.includes('--send-only');
 const toArgIdx = args.indexOf('--to');
-const TO = toArgIdx >= 0 ? args[toArgIdx + 1] : (process.env.CLIENT_PRESENTATION_TO || 'jarrell@fleetcomanagement.org');
+const TO = toArgIdx >= 0 ? args[toArgIdx + 1] : (process.env.CLIENT_PRESENTATION_TO || 'jarell.slack@fleetcomanagement.org');
 const DECK = path.join(ROOT, 'marketing', 'FleetCo-Client-Presentation.pptx');
 const VIDEO = path.join(ROOT, 'marketing', 'FleetCo-Client-Presentation.mp4');
 

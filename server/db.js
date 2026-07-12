@@ -119,14 +119,14 @@ export function createUser({ email, passwordHash, fullName, role = 'user', custo
 }
 
 export function updateUser(id, fields) {
-  const allowed = ['full_name', 'role', 'customer_id', 'status', 'sidebar_modules', 'employee_number', 'password_hash'];
+  const allowed = ['email', 'full_name', 'role', 'customer_id', 'status', 'sidebar_modules', 'employee_number', 'password_hash'];
   let updated = null;
   withStore((store) => {
     const idx = store.users.findIndex((u) => u.id === id);
     if (idx === -1) return;
     for (const [key, val] of Object.entries(fields)) {
       if (!allowed.includes(key)) continue;
-      store.users[idx][key] = val;
+      store.users[idx][key] = key === 'email' ? String(val).toLowerCase() : val;
     }
     store.users[idx].updated_date = nowIso();
     updated = parseUser(store.users[idx]);

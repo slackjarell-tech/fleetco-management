@@ -77,7 +77,7 @@ async function main() {
   }
 
   const accounts = [
-    { label: 'owner', email: 'jarrell@fleetcomanagement.org', password: 'FleetCo2026!' },
+    { label: 'owner', email: 'jarell.slack@fleetcomanagement.org', password: 'FleetCo2026!' },
     { label: 'executive', email: 'admin@fleetco.com', password: 'admin123' },
     { label: 'manager', email: 'manager@fleetco.com', password: 'demo123' },
     { label: 'driver', email: 'driver1@fleetco.com', password: 'demo123' },

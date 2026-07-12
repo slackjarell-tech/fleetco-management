@@ -72,7 +72,7 @@ async function main() {
   }
 
   const accounts = [
-    { label: 'owner', email: 'jarrell@fleetcomanagement.org', password: 'FleetCo2026!' },
+    { label: 'owner', email: 'jarell.slack@fleetcomanagement.org', password: 'FleetCo2026!' },
     { label: 'executive', email: 'admin@fleetco.com', password: 'admin123' },
     { label: 'manager', email: 'manager@fleetco.com', password: 'demo123' },
     { label: 'driver', email: 'driver1@fleetco.com', password: 'demo123' },
@@ -98,7 +98,7 @@ async function main() {
 
   // Owner login fallback if executive fails
   if (!token) {
-    const ownerLogin = await login('jarrell@fleetcomanagement.org', 'FleetCo2026!');
+    const ownerLogin = await login('jarell.slack@fleetcomanagement.org', 'FleetCo2026!');
     token = ownerLogin.token;
     activeUser = ownerLogin.user;
   }
@@ -138,7 +138,7 @@ async function main() {
   }
 
   // Role permission simulation
-  const ownerToken = (await login('jarrell@fleetcomanagement.org', 'FleetCo2026!')).token;
+  const ownerToken = (await login('jarell.slack@fleetcomanagement.org', 'FleetCo2026!')).token;
   const ownerCreateEmployee = ownerToken
     ? await authed('/api/functions/createUserAccount', ownerToken, {
         method: 'POST',

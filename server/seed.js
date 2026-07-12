@@ -5,6 +5,7 @@ import {
   filterEntities,
   findUserByEmail,
   updateEntity,
+  updateUser,
   listEntities,
   nowIso,
 } from './db.js';
@@ -13,9 +14,31 @@ import { seedDemoData } from './seedDemo.js';
 import { repairCustomerPortalLogins } from './repairCustomerLogins.js';
 import { getStoreStats } from './db.js';
 
-const OWNER_EMAIL = 'jarrell@fleetcomanagement.org';
+const OWNER_EMAIL = 'jarell.slack@fleetcomanagement.org';
+const LEGACY_OWNER_EMAIL = 'jarrell@fleetcomanagement.org';
+
+function migrateOwnerEmail() {
+  if (findUserByEmail(OWNER_EMAIL)) return;
+
+  const legacyOwner = findUserByEmail(LEGACY_OWNER_EMAIL);
+  if (!legacyOwner) return;
+
+  updateUser(legacyOwner.id, { email: OWNER_EMAIL });
+  console.log(`[seed] Migrated owner login: ${LEGACY_OWNER_EMAIL} → ${OWNER_EMAIL}`);
+
+  const legacyMailbox = filterEntities('DomainEmail', { email: LEGACY_OWNER_EMAIL }, null, 1)[0];
+  if (legacyMailbox) {
+    updateEntity('DomainEmail', legacyMailbox.id, {
+      email: OWNER_EMAIL,
+      local_part: 'jarell.slack',
+      created_by: OWNER_EMAIL,
+    });
+  }
+}
 
 export function seedDatabase() {
+  migrateOwnerEmail();
+
   // Owner login — JaRell Slack creates all FleetCo employees
   const owner = findUserByEmail(OWNER_EMAIL);
   if (!owner) {
@@ -34,7 +57,7 @@ export function seedDatabase() {
   if (!ownerMailbox && ownerUser) {
     createEntity('DomainEmail', {
       email: OWNER_EMAIL,
-      local_part: 'jarrell',
+      local_part: 'jarell.slack',
       display_name: 'JaRell D. Slack',
       mailbox_type: 'employee',
       status: 'active',
