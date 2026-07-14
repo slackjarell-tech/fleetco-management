@@ -23,6 +23,7 @@ export const PATH_TO_SECTION = {
   '/portal/inspections': 'Maintenance',
   '/portal/service-templates': 'Maintenance',
   '/portal/parts': 'Maintenance',
+  '/portal/vehicle-lookup': 'Maintenance',
   '/portal/vendors': 'Maintenance',
   '/portal/drivers': 'Drivers & Payroll',
   '/portal/scorecard': 'Drivers & Payroll',

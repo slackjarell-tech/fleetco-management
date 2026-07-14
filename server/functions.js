@@ -49,6 +49,7 @@ import {
 import { sendWelcomeSignupEmail } from './customerEmails.js';
 import { sendInquiryNotificationEmail } from './inquiryEmails.js';
 import { getEmailConfigStatus, sendEmail as sendEmailDirect } from './email.js';
+import { vehiclePartsLookup, accessorySerialLookup } from './vehiclePartsLookup.js';
 
 const SIM_ROUTES = [
   { name: 'I-80 Westbound', id: 'sim_driver_01', userName: '👤 Mike R. (Sim)', steps: [
@@ -80,6 +81,10 @@ export async function invokeFunction(name, body, user) {
   switch (name) {
     case 'decodeVin':
       return decodeVin(body);
+    case 'vehiclePartsLookup':
+      return vehiclePartsLookup(body, user);
+    case 'accessorySerialLookup':
+      return accessorySerialLookup(body, user);
     case 'submitInquiry':
       return submitInquiry(body);
     case 'upgradeUserRole':

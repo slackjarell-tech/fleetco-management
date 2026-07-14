@@ -15,6 +15,11 @@ export default function PartModal({ part, onSave, onDelete, onClose }) {
     supplier: part?.supplier || '',
     location: part?.location || '',
     notes: part?.notes || '',
+    compatible_makes: part?.compatible_makes || '',
+    compatible_models: part?.compatible_models || '',
+    compatible_engines: part?.compatible_engines || '',
+    compatible_brands: part?.compatible_brands || '',
+    accessory_types: part?.accessory_types || '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -98,6 +103,37 @@ export default function PartModal({ part, onSave, onDelete, onClose }) {
             <label className="block text-xs font-bold text-slate-500 mb-1">Notes</label>
             <textarea rows={2} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
               value={form.notes} onChange={e => set('notes', e.target.value)} />
+          </div>
+
+          <div className="border-t border-slate-100 pt-3 space-y-3">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Vehicle / Accessory Fitment (optional)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Compatible Makes</label>
+                <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  value={form.compatible_makes} onChange={e => set('compatible_makes', e.target.value)} placeholder="Freightliner, Kenworth" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Compatible Models</label>
+                <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  value={form.compatible_models} onChange={e => set('compatible_models', e.target.value)} placeholder="Cascadia, T680" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Compatible Engines</label>
+                <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  value={form.compatible_engines} onChange={e => set('compatible_engines', e.target.value)} placeholder="Cummins ISX" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Accessory Brands</label>
+                <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  value={form.compatible_brands} onChange={e => set('compatible_brands', e.target.value)} placeholder="Miller, Auto Crane" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">Accessory Types</label>
+              <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                value={form.accessory_types} onChange={e => set('accessory_types', e.target.value)} placeholder="crane, welder, reefer" />
+            </div>
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-slate-100">

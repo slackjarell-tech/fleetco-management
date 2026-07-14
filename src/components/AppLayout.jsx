@@ -6,7 +6,7 @@ import {
   BarChart2, ClipboardList, Building2, Users, ClipboardCheck, Wrench, UserCheck,
   Archive, Calendar, Cpu, Store, Bot, Crown, MessageCircle, Navigation, TrendingUp,
   Map, Route, DollarSign, Globe, Clock, ShieldCheck, AlertTriangle, Award, Lightbulb,
-  MapPin, Megaphone, Zap, Mail, ScanLine, Video, Upload, Warehouse,
+  MapPin, Megaphone, Zap, Mail, ScanLine, Video, Upload, Warehouse, Search,
   ChevronDown, KeyRound, Bell, Database, Calculator,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -73,6 +73,7 @@ const NAV_GROUPS = [
       { label: 'Inspections', icon: ClipboardCheck, path: '/portal/inspections' },
       { label: 'Service Templates', icon: ClipboardList, path: '/portal/service-templates' },
       { label: 'Parts Inventory', icon: Archive, path: '/portal/parts' },
+      { label: 'Vehicle Parts Research', icon: Search, path: '/portal/vehicle-lookup' },
       { label: 'Vendors & Contracts', icon: Store, path: '/portal/vendors' },
     ]
   },

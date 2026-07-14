@@ -64,6 +64,7 @@ import SetPassword from './pages/SetPassword';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ServiceTemplates from './pages/ServiceTemplates';
+import VehiclePartsResearch from './pages/VehiclePartsResearch';
 import ModulePreferences from './pages/ModulePreferences';
 import NotificationPreferences from './pages/NotificationPreferences';
 import Advertisement from './pages/Advertisement';
@@ -142,6 +143,7 @@ const AuthenticatedApp = () => {
           <Route path="maintenance" element={<Maintenance />} />
           <Route path="drivers" element={<Drivers />} />
           <Route path="parts" element={<PartInventory />} />
+          <Route path="vehicle-lookup" element={<VehiclePartsResearch />} />
           <Route path="calendar" element={<MaintenanceCalendar />} />
           <Route path="pretrip" element={<PreTripChecklist />} />
           <Route path="hos" element={<HOSReport />} />

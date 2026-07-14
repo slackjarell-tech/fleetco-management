@@ -223,10 +223,12 @@ function seedCoreDemoData() {
   createEntity('Vendor', { name: 'Commercial Tire Pros', type: 'tires', phone: '(713) 555-6600', city: 'Houston', state: 'TX', status: 'active' });
 
   [
-    { part_number: 'BP-4410', description: 'Brake pad set — steer axle', quantity: 12, unit_cost: 89.5, location: 'A-12', reorder_point: 4 },
-    { part_number: 'OF-3350', description: 'Oil filter — Cummins ISX', quantity: 24, unit_cost: 18.75, location: 'B-03', reorder_point: 8 },
-    { part_number: 'DF-2201', description: 'DEF fluid — 2.5 gal', quantity: 36, unit_cost: 12.99, location: 'C-01', reorder_point: 12 },
-    { part_number: 'BL-8800', description: 'Serpentine belt', quantity: 8, unit_cost: 42.0, location: 'B-08', reorder_point: 3 },
+    { part_number: 'BP-4410', description: 'Brake pad set — steer axle', category: 'Brakes', quantity_on_hand: 12, unit_cost: 89.5, location: 'A-12', reorder_point: 4, compatible_makes: 'Freightliner, Kenworth, Volvo' },
+    { part_number: 'OF-3350', description: 'Oil filter — Cummins ISX', category: 'Filters', quantity_on_hand: 24, unit_cost: 18.75, location: 'B-03', reorder_point: 8, compatible_makes: 'Freightliner, Kenworth, Peterbilt', compatible_engines: 'Cummins ISX' },
+    { part_number: 'DF-2201', description: 'DEF fluid — 2.5 gal', category: 'Fluids', quantity_on_hand: 36, unit_cost: 12.99, location: 'C-01', reorder_point: 12 },
+    { part_number: 'BL-8800', description: 'Serpentine belt', category: 'Engine', quantity_on_hand: 8, unit_cost: 42.0, location: 'B-08', reorder_point: 3, compatible_makes: 'Freightliner, International' },
+    { part_number: 'CR-HYD-220', description: 'Crane hydraulic hose kit', category: 'Other', quantity_on_hand: 4, unit_cost: 125, location: 'D-02', reorder_point: 2, accessory_types: 'crane', compatible_brands: 'Auto Crane' },
+    { part_number: 'WL-TIP-14', description: 'Welder contact tips (10pk)', category: 'Other', quantity_on_hand: 15, unit_cost: 28.5, location: 'D-04', reorder_point: 5, accessory_types: 'welder', compatible_brands: 'Miller, Lincoln' },
   ].forEach((p) => createEntity('PartInventory', p));
 
   [
@@ -250,6 +252,28 @@ function seedCoreDemoData() {
 
   createEntity('MaintenanceSchedule', { vehicle_id: vehicleRecords[0].id, service_type: 'PM-A', interval_miles: 25000, last_service_miles: 100000, next_due_miles: 125000, status: 'due_soon' });
   createEntity('MaintenanceSchedule', { vehicle_id: vehicleRecords[5].id, service_type: 'DOT Annual', interval_months: 12, last_service_date: dateOnly(-400), next_due_date: dateOnly(30), status: 'scheduled' });
+
+  createEntity('VehicleAccessory', {
+    accessory_type: 'crane',
+    brand: 'Auto Crane',
+    model: '5005H',
+    serial_number: 'AC-5005-88421',
+    install_date: dateOnly(-400),
+    warranty_expiry: dateOnly(330),
+    vehicle_id: vehicleRecords[0].id,
+    customer_id: c1,
+    notes: 'Knuckleboom — annual hydraulic inspection required',
+  });
+  createEntity('VehicleAccessory', {
+    accessory_type: 'welder',
+    brand: 'Miller',
+    model: 'Trailblazer 325',
+    serial_number: 'ML-TB325-77201',
+    install_date: dateOnly(-180),
+    warranty_expiry: dateOnly(545),
+    vehicle_id: vehicleRecords[1].id,
+    customer_id: c1,
+  });
 
   createEntity('HOSLog', { driver_name: 'Mike Rodriguez', status: 'driving', hours_remaining: 6.5, cycle_remaining: 42, date: dateOnly(0) });
   createEntity('HOSLog', { driver_name: 'Lisa Thompson', status: 'on_duty_not_driving', hours_remaining: 8, cycle_remaining: 38, date: dateOnly(0) });
@@ -554,7 +578,7 @@ export function getDemoSeedSummary() {
     'DiagnosticCode', 'DeliveryRoute', 'DeliveryStop', 'FuelLog', 'FuelStation',
     'HOSLog', 'Incident', 'Inquiry', 'MaintenanceSchedule', 'Message',
     'PartInventory', 'PayrollRecord', 'ScreeningRecord', 'ServiceTemplate',
-    'Subscription', 'UsageFeedback', 'VehicleDocument', 'Vendor', 'TimeClockEntry',
+    'Subscription', 'UsageFeedback', 'VehicleDocument', 'VehicleAccessory', 'Vendor', 'TimeClockEntry',
     'DriverLocation', 'BarcodeScan', 'DomainEmail', 'PaymentReminder',
     'DashcamSession', 'DashcamFrame', 'Yard', 'YardPlacement',
   ];
