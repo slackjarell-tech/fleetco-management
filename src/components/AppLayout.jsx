@@ -7,7 +7,7 @@ import {
   Archive, Calendar, Cpu, Store, Bot, Crown, MessageCircle, Navigation, TrendingUp,
   Map, Route, DollarSign, Globe, Clock, ShieldCheck, AlertTriangle, Award, Lightbulb,
   MapPin, Megaphone, Zap, Mail, ScanLine, Video, Upload, Warehouse,
-  ChevronDown, KeyRound, Bell, Database
+  ChevronDown, KeyRound, Bell, Database, Calculator,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
@@ -103,6 +103,7 @@ const NAV_GROUPS = [
     icon: DollarSign,
     items: [
       { label: 'Invoices', icon: FileText, path: '/portal/invoices' },
+      { label: 'Accounting', icon: Calculator, path: '/portal/accounting' },
       { label: 'Fuel Stations', icon: MapPin, path: '/portal/fuel-stations' },
       { label: 'Fuel Audits', icon: Fuel, path: '/portal/fuel' },
       { label: 'Driver Scans', icon: ScanLine, path: '/portal/driver-scans' },

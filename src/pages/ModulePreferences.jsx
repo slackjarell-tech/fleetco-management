@@ -10,7 +10,7 @@ const ALL_MODULES = [
   { label: 'Maintenance', icon: Wrench, description: 'PM schedules, Inspections, Parts, Vendors' },
   { label: 'Drivers & Payroll', icon: Users, description: 'Drivers, Payroll, Time Clock' },
   { label: 'Compliance', icon: ShieldCheck, description: 'HOS logs, IFTA, Incidents' },
-  { label: 'Finance', icon: DollarSign, description: 'Invoices, Fuel, Reports' },
+  { label: 'Finance', icon: DollarSign, description: 'Invoices, Accounting, Fuel, Reports' },
   { label: 'Other', icon: Building2, description: 'Messages, AI Assistant' },
 ];
 

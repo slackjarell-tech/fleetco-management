@@ -16,6 +16,7 @@ import FuelAudits from './pages/FuelAudits';
 import FuelStations from './pages/FuelStations';
 import Fleet from './pages/Fleet';
 import Reports from './pages/Reports';
+import Accounting from './pages/Accounting';
 import AppLayout from './components/AppLayout';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -132,6 +133,7 @@ const AuthenticatedApp = () => {
           <Route path="fuel-stations" element={<FuelStations />} />
           <Route path="fleet" element={<Fleet />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="accounting" element={<Accounting />} />
           <Route path="repairs" element={<RepairsDashboard />} />
           <Route path="workorders" element={<WorkOrders />} />
           <Route path="customers" element={<Customers />} />

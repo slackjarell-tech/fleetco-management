@@ -16,7 +16,7 @@ const ENTITY_TYPES = [
   'Customer', 'DriverLocation', 'DiagnosticCode', 'FuelLog', 'DeliveryRoute',
   'DeliveryStop', 'HOSLog', 'FuelStation', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
-  'PayrollRecord', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
+  'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
   'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder',
 ];
 

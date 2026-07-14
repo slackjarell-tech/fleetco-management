@@ -40,6 +40,7 @@ export const PATH_TO_SECTION = {
   '/portal/driver-scans': 'Finance',
   '/portal/driver-media': 'Finance',
   '/portal/reports': 'Finance',
+  '/portal/accounting': 'Finance',
   '/portal/customers': 'Other',
   '/portal/messages': 'Other',
   '/portal/assistant': 'Other',

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calculator, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { calculateW2Withholding, calculate1099Estimate } from '@/lib/accounting/taxEngine';
 
 const PAY_TYPES = ['W2', '1099', 'Per Mile', 'Per Stop', 'Salary', 'Hourly'];
 const PAYMENT_METHODS = ['Direct Deposit', 'Check', 'Cash', 'Zelle', 'Other'];
@@ -29,7 +30,7 @@ const getDefaultPeriod = () => {
   };
 };
 
-export default function PayrollRunModal({ record, drivers, hosLogs, deliveryStops, onSave, onClose }) {
+export default function PayrollRunModal({ record, drivers, hosLogs, deliveryStops, onSave, onClose, customerState = 'TX' }) {
   const period = getDefaultPeriod();
 
   const [form, setForm] = useState({
@@ -80,7 +81,7 @@ export default function PayrollRunModal({ record, drivers, hosLogs, deliveryStop
     });
   };
 
-  // Auto-calculate gross pay
+  // Auto-calculate gross pay and tax withholdings
   useEffect(() => {
     let gross = 0;
     const pt = form.pay_type;
@@ -93,15 +94,40 @@ export default function PayrollRunModal({ record, drivers, hosLogs, deliveryStop
     } else if (pt === 'Salary') {
       gross = parseFloat(form.salary_amount) || 0;
     } else if (pt === '1099') {
-      // For 1099 allow manual gross or calculate from hours/miles
       const fromHours = (parseFloat(form.hours_worked) || 0) * (parseFloat(form.hourly_rate) || 0);
       const fromMiles = (parseFloat(form.miles_driven) || 0) * (parseFloat(form.rate_per_mile) || 0);
       gross = fromHours + fromMiles || parseFloat(form.salary_amount) || 0;
     }
     gross += parseFloat(form.bonuses) || 0;
-    const net = gross - (parseFloat(form.deductions) || 0);
-    setForm(p => ({ ...p, gross_pay: parseFloat(gross.toFixed(2)), net_pay: parseFloat(net.toFixed(2)) }));
-  }, [form.pay_type, form.hours_worked, form.hourly_rate, form.miles_driven, form.rate_per_mile, form.stops_completed, form.rate_per_stop, form.salary_amount, form.bonuses, form.deductions]);
+
+    let deductions = parseFloat(form.deductions) || 0;
+    let net = gross - deductions;
+
+    if (pt === 'W2' || pt === 'Hourly') {
+      const tax = calculateW2Withholding(gross, { state: customerState });
+      deductions = tax.totalEmployeeWithholding;
+      net = tax.netPay;
+    } else if (pt === '1099') {
+      deductions = 0;
+      net = gross;
+    }
+
+    setForm(p => ({
+      ...p,
+      gross_pay: parseFloat(gross.toFixed(2)),
+      deductions: parseFloat(deductions.toFixed(2)),
+      net_pay: parseFloat(net.toFixed(2)),
+    }));
+  }, [form.pay_type, form.hours_worked, form.hourly_rate, form.miles_driven, form.rate_per_mile, form.stops_completed, form.rate_per_stop, form.salary_amount, form.bonuses, customerState]);
+
+  const taxPreview = useMemo(() => {
+    const gross = parseFloat(form.gross_pay) || 0;
+    if (form.pay_type === 'W2' || form.pay_type === 'Hourly') {
+      return calculateW2Withholding(gross, { state: customerState });
+    }
+    if (form.pay_type === '1099') return calculate1099Estimate(gross);
+    return null;
+  }, [form.gross_pay, form.pay_type, customerState]);
 
   const canSave = form.driver_id && form.pay_type && form.pay_period_start && form.pay_period_end;
 
@@ -249,10 +275,30 @@ export default function PayrollRunModal({ record, drivers, hosLogs, deliveryStop
               <Input type="number" placeholder="0.00" value={form.bonuses} onChange={e => set('bonuses', e.target.value)} />
             </div>
             <div>
-              <label className="text-xs font-black text-slate-500 uppercase mb-1 block">Deductions ($)</label>
-              <Input type="number" placeholder="0.00" value={form.deductions} onChange={e => set('deductions', e.target.value)} />
+              <label className="text-xs font-black text-slate-500 uppercase mb-1 block">
+                {form.pay_type === 'W2' || form.pay_type === 'Hourly' ? 'Tax withholdings ($)' : 'Deductions ($)'}
+              </label>
+              <Input type="number" placeholder="0.00" value={form.deductions}
+                readOnly={form.pay_type === 'W2' || form.pay_type === 'Hourly'}
+                onChange={e => set('deductions', e.target.value)} />
             </div>
           </div>
+
+          {taxPreview?.breakdown && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs space-y-1">
+              <div className="font-black text-amber-900 mb-1">Tax breakdown (auto-calculated)</div>
+              {taxPreview.breakdown.map(b => (
+                <div key={b.label} className="flex justify-between text-amber-800">
+                  <span>{b.label}</span><span>${b.amount}</span>
+                </div>
+              ))}
+              {taxPreview.employerTaxes != null && (
+                <div className="flex justify-between text-amber-700 pt-1 border-t border-amber-200 font-semibold">
+                  <span>Employer taxes (est.)</span><span>${taxPreview.employerTaxes}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Auto-calculated Pay Summary */}
           <div className="bg-slate-900 rounded-xl p-4 space-y-2">

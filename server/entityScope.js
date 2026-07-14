@@ -159,6 +159,8 @@ export function stampEntityForCreate(type, data, ctx) {
   const customerFieldTypes = new Set([
     'Load',
     'Invoice',
+    'PurchaseOrder',
+    'PayrollRun',
     'Yard',
     'Message',
     'Subscription',

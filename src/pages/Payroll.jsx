@@ -32,16 +32,22 @@ export default function Payroll() {
   const [editRecord, setEditRecord] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPeriod, setFilterPeriod] = useState('');
+  const [customerState, setCustomerState] = useState('TX');
 
   const load = async () => {
     const u = await api.auth.me().catch(() => null);
     setUser(u);
-    const [rs, us, hs, ds] = await Promise.all([
+    const [rs, us, hs, ds, cust] = await Promise.all([
       api.entities.PayrollRecord.list('-created_date', 200),
       api.entities.User.list(),
       api.entities.HOSLog.list('-log_date', 500),
       api.entities.DeliveryStop.filter({ status: 'delivered' }),
+      u?.customer_id ? api.entities.Customer.list() : Promise.resolve([]),
     ]);
+    if (u?.customer_id) {
+      const c = cust.find(x => x.id === u.customer_id);
+      if (c?.state) setCustomerState(c.state);
+    }
     let driverList = us.filter(u => u.role === 'driver');
     if (u?.customer_id) driverList = driverList.filter(d => d.customer_id === u.customer_id);
     setDrivers(driverList);
@@ -210,6 +216,7 @@ export default function Payroll() {
           drivers={drivers}
           hosLogs={hosLogs}
           deliveryStops={deliveryStops}
+          customerState={customerState}
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditRecord(null); }}
         />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
-import { Package, AlertTriangle, Search, Plus, Minus, Shield, Edit2, Check, X } from 'lucide-react';
+import { Package, AlertTriangle, Search, Plus, Minus, Shield, Edit2, Check, X, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -91,9 +92,16 @@ export default function PartInventory() {
           <h1 className="text-2xl font-black text-slate-900">Parts Inventory</h1>
           <p className="text-slate-500 text-sm mt-0.5">Track stock levels and reorder points</p>
         </div>
-        <Button onClick={() => { setEditingPart(null); setShowModal(true); }} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold">
-          <Plus className="w-4 h-4" /> Add Part
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button asChild variant="outline" className="font-bold border-indigo-200 text-indigo-700">
+            <Link to="/portal/accounting?tab=purchase-orders">
+              <FileText className="w-4 h-4 mr-1" /> Request PO
+            </Link>
+          </Button>
+          <Button onClick={() => { setEditingPart(null); setShowModal(true); }} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold">
+            <Plus className="w-4 h-4" /> Add Part
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
