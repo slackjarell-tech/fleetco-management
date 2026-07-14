@@ -30,6 +30,7 @@ import {
 } from './db.js';
 import { seedDatabase } from './seed.js';
 import { invokeFunction } from './functions.js';
+import { emailPurchaseOrder } from './accountingActions.js';
 import { runAgent, simpleLLM } from './aiAgent.js';
 import { getBillingSnapshot } from './billing.js';
 import { getCustomerNotificationPrefs } from './notificationPreferences.js';
@@ -391,7 +392,7 @@ const ENTITY_NAMES = [
   'Customer', 'DriverLocation', 'DiagnosticCode', 'FuelLog', 'DeliveryRoute',
   'DeliveryStop', 'HOSLog', 'FuelStation', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
-  'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
+  'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
   'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
 ];
 
@@ -612,6 +613,23 @@ app.post('/api/customers/welcome-email', requireAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/accounting/purchase-orders/:id/email', requireAuth, async (req, res) => {
+  try {
+    const result = await emailPurchaseOrder({
+      poId: req.params.id,
+      pdfBase64: req.body?.pdfBase64,
+      recipientEmail: req.body?.recipientEmail,
+      user: req.user,
+    });
+    if (!result.success) {
+      return res.status(result.skipped ? 503 : 502).json(result);
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, hint: err.hint });
   }
 });
 

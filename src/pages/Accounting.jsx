@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import {
   Calculator, FileText, Package, Users, CheckCircle2, XCircle,
-  Send, Truck, DollarSign, Plus, RefreshCw, AlertTriangle,
+  Send, Truck, DollarSign, Plus, RefreshCw, AlertTriangle, BookOpen, Clock, Mail, Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PurchaseOrderModal from '@/components/accounting/PurchaseOrderModal';
@@ -13,6 +13,10 @@ import {
   PO_STATUS_LABELS, PAYROLL_RUN_STATUS_LABELS,
 } from '@/lib/accounting/accountingRoles';
 import { calculatePayrollTaxes, summarizeBusinessTaxes } from '@/lib/accounting/taxEngine';
+import { buildPurchaseOrderPdfBase64, downloadPurchaseOrderPdf } from '@/lib/accounting/poPdf';
+import { hoursByUser, buildPayrollDraftFromTimeClock } from '@/lib/accounting/timeclockPayroll';
+import { ensureDefaultChart, suggestJournalForPO, suggestJournalForPayrollRun } from '@/lib/accounting/chartOfAccounts';
+import { build1099Summary, download1099Csv } from '@/lib/accounting/form1099';
 import { useCustomerContext } from '@/lib/CustomerContext';
 
 const PO_STATUS_STYLE = {
@@ -29,6 +33,7 @@ const TABS = [
   { id: 'overview', label: 'Overview', icon: Calculator },
   { id: 'purchase-orders', label: 'Purchase Orders', icon: Package },
   { id: 'payroll-runs', label: 'Payroll Runs', icon: Users },
+  { id: 'general-ledger', label: 'General Ledger', icon: BookOpen },
   { id: 'taxes', label: 'Tax Center', icon: FileText },
 ];
 
@@ -57,12 +62,27 @@ export default function Accounting() {
   const [declineReason, setDeclineReason] = useState('');
   const [selectedPayrollIds, setSelectedPayrollIds] = useState([]);
   const [customerState, setCustomerState] = useState('TX');
+  const [timeClockEntries, setTimeClockEntries] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [chartAccounts, setChartAccounts] = useState([]);
+  const [journalEntries, setJournalEntries] = useState([]);
+  const [tcFrom, setTcFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 14);
+    return d.toISOString().slice(0, 10);
+  });
+  const [tcTo, setTcTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [tcHourlyRate, setTcHourlyRate] = useState(22);
+  const [taxYear, setTaxYear] = useState(new Date().getFullYear());
+  const [poEmailMsg, setPoEmailMsg] = useState('');
 
   const load = async () => {
     setLoading(true);
     const u = await api.auth.me().catch(() => null);
     setUser(u);
-    const [poList, runs, records, p, v, inv, fuel, cust] = await Promise.all([
+    const cid = u?.customer_id || viewAsCustomerId || null;
+    const [poList, runs, records, p, v, inv, fuel, cust, tc, users, coa, journals] = await Promise.all([
       api.entities.PurchaseOrder.list('-created_date', 500),
       api.entities.PayrollRun.list('-created_date', 200),
       api.entities.PayrollRecord.list('-created_date', 500),
@@ -71,6 +91,10 @@ export default function Accounting() {
       api.entities.Invoice.list('-issue_date', 500),
       api.entities.FuelLog.list('-date', 500),
       api.entities.Customer.list(),
+      api.entities.TimeClockEntry.list('-clock_in', 2000),
+      api.entities.User.list(),
+      api.entities.ChartOfAccount.list(),
+      api.entities.JournalEntry.list('-created_date', 300),
     ]);
     setPos(poList);
     setPayrollRuns(runs);
@@ -80,8 +104,18 @@ export default function Accounting() {
     setInvoices(inv);
     setFuelLogs(fuel);
     setCustomers(cust);
+    setTimeClockEntries(tc);
+    setAllUsers(users);
+    const driverList = users.filter(x => x.role === 'driver' && (!cid || x.customer_id === cid));
+    setDrivers(driverList);
+    setJournalEntries(journals);
 
-    const cid = u?.customer_id || viewAsCustomerId;
+    let accounts = coa;
+    if (canAccessAccounting(u) && accounts.length < 5) {
+      accounts = await ensureDefaultChart(api, cid);
+    }
+    setChartAccounts(accounts);
+
     if (cid) {
       const c = cust.find(x => x.id === cid);
       if (c?.state) setCustomerState(c.state);
@@ -116,6 +150,16 @@ export default function Accounting() {
   );
 
   const draftPayroll = scopedRecords.filter(r => r.status === 'draft');
+
+  const tcHours = useMemo(() => {
+    const driverIds = drivers.map(d => d.id);
+    return hoursByUser(timeClockEntries, { dateFrom: tcFrom, dateTo: tcTo, customerUserIds: driverIds });
+  }, [timeClockEntries, tcFrom, tcTo, drivers]);
+
+  const form1099 = useMemo(
+    () => build1099Summary(scopedRecords.filter(r => r.status === 'paid'), allUsers, taxYear),
+    [scopedRecords, allUsers, taxYear],
+  );
 
   const handleSavePO = async (data) => {
     if (editPO) {
@@ -161,11 +205,69 @@ export default function Accounting() {
   };
 
   const issuePO = async (po) => {
-    await updatePO(po, {
+    const vendor = vendors.find(v => v.id === po.vendor_id);
+    const pdfBase64 = buildPurchaseOrderPdfBase64(po, vendor);
+    let emailResult = { success: false };
+    try {
+      emailResult = await api.accounting.emailPurchaseOrder(po.id, { pdfBase64 });
+    } catch (err) {
+      emailResult = { success: false, error: err.message, hint: err.hint };
+    }
+
+    const updated = await api.entities.PurchaseOrder.update(po.id, {
       status: 'issued',
       issued_at: new Date().toISOString(),
       issued_by_name: user.full_name,
+      emailed_to: emailResult.sentTo || null,
+      email_sent: !!emailResult.success,
     });
+    setPos(prev => prev.map(p => p.id === po.id ? updated : p));
+
+    const journal = suggestJournalForPO(updated);
+    const entry = await api.entities.JournalEntry.create({
+      ...journal,
+      customer_id: user?.customer_id || viewAsCustomerId || null,
+      entry_number: `JE-PO-${updated.po_number}`,
+      entry_date: new Date().toISOString().slice(0, 10),
+      status: 'posted',
+      source_type: 'purchase_order',
+      source_id: updated.id,
+    });
+    setJournalEntries(prev => [entry, ...prev]);
+
+    if (emailResult.success) {
+      setPoEmailMsg(`PO ${updated.po_number} emailed to ${emailResult.sentTo}`);
+    } else {
+      setPoEmailMsg(emailResult.error
+        ? `PO issued — email failed: ${emailResult.error}${emailResult.hint ? ` (${emailResult.hint})` : ''}`
+        : 'PO issued — configure RESEND_API_KEY to email vendors');
+    }
+    setTimeout(() => setPoEmailMsg(''), 8000);
+  };
+
+  const importTimeClockPayroll = async () => {
+    if (!tcHours.length) return;
+    const created = [];
+    for (const row of tcHours) {
+      const driver = drivers.find(d => d.id === row.user_id);
+      if (!driver || row.hours <= 0) continue;
+      const draft = buildPayrollDraftFromTimeClock({
+        driver,
+        hours: row.hours,
+        periodStart: tcFrom,
+        periodEnd: tcTo,
+        hourlyRate: tcHourlyRate,
+      });
+      const tax = calculatePayrollTaxes({ ...draft, pay_type: 'Hourly' }, customerState);
+      draft.deductions = tax.totalEmployeeWithholding || 0;
+      draft.net_pay = tax.netPay ?? draft.gross_pay;
+      const rec = await api.entities.PayrollRecord.create({
+        ...draft,
+        customer_id: user?.customer_id || viewAsCustomerId || null,
+      });
+      created.push(rec);
+    }
+    setPayrollRecords(prev => [...created, ...prev]);
   };
 
   const receivePO = async (po) => {
@@ -220,6 +322,19 @@ export default function Accounting() {
       for (const id of run.record_ids || []) {
         await api.entities.PayrollRecord.update(id, { status: patch.status === 'paid' ? 'paid' : 'approved' });
       }
+      if (patch.status === 'posted') {
+        const journal = suggestJournalForPayrollRun(updated);
+        const entry = await api.entities.JournalEntry.create({
+          ...journal,
+          customer_id: user?.customer_id || viewAsCustomerId || null,
+          entry_number: `JE-${updated.run_number}`,
+          entry_date: new Date().toISOString().slice(0, 10),
+          status: 'posted',
+          source_type: 'payroll_run',
+          source_id: updated.id,
+        });
+        setJournalEntries(prev => [entry, ...prev]);
+      }
       load();
     }
   };
@@ -268,6 +383,12 @@ export default function Accounting() {
           ))}
         </div>
       </div>
+
+      {poEmailMsg && (
+        <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
+          <Mail className="w-4 h-4 flex-shrink-0" /> {poEmailMsg}
+        </div>
+      )}
 
       {tab === 'overview' && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -346,7 +467,12 @@ export default function Accounting() {
                     )}
                     {po.status === 'approved' && canIssuePurchaseOrder(user) && (
                       <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => issuePO(po)}>
-                        <FileText className="w-3.5 h-3.5 mr-1" /> Issue PO
+                        <Mail className="w-3.5 h-3.5 mr-1" /> Issue PO &amp; email vendor
+                      </Button>
+                    )}
+                    {(po.status === 'issued' || po.status === 'received') && (
+                      <Button size="sm" variant="outline" onClick={() => downloadPurchaseOrderPdf(po, vendors.find(v => v.id === po.vendor_id))}>
+                        <Download className="w-3.5 h-3.5 mr-1" /> PDF
                       </Button>
                     )}
                     {po.status === 'issued' && canReceivePurchaseOrder(user) && (
@@ -386,6 +512,43 @@ export default function Accounting() {
 
       {tab === 'payroll-runs' && (
         <div className="space-y-6">
+          {canRunPayroll(user) && (
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <h3 className="font-black text-slate-900 mb-3 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-500" /> Import hours from Time Clock
+              </h3>
+              <div className="flex flex-wrap gap-3 items-end mb-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">From</label>
+                  <input type="date" value={tcFrom} onChange={e => setTcFrom(e.target.value)} className="border rounded-lg px-2 py-1.5 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">To</label>
+                  <input type="date" value={tcTo} onChange={e => setTcTo(e.target.value)} className="border rounded-lg px-2 py-1.5 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">Hourly rate ($)</label>
+                  <input type="number" min="0" step="0.01" value={tcHourlyRate} onChange={e => setTcHourlyRate(e.target.value)} className="border rounded-lg px-2 py-1.5 text-sm w-24" />
+                </div>
+                <Button className="bg-slate-900 text-white font-bold" onClick={importTimeClockPayroll} disabled={!tcHours.length}>
+                  Create {tcHours.length} draft payroll entries
+                </Button>
+              </div>
+              {tcHours.length > 0 ? (
+                <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                  {tcHours.map(row => (
+                    <div key={row.user_id} className="flex justify-between text-slate-600">
+                      <span>{row.user_name}</span>
+                      <span className="font-bold">{row.hours} hrs · ${(row.hours * tcHourlyRate).toFixed(2)} gross</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">No shift entries in this date range — drivers clock in via <Link to="/portal/timeclock" className="underline">Time Clock</Link>.</p>
+              )}
+            </div>
+          )}
+
           {canRunPayroll(user) && draftPayroll.length > 0 && (
             <div className="bg-white border border-slate-200 rounded-xl p-4">
               <h3 className="font-black text-slate-900 mb-3">Create payroll run from draft entries</h3>
@@ -441,6 +604,48 @@ export default function Accounting() {
         </div>
       )}
 
+      {tab === 'general-ledger' && (
+        <div className="grid lg:grid-cols-2 gap-6">
+          <div className="bg-white border border-slate-200 rounded-xl p-5">
+            <h3 className="font-black text-slate-900 mb-3">Chart of accounts</h3>
+            <div className="max-h-80 overflow-y-auto text-sm">
+              <table className="w-full">
+                <thead><tr className="text-xs text-slate-400 uppercase border-b">
+                  <th className="text-left pb-2">Code</th><th className="text-left pb-2">Account</th><th className="text-left pb-2">Type</th>
+                </tr></thead>
+                <tbody>
+                  {chartAccounts.map(a => (
+                    <tr key={a.id || a.code} className="border-b border-slate-50">
+                      <td className="py-1.5 font-mono text-xs">{a.code}</td>
+                      <td className="py-1.5">{a.name}</td>
+                      <td className="py-1.5 text-slate-500">{a.type}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-xl p-5">
+            <h3 className="font-black text-slate-900 mb-3">Journal entries</h3>
+            {journalEntries.length === 0 && <p className="text-sm text-slate-400">Entries auto-post when POs are issued or payroll runs are posted.</p>}
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {journalEntries.map(je => (
+                <div key={je.id} className="border border-slate-100 rounded-lg p-3 text-xs">
+                  <div className="font-bold text-slate-900">{je.entry_number || je.description}</div>
+                  <div className="text-slate-500">{je.entry_date} · {je.status}</div>
+                  {(je.line_items || []).map((l, i) => (
+                    <div key={i} className="flex justify-between text-slate-600 mt-1">
+                      <span>{l.account_code} {l.account_name}</span>
+                      <span>{l.debit ? `Dr $${l.debit}` : `Cr $${l.credit}`}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === 'taxes' && (
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
@@ -481,6 +686,40 @@ export default function Accounting() {
               );
             })}
             {!draftPayroll.length && <p className="text-sm text-slate-400">No draft payroll to preview.</p>}
+          </div>
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <h3 className="font-black text-slate-900">1099-NEC contractor summary (≥ $600)</h3>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-slate-500">Tax year</label>
+                <input type="number" value={taxYear} onChange={e => setTaxYear(Number(e.target.value))} className="border rounded px-2 py-1 text-sm w-24" />
+                <Button size="sm" variant="outline" disabled={!form1099.length} onClick={() => download1099Csv(form1099, { taxYear, name: 'FleetCo Management LLC' })}>
+                  <Download className="w-3.5 h-3.5 mr-1" /> Export CSV
+                </Button>
+              </div>
+            </div>
+            {form1099.length === 0 ? (
+              <p className="text-sm text-slate-400">No paid 1099 contractors at $600+ for {taxYear}. Mark payroll as paid with pay type 1099.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="text-xs text-slate-400 uppercase border-b">
+                    <th className="text-left pb-2">Contractor</th><th className="text-left pb-2">Email</th><th className="text-right pb-2">Box 1 payments</th><th className="text-right pb-2"># Payments</th>
+                  </tr></thead>
+                  <tbody>
+                    {form1099.map(c => (
+                      <tr key={c.contractor_id || c.legal_name} className="border-b border-slate-50">
+                        <td className="py-2 font-medium">{c.legal_name}</td>
+                        <td className="py-2 text-slate-500">{c.email || '—'}</td>
+                        <td className="py-2 text-right font-bold">${c.payments.toFixed(2)}</td>
+                        <td className="py-2 text-right">{c.payment_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="text-[10px] text-slate-400 mt-3">Export and file via your CPA or IRS FIRE system — not a substitute for official 1099 forms.</p>
           </div>
         </div>
       )}

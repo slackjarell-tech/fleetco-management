@@ -161,6 +161,8 @@ export function stampEntityForCreate(type, data, ctx) {
     'Invoice',
     'PurchaseOrder',
     'PayrollRun',
+    'ChartOfAccount',
+    'JournalEntry',
     'Yard',
     'Message',
     'Subscription',

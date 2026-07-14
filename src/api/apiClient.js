@@ -132,7 +132,7 @@ const ENTITY_NAMES = [
   'Customer', 'DriverLocation', 'DiagnosticCode', 'FuelLog', 'DeliveryRoute',
   'DeliveryStop', 'HOSLog', 'FuelStation', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
-  'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
+  'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
   'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
 ];
 
@@ -348,6 +348,15 @@ export const api = { auth, entities, functions, integrations, agents, reports: {
   async summary() {
     return apiFetch('/customer-analytics/summary');
   },
-} };
+},
+accounting: {
+  async emailPurchaseOrder(poId, { pdfBase64, recipientEmail } = {}) {
+    return apiFetch(`/accounting/purchase-orders/${poId}/email`, {
+      method: 'POST',
+      body: JSON.stringify({ pdfBase64, recipientEmail }),
+    });
+  },
+},
+};
 
 export { getToken, setToken };
