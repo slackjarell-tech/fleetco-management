@@ -1,6 +1,6 @@
 import { sendEmail } from './email.js';
 import { getEntity } from './db.js';
-import { isInternalRole } from './roles.js';
+import { isInternalRole } from './entityScope.js';
 
 function canEmailPO(user) {
   if (!user) return false;
