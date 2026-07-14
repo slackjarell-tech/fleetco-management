@@ -7,8 +7,15 @@ import {
   ClipboardList, Globe, TrendingUp, AlertTriangle, Calendar,
   ShieldCheck, MapPin, Clock, CreditCard, BoxSelect
 } from 'lucide-react';
-import ReportConfigModal from '@/components/reports/ReportConfigModal';
-import { isPlatformAdmin } from '@/lib/roles';
+import ReportConfigModal, { getColumnsForReport, getDefaultColumnKeys } from '@/components/reports/ReportConfigModal';
+import CustomerReportPicker from '@/components/reports/CustomerReportPicker';
+import { isInternalRole, isCustomerPortalUser } from '@/lib/roles';
+import { filterReportData, customerFilterLabel } from '@/lib/reportCustomerFilter';
+import { useCustomerContext } from '@/lib/CustomerContext';
+import {
+  filterRowsByColumns,
+  downloadReportRows,
+} from '@/lib/reportExport';
 
 // ─── Report Definitions ───────────────────────────────────────────────────────
 const REPORT_CATALOG = [
@@ -203,6 +210,16 @@ const REPORT_CATALOG = [
     border: 'border-yellow-200',
   },
   {
+    id: 'fleetco_master_export',
+    category: 'CRM',
+    title: 'FleetCo Master Data Export',
+    description: 'All data types in one workbook — loads, fleet, fuel, work orders, invoices, inspections, HOS, payroll',
+    icon: FileSpreadsheet,
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+    border: 'border-amber-300',
+  },
+  {
     id: 'fleet_pnl',
     category: 'Financial',
     title: 'Fleet P&L Summary',
@@ -234,16 +251,22 @@ function extractState(str) {
 }
 
 // ─── Excel Export Builder ─────────────────────────────────────────────────────
-function downloadExcel(sheetData, filename, sheetName = 'Report') {
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
-  // Auto column widths
-  const colWidths = sheetData[0]?.map((_, ci) =>
-    Math.min(60, Math.max(12, ...sheetData.map(row => String(row[ci] ?? '').length)))
-  ) ?? [];
-  ws['!cols'] = colWidths.map(w => ({ wch: w }));
+function downloadMasterWorkbook(data, userMap, dateFrom, dateTo, customerLabel) {
+  const sheetIds = [
+    'load_summary', 'fleet_status', 'fuel_cost', 'work_orders', 'invoice_aging',
+    'inspections', 'hos_logs', 'payroll_summary', 'customer_list',
+  ];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  XLSX.writeFile(wb, filename);
+  for (const id of sheetIds) {
+    const result = buildReport(id, data, userMap, dateFrom, dateTo);
+    if (result?.rows?.length) {
+      const ws = XLSX.utils.aoa_to_sheet(result.rows);
+      const safeName = (result.sheet || id).slice(0, 31);
+      XLSX.utils.book_append_sheet(wb, ws, safeName);
+    }
+  }
+  const label = customerLabel.replace(/[^\w-]+/g, '_').slice(0, 40);
+  XLSX.writeFile(wb, `FleetCo_Master_Export_${label}.xlsx`);
 }
 
 // ─── Report Generators ────────────────────────────────────────────────────────
@@ -583,18 +606,23 @@ function buildReport(reportId, data, userMap, dateFrom, dateTo) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function Reports() {
+  const { viewAsCustomerId } = useCustomerContext();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
     loads: [], invoices: [], fuel: [], vehicles: [], workOrders: [],
     maintenance: [], inspections: [], hosLogs: [], customers: [],
     vendors: [], payroll: [], parts: [], screenings: [], users: [],
+    incidents: [],
   });
   const [generating, setGenerating] = useState(null);
   const [done, setDone] = useState(null);
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
-  const [configReport, setConfigReport] = useState(null); // report being configured
+  const [configReport, setConfigReport] = useState(null);
+  const [allCustomersSelected, setAllCustomersSelected] = useState(true);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState([]);
+  const [showCustomerPicker, setShowCustomerPicker] = useState(false);
 
   // Date range
   const now = new Date();
@@ -614,65 +642,98 @@ export default function Reports() {
   useEffect(() => {
     api.auth.me().then(async u => {
       setUser(u);
+      const internal = isInternalRole(u?.role);
+      const listEntity = (name, sort, limit) => (
+        internal
+          ? api.reports.listEntity(name, sort, limit)
+          : api.entities[name].list(sort, limit)
+      );
+
       const [loads, invoices, fuel, vehicles, workOrders, maintenance,
-        inspections, hosLogs, customers, vendors, payroll, parts, screenings, users] =
+        inspections, hosLogs, customers, vendors, payroll, parts, screenings, users, incidents] =
         await Promise.all([
-          api.entities.Load.list('-pickup_date', 2000),
-          api.entities.Invoice.list('-issue_date', 2000),
-          api.entities.FuelLog.list('-date', 2000),
-          api.entities.Vehicle.list(),
-          api.entities.WorkOrder.list('-opened_date', 2000),
-          api.entities.MaintenanceSchedule.list(),
-          api.entities.Inspection.list('-inspection_date', 2000),
-          api.entities.HOSLog.list('-log_date', 2000),
-          api.entities.Customer.list(),
-          api.entities.Vendor.list(),
-          api.entities.PayrollRecord.list('-pay_period_end', 2000),
-          api.entities.PartInventory.list(),
-          api.entities.ScreeningRecord.list(),
-          api.entities.User.list(),
+          listEntity('Load', '-pickup_date', 2000),
+          listEntity('Invoice', '-issue_date', 2000),
+          listEntity('FuelLog', '-date', 2000),
+          listEntity('Vehicle'),
+          listEntity('WorkOrder', '-opened_date', 2000),
+          listEntity('MaintenanceSchedule'),
+          listEntity('Inspection', '-inspection_date', 2000),
+          listEntity('HOSLog', '-log_date', 2000),
+          listEntity('Customer'),
+          listEntity('Vendor'),
+          listEntity('PayrollRecord', '-pay_period_end', 2000),
+          listEntity('PartInventory'),
+          listEntity('ScreeningRecord'),
+          listEntity('User'),
+          listEntity('Incident', '-incident_date', 2000),
         ]);
       setData({ loads, invoices, fuel, vehicles, workOrders, maintenance,
-        inspections, hosLogs, customers, vendors, payroll, parts, screenings, users });
+        inspections, hosLogs, customers, vendors, payroll, parts, screenings, users, incidents });
+      if (internal && viewAsCustomerId) {
+        setAllCustomersSelected(false);
+        setSelectedCustomerIds([viewAsCustomerId]);
+      } else if (!internal && u?.customer_id) {
+        setAllCustomersSelected(false);
+        setSelectedCustomerIds([u.customer_id]);
+      }
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, []);
+  }, [viewAsCustomerId]);
+
+  const effectiveCustomerIds = useMemo(() => {
+    if (allCustomersSelected) return null;
+    return selectedCustomerIds;
+  }, [allCustomersSelected, selectedCustomerIds]);
+
+  const filteredData = useMemo(
+    () => filterReportData(data, effectiveCustomerIds),
+    [data, effectiveCustomerIds],
+  );
+
+  const customerFilterText = useMemo(
+    () => customerFilterLabel(effectiveCustomerIds, data.customers),
+    [effectiveCustomerIds, data.customers],
+  );
 
   const userMap = useMemo(() =>
     Object.fromEntries(data.users.map(u => [u.id, u])),
     [data.users]
   );
 
-  const handleGenerate = async (reportId, selectedKeys, fromDate, toDate) => {
+  const handleGenerate = async (reportId, selectedKeys, fromDate, toDate, format = 'xlsx') => {
     const effectiveFrom = fromDate || dateFrom;
     const effectiveTo = toDate || dateTo;
+    if (!allCustomersSelected && selectedCustomerIds.length === 0) return;
+
     setGenerating(reportId);
     setDone(null);
     await new Promise(r => setTimeout(r, 400));
-    const result = buildReport(reportId, data, userMap, effectiveFrom, effectiveTo);
+
+    if (reportId === 'fleetco_master_export') {
+      downloadMasterWorkbook(filteredData, userMap, effectiveFrom, effectiveTo, customerFilterText);
+      setDone(reportId);
+      setTimeout(() => { setDone(null); setConfigReport(null); }, 2500);
+      setGenerating(null);
+      return;
+    }
+
+    const result = buildReport(reportId, filteredData, userMap, effectiveFrom, effectiveTo);
     if (result) {
-      // Filter columns based on user selection
       let rows = result.rows;
-      if (selectedKeys && selectedKeys.length > 0 && rows.length > 0) {
-        const header = rows[0];
-        // Build index map: column label index -> included?
-        // We match by order from REPORT_COLUMNS which matches header order
-        const { getColumnsForReport } = await import('@/components/reports/ReportConfigModal');
-        const colDefs = getColumnsForReport(reportId);
-        if (colDefs.length > 0) {
-          const indices = colDefs.map((c, i) => ({ key: c.key, i }))
-            .filter(({ key }) => selectedKeys.includes(key))
-            .map(({ i }) => i);
-          rows = rows.map(row => indices.map(i => row[i]));
-        }
+      if (selectedKeys?.length) {
+        rows = filterRowsByColumns(reportId, rows, selectedKeys, getColumnsForReport);
       }
-      const rangeLabel = effectiveFrom === '2000-01-01' ? 'AllTime' : `${effectiveFrom}_to_${effectiveTo}`;
-      const filename = result.filename.replace('.xlsx', `_${rangeLabel}.xlsx`);
-      downloadExcel(rows, filename, result.sheet);
+      downloadReportRows(rows, result.filename, result.sheet, format, effectiveFrom, effectiveTo);
       setDone(reportId);
       setTimeout(() => { setDone(null); setConfigReport(null); }, 2500);
     }
     setGenerating(null);
+  };
+
+  const handleQuickDownload = async (report, format) => {
+    const defaultKeys = getDefaultColumnKeys(report.id);
+    await handleGenerate(report.id, defaultKeys, dateFrom, dateTo, format);
   };
 
   const filteredReports = useMemo(() =>
@@ -701,9 +762,11 @@ export default function Reports() {
     </div>
   );
 
-  if (!isPlatformAdmin(user?.role)) {
-    return <div className="p-6 text-center text-slate-500">Reports are available to administrators only.</div>;
+  if (!isInternalRole(user?.role) && !isCustomerPortalUser(user)) {
+    return <div className="p-6 text-center text-slate-500">Reports are available to FleetCo employees and customer portal users.</div>;
   }
+
+  const canPickCustomers = isInternalRole(user?.role);
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
@@ -716,12 +779,12 @@ export default function Reports() {
               <FileSpreadsheet className="w-5 h-5 text-amber-400" /> Reports Center
             </h1>
             <p className="text-slate-300 text-xs mt-0.5">
-              {REPORT_CATALOG.length} reports available — select any to generate & download as Excel (.xlsx)
+              {REPORT_CATALOG.length} reports — download Excel or CSV · read-only (no data or logins modified)
             </p>
           </div>
           <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300">
             <Download className="w-3.5 h-3.5 text-amber-400" />
-            Excel (.xlsx) format
+            Excel (.xlsx) · CSV (.csv)
           </div>
         </div>
 
@@ -760,9 +823,48 @@ export default function Reports() {
           </div>
         </div>
         <div className="mt-2 text-xs text-slate-400">
-          Showing data from <span className="text-amber-300 font-bold">{dateFrom === '2000-01-01' ? 'All Time' : `${dateFrom} → ${dateTo}`}</span>
+          Date range: <span className="text-amber-300 font-bold">{dateFrom === '2000-01-01' ? 'All Time' : `${dateFrom} → ${dateTo}`}</span>
+          {' · '}
+          Customers: <span className="text-amber-300 font-bold">{customerFilterText}</span>
         </div>
       </div>
+
+      {canPickCustomers && (
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setShowCustomerPicker((v) => !v)}
+            className="w-full flex items-center justify-between text-left"
+          >
+            <div>
+              <h2 className="font-black text-slate-900 text-sm">Customer scope</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Pull data from all customers or select specific accounts — applies to every report below
+              </p>
+            </div>
+            <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+              {customerFilterText}
+            </span>
+          </button>
+          {showCustomerPicker && (
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <CustomerReportPicker
+                customers={data.customers}
+                selectedIds={selectedCustomerIds}
+                allSelected={allCustomersSelected}
+                onChange={(ids) => {
+                  setAllCustomersSelected(false);
+                  setSelectedCustomerIds(ids);
+                }}
+                onToggleAll={() => {
+                  setAllCustomersSelected((v) => !v);
+                  if (!allCustomersSelected) setSelectedCustomerIds([]);
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Category Filter */}
       <div className="flex flex-wrap gap-2">
@@ -794,13 +896,17 @@ export default function Reports() {
             {reports.map(report => {
               const isGenerating = generating === report.id;
               const isDone = done === report.id;
+              const isMaster = report.id === 'fleetco_master_export';
               return (
-                <button
+                <div
                   key={report.id}
-                  onClick={() => setConfigReport(report)}
-                  className={`bg-white rounded-xl border ${report.border} p-4 flex flex-col gap-3 hover:shadow-md transition-all text-left cursor-pointer hover:scale-[1.01]`}
+                  className={`bg-white rounded-xl border ${report.border} p-4 flex flex-col gap-3 hover:shadow-md transition-all`}
                 >
-                  <div className="flex items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setConfigReport(report)}
+                    className="flex items-start gap-3 text-left cursor-pointer hover:opacity-90"
+                  >
                     <div className={`${report.bg} p-2 rounded-lg flex-shrink-0`}>
                       <report.icon className={`w-4 h-4 ${report.color}`} />
                     </div>
@@ -808,23 +914,71 @@ export default function Reports() {
                       <div className="font-black text-slate-900 text-sm leading-tight">{report.title}</div>
                       <div className="text-xs text-slate-500 mt-0.5 leading-snug">{report.description}</div>
                     </div>
-                  </div>
-                  <div className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold ${
-                    isDone
-                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                      : isGenerating
-                      ? 'bg-slate-100 text-slate-400'
-                      : `${report.bg} ${report.color} border ${report.border}`
-                  }`}>
-                    {isGenerating ? (
-                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</>
-                    ) : isDone ? (
-                      <><CheckCircle2 className="w-3.5 h-3.5" /> Downloaded!</>
+                  </button>
+                  <div className="flex gap-2">
+                    {isMaster ? (
+                      <button
+                        type="button"
+                        onClick={() => handleQuickDownload(report, 'xlsx')}
+                        disabled={isGenerating}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold border transition-all ${
+                          isDone
+                            ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                            : isGenerating
+                            ? 'bg-slate-100 text-slate-400 border-slate-200'
+                            : `${report.bg} ${report.color} ${report.border} hover:opacity-80`
+                        }`}
+                      >
+                        {isGenerating ? (
+                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Downloading...</>
+                        ) : isDone ? (
+                          <><CheckCircle2 className="w-3.5 h-3.5" /> Downloaded!</>
+                        ) : (
+                          <><Download className="w-3.5 h-3.5" /> Download Workbook</>
+                        )}
+                      </button>
                     ) : (
-                      <><Download className="w-3.5 h-3.5" /> Select &amp; Export</>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickDownload(report, 'xlsx')}
+                          disabled={isGenerating}
+                          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-bold border transition-all ${
+                            isGenerating
+                              ? 'bg-slate-100 text-slate-400 border-slate-200'
+                              : `${report.bg} ${report.color} ${report.border} hover:opacity-80`
+                          }`}
+                        >
+                          {isGenerating ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <><Download className="w-3.5 h-3.5" /> Excel</>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickDownload(report, 'csv')}
+                          disabled={isGenerating}
+                          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-bold border border-slate-200 transition-all ${
+                            isGenerating
+                              ? 'bg-slate-100 text-slate-400'
+                              : 'bg-white text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Download className="w-3.5 h-3.5" /> CSV
+                        </button>
+                      </>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => setConfigReport(report)}
+                      className="px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100 transition-all"
+                      title="Choose columns, date range, and format"
+                    >
+                      Customize
+                    </button>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>

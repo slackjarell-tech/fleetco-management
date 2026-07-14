@@ -248,10 +248,25 @@ const REPORT_COLUMNS = {
     { key: 'total_cost', label: 'Total Cost', default: true },
     { key: 'net_pnl', label: 'Net P&L', default: true },
   ],
+  fleetco_master_export: [
+    { key: 'loads', label: 'Loads sheet', default: true },
+    { key: 'fleet', label: 'Fleet sheet', default: true },
+    { key: 'fuel', label: 'Fuel sheet', default: true },
+    { key: 'work_orders', label: 'Work orders sheet', default: true },
+    { key: 'invoices', label: 'Invoices sheet', default: true },
+    { key: 'inspections', label: 'Inspections sheet', default: true },
+    { key: 'hos', label: 'HOS sheet', default: true },
+    { key: 'payroll', label: 'Payroll sheet', default: true },
+    { key: 'customers', label: 'Customers sheet', default: true },
+  ],
 };
 
 export function getColumnsForReport(reportId) {
   return REPORT_COLUMNS[reportId] || [];
+}
+
+export function getDefaultColumnKeys(reportId) {
+  return getColumnsForReport(reportId).filter(c => c.default).map(c => c.key);
 }
 
 const PRESETS = [
@@ -279,9 +294,11 @@ const PRESETS = [
 
 export default function ReportConfigModal({ report, onClose, onGenerate, generating, done }) {
   const allCols = REPORT_COLUMNS[report.id] || [];
+  const isMasterExport = report.id === 'fleetco_master_export';
   const [selected, setSelected] = useState(
     Object.fromEntries(allCols.map(c => [c.key, c.default]))
   );
+  const [exportFormat, setExportFormat] = useState('xlsx');
 
   const now = new Date();
   const defaultFrom = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
@@ -386,6 +403,32 @@ export default function ReportConfigModal({ report, onClose, onGenerate, generat
           </div>
         </div>
 
+        {/* Export format */}
+        {!isMasterExport && (
+          <div className="px-5 py-3 border-t border-slate-100">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Download format</div>
+            <div className="flex gap-2">
+              {[
+                { id: 'xlsx', label: 'Excel (.xlsx)' },
+                { id: 'csv', label: 'CSV (.csv)' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setExportFormat(opt.id)}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
+                    exportFormat === opt.id
+                      ? `${report.bg} ${report.color} border-current`
+                      : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="px-5 py-4 border-t border-slate-100 flex gap-3">
           <button
@@ -395,7 +438,7 @@ export default function ReportConfigModal({ report, onClose, onGenerate, generat
             Cancel
           </button>
           <button
-            onClick={() => onGenerate(report.id, selectedKeys, dateFrom, dateTo)}
+            onClick={() => onGenerate(report.id, selectedKeys, dateFrom, dateTo, exportFormat)}
             disabled={!canExport || generating}
             className={`flex-2 flex-grow-[2] flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-black transition-all ${
               done
@@ -406,11 +449,11 @@ export default function ReportConfigModal({ report, onClose, onGenerate, generat
             }`}
           >
             {generating ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
+              <><Loader2 className="w-4 h-4 animate-spin" /> Preparing download...</>
             ) : done ? (
               <><CheckCircle2 className="w-4 h-4" /> Downloaded!</>
             ) : (
-              <><Download className="w-4 h-4" /> Export {selectedKeys.length} Columns</>
+              <><Download className="w-4 h-4" /> Download {isMasterExport ? 'Workbook' : exportFormat === 'csv' ? 'CSV' : 'Excel'}</>
             )}
           </button>
         </div>

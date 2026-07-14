@@ -289,7 +289,15 @@ const agents = {
   },
 };
 
-export const api = { auth, entities, functions, integrations, agents, admin: {
+export const api = { auth, entities, functions, integrations, agents, reports: {
+  listEntity(entityName, sort, limit) {
+    const params = new URLSearchParams();
+    if (sort) params.set('sort', sort);
+    if (limit) params.set('limit', String(limit));
+    const qs = params.toString();
+    return apiFetch(`/entities/${entityName}${qs ? `?${qs}` : ''}`, { skipCustomerContext: true });
+  },
+}, admin: {
   async getDatastoreStats() {
     return apiFetch('/admin/datastore');
   },
