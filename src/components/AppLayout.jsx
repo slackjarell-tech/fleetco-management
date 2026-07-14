@@ -15,6 +15,9 @@ import PaymentDueBanner from '@/components/billing/PaymentDueBanner';
 import CustomerPausedOverlay from '@/components/billing/CustomerPausedOverlay';
 import BulkCsvImport from '@/components/shared/BulkCsvImport';
 import { getBulkImportConfig } from '@/lib/bulkImportConfigs';
+import { CustomerProvider, useCustomerContext } from '@/lib/CustomerContext';
+import { defaultSidebarModulesForRole } from '@/lib/customerRoles';
+import { sectionForPath, isCustomerFacingPath } from '@/lib/portalSections';
 
 const isInternalRole = (role) => {
   return ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(role);
@@ -31,6 +34,7 @@ const NAV_GROUPS = [
     items: [
       { label: 'Admin Dashboard', icon: LayoutDashboard, path: '/portal' },
       { label: 'Executive View', icon: Crown, path: '/portal/executive' },
+      { label: 'Customer Insights', icon: BarChart2, path: '/portal/customer-insights', internalOnly: true },
     ]
   },
   {
@@ -132,9 +136,6 @@ export default function AppLayout() {
   const location = useLocation();
   const bulkConfig = getBulkImportConfig(location.pathname);
 
-  // Track which groups are expanded
-  const [expandedGroups, setExpandedGroups] = useState(() => ({}));
-
   useEffect(() => {
     api.auth.me().catch(() => null).then(u => {
       setUser(u);
@@ -144,6 +145,45 @@ export default function AppLayout() {
       }
     });
   }, []);
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <CustomerProvider user={user}>
+      <AppLayoutShell
+        user={user}
+        open={open}
+        setOpen={setOpen}
+        showBulkImport={showBulkImport}
+        setShowBulkImport={setShowBulkImport}
+        location={location}
+        bulkConfig={bulkConfig}
+      />
+    </CustomerProvider>
+  );
+}
+
+function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport, location, bulkConfig }) {
+  const {
+    customers,
+    loadingCustomers,
+    viewAsCustomerId,
+    viewAsCustomer,
+    selectCustomer,
+    clearCustomerView,
+    isViewingAsCustomer,
+    isInternal,
+  } = useCustomerContext();
+
+  // Track which groups are expanded
+  const [expandedGroups, setExpandedGroups] = useState(() => ({}));
+  const [viewCustomerModules, setViewCustomerModules] = useState(null);
 
   // Auto-expand groups that contain the active route
   useEffect(() => {
@@ -160,17 +200,53 @@ export default function AppLayout() {
     if (changed) setExpandedGroups(newExpanded);
   }, [location.pathname, user]);
 
+  useEffect(() => {
+    if (!isViewingAsCustomer || !viewAsCustomerId) {
+      setViewCustomerModules(null);
+      return;
+    }
+    api.entities.User.list()
+      .then((users) => {
+        const modules = new Set();
+        users.forEach((u) => {
+          const mods = u.sidebar_modules?.length
+            ? u.sidebar_modules
+            : defaultSidebarModulesForRole(u.role);
+          mods.forEach((m) => modules.add(m));
+        });
+        setViewCustomerModules(
+          modules.size ? [...modules] : defaultSidebarModulesForRole('customer_owner'),
+        );
+      })
+      .catch(() => {
+        setViewCustomerModules(defaultSidebarModulesForRole('customer_owner'));
+      });
+  }, [isViewingAsCustomer, viewAsCustomerId]);
+
+  useEffect(() => {
+    if (!user || !location.pathname.startsWith('/portal')) return;
+    const customerId = user.customer_id || (isViewingAsCustomer ? viewAsCustomerId : null);
+    if (!customerId) return;
+    api.customerAnalytics.track({
+      path: location.pathname,
+      section: sectionForPath(location.pathname),
+      customer_id: customerId,
+    }).catch(() => {});
+  }, [location.pathname, user?.id, viewAsCustomerId, isViewingAsCustomer]);
+
   const toggleGroup = (label) => {
     setExpandedGroups(p => ({ ...p, [label]: !p[label] }));
   };
 
-  if (!authChecked) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const handleCustomerSwitch = (e) => {
+    const value = e.target.value;
+    if (!value) {
+      clearCustomerView();
+    } else {
+      selectCustomer(value);
+    }
+    window.dispatchEvent(new CustomEvent('fleetco:customer-context-changed'));
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -194,23 +270,53 @@ export default function AppLayout() {
 
         {/* User */}
         {user && (
-          <div className="px-4 py-3 border-b border-slate-800">
+          <div className="px-4 py-3 border-b border-slate-800 space-y-2">
             <div className="text-white text-sm font-medium truncate">{user.full_name}</div>
             <div className="text-slate-400 text-xs capitalize">{user.role || 'user'}</div>
+            {isInternal && (
+              <div className="pt-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  Customer view
+                </label>
+                <select
+                  value={viewAsCustomerId || ''}
+                  onChange={handleCustomerSwitch}
+                  disabled={loadingCustomers}
+                  className="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                >
+                  <option value="">All customers (FleetCo)</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.company_name || c.contact_name || c.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         )}
 
         {/* Nav Groups */}
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
           {NAV_GROUPS.map(group => {
-            // Filter groups based on user's sidebar_modules preference
             const modules = user?.sidebar_modules;
-            if (modules && modules.length > 0 && !modules.includes(group.label)) return null;
+            const activeModuleFilter = isViewingAsCustomer
+              ? viewCustomerModules
+              : (modules && modules.length > 0 ? modules : null);
 
-            // Filter items based on user role
+            if (activeModuleFilter && !activeModuleFilter.includes(group.label)) return null;
+
             const visibleItems = group.items.filter(item => {
+              if (item.internalOnly && !isInternal) return false;
               if (item.sltOnly && !['owner', 'executive', 'fleet_manager'].includes(user?.role)) return false;
               if (item.ownerOnly && user?.role !== 'owner') return false;
+
+              if (isViewingAsCustomer) {
+                if (item.internalOnly || !isCustomerFacingPath(item.path)) return false;
+                if (item.path === '/portal/customers') return true;
+                return true;
+              }
+
               if (isFleetCoAdmin(user?.role)) return true;
               if (user?.role === 'fleet_coordinator') {
                 if (item.path === '/portal/executive') return false;
@@ -218,17 +324,16 @@ export default function AppLayout() {
                 if (item.path === '/portal/dev-feedback') return false;
                 return true;
               }
-              // Customer team managers see My Team (same route, different label in UI)
               if (item.path === '/portal/customers' && canManageCustomerTeam(user?.role) && user?.customer_id) {
                 return true;
               }
-              // Customer users cannot see internal-only pages
               if (item.path === '/portal/executive') return false;
               if (item.path === '/portal/advertisement') return false;
               if (item.path === '/portal/customers') return false;
               if (item.path === '/portal/team') return false;
               if (item.path === '/portal/dev-feedback') return false;
               if (item.path === '/portal/revan') return false;
+              if (item.internalOnly) return false;
               return true;
             });
             if (visibleItems.length === 0) return null;
@@ -266,8 +371,10 @@ export default function AppLayout() {
                           }`}
                         >
                           <item.icon className="w-3.5 h-3.5 flex-shrink-0" />
-                          {item.path === '/portal/customers' && canManageCustomerTeam(user?.role) && user?.customer_id
-                            ? 'My Team'
+                          {item.path === '/portal/customers' && (
+                            (canManageCustomerTeam(user?.role) && user?.customer_id) || isViewingAsCustomer
+                          )
+                            ? (isViewingAsCustomer ? 'Customer Team' : 'My Team')
                             : item.label}
                         </Link>
                       );
@@ -317,6 +424,21 @@ export default function AppLayout() {
           </div>
         </header>
         <PaymentDueBanner user={user} />
+        {isViewingAsCustomer && (
+          <div className="bg-amber-500 text-slate-900 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span>
+              <strong>Customer view:</strong> {viewAsCustomer?.company_name || viewAsCustomerId}
+              <span className="hidden sm:inline text-slate-800/80"> — same tabs as this customer · edits save to their account</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => { clearCustomerView(); window.dispatchEvent(new CustomEvent('fleetco:customer-context-changed')); }}
+              className="font-bold underline hover:no-underline text-xs sm:text-sm"
+            >
+              Exit customer view
+            </button>
+          </div>
+        )}
         {bulkConfig && (
           <div className="hidden lg:flex absolute top-4 right-6 z-20">
             <Button
@@ -343,7 +465,7 @@ export default function AppLayout() {
               </Button>
             </div>
           )}
-          <Outlet />
+          <Outlet key={viewAsCustomerId || 'all-customers'} />
         </main>
         {showBulkImport && bulkConfig && (
           <BulkCsvImport

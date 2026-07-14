@@ -54,6 +54,7 @@ import YardManagement from './pages/YardManagement';
 import DriverScorecard from './pages/DriverScorecard';
 import VehicleTCO from './pages/VehicleTCO';
 import DevFeedbackDashboard from './pages/DevFeedbackDashboard';
+import CustomerInsights from './pages/CustomerInsights';
 import CustomerManual from './pages/CustomerManual';
 import SystemManual from './pages/SystemManual';
 import MarketingMaterials from './pages/MarketingMaterials';
@@ -146,6 +147,7 @@ const AuthenticatedApp = () => {
           <Route path="vendors" element={<Vendors />} />
           <Route path="assistant" element={<Assistant />} />
           <Route path="executive" element={<ExecutiveDashboard />} />
+          <Route path="customer-insights" element={<CustomerInsights />} />
           <Route path="messages" element={<Messages />} />
           <Route path="navigation" element={<Navigation />} />
           <Route path="fleetpnl" element={<FleetPnL />} />

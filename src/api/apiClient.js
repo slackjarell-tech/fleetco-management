@@ -1,4 +1,29 @@
 const TOKEN_KEY = 'fleet_pulse_access_token';
+export const CUSTOMER_CONTEXT_KEY = 'fleetco_view_customer_id';
+
+export function getViewAsCustomerId() {
+  try {
+    return sessionStorage.getItem(CUSTOMER_CONTEXT_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function setViewAsCustomerId(customerId) {
+  try {
+    sessionStorage.setItem(CUSTOMER_CONTEXT_KEY, customerId);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearViewAsCustomerId() {
+  try {
+    sessionStorage.removeItem(CUSTOMER_CONTEXT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -15,6 +40,11 @@ async function apiFetch(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
+
+  if (!options.skipCustomerContext) {
+    const customerContext = getViewAsCustomerId();
+    if (customerContext) headers['X-Customer-Context'] = customerContext;
+  }
 
   const res = await fetch(url, { ...options, headers });
   const data = await res.json().catch(() => ({}));
@@ -103,7 +133,7 @@ const ENTITY_NAMES = [
   'DeliveryStop', 'HOSLog', 'FuelStation', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
-  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
+  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
 ];
 
 const entities = {};
@@ -295,6 +325,20 @@ export const api = { auth, entities, functions, integrations, agents, admin: {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  },
+}, customerView: {
+  async options() {
+    return apiFetch('/customer-view/options', { skipCustomerContext: true });
+  },
+}, customerAnalytics: {
+  async track(payload) {
+    return apiFetch('/customer-analytics/track', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  async summary() {
+    return apiFetch('/customer-analytics/summary');
   },
 } };
 

@@ -10,10 +10,12 @@ function resolveVehicleId(unitRef) {
   return match?.id;
 }
 
-function enrichRecord(type, record, user) {
+function enrichRecord(type, record, user, ctx) {
   const data = { ...record };
 
-  if (user?.customer_id && !data.customer_id) {
+  if (ctx?.customerId && !data.customer_id) {
+    data.customer_id = ctx.customerId;
+  } else if (user?.customer_id && !data.customer_id) {
     data.customer_id = user.customer_id;
   }
 
@@ -34,26 +36,27 @@ function enrichRecord(type, record, user) {
   return data;
 }
 
-function createBulkRecord(type, record, user) {
+function createBulkRecord(type, record, user, ctx) {
   if (type === 'User') {
     const { email, password, ...rest } = record;
     if (!email) throw new Error('Email required');
     if (findUserByEmail(email)) throw new Error(`User already exists: ${email}`);
     const hash = bcrypt.hashSync(password || 'changeme123', 10);
-    return createUser({ email, passwordHash: hash, ...rest });
+    const customerId = rest.customer_id || ctx?.customerId || user?.customer_id || null;
+    return createUser({ email, passwordHash: hash, ...rest, customerId });
   }
 
-  const data = enrichRecord(type, record, user);
+  const data = enrichRecord(type, record, user, ctx);
   return createEntity(type, data);
 }
 
-export function bulkCreateEntities(type, rows, user) {
+export function bulkCreateEntities(type, rows, user, ctx = null) {
   const created = [];
   const failed = [];
 
   rows.forEach((record, index) => {
     try {
-      const item = createBulkRecord(type, record, user);
+      const item = createBulkRecord(type, record, user, ctx);
       created.push(item);
     } catch (err) {
       failed.push({ row: index + 1, error: err.message });

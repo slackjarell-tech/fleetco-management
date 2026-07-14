@@ -42,6 +42,18 @@ import {
   canManageDatastore,
 } from './roles.js';
 import { bulkCreateEntities } from './bulkImport.js';
+import { buildCustomerAnalytics, buildAllCustomersAnalytics, trackPortalVisit } from './customerAnalytics.js';
+import {
+  resolveCustomerContext,
+  buildScopeIndex,
+  filterEntitiesForContext,
+  assertEntityAccess,
+  stampEntityForCreate,
+  assertDeleteAllowed,
+  filterUsersForContext,
+  readCustomerContextHeader,
+  isInternalRole,
+} from './entityScope.js';
 import {
   buildFullBackup,
   buildCredentialsManifest,
@@ -324,12 +336,63 @@ app.post('/api/agents/conversations/:id/messages', requireAuth, async (req, res)
 
 // ─── Entities ───────────────────────────────────────────────────────────────
 
+app.get('/api/customer-view/options', requireAuth, (req, res) => {
+  if (!isInternalRole(req.user?.role)) {
+    return res.status(403).json({ error: 'Internal FleetCo access only' });
+  }
+  const customers = listEntities('Customer')
+    .map((c) => ({
+      id: c.id,
+      company_name: c.company_name,
+      contact_name: c.contact_name,
+      subscription_status: c.subscription_status,
+      fleet_size: c.fleet_size,
+    }))
+    .sort((a, b) => (a.company_name || '').localeCompare(b.company_name || ''));
+  res.json(customers);
+});
+
+app.post('/api/customer-analytics/track', requireAuth, (req, res) => {
+  const { path: visitPath, section, customer_id: bodyCustomerId } = req.body || {};
+  const ctx = getEntityContext(req);
+  const customerId = req.user?.customer_id || ctx.customerId || bodyCustomerId;
+  if (!customerId || !visitPath) {
+    return res.status(400).json({ error: 'customer_id and path required' });
+  }
+  if (req.user?.customer_id && req.user.customer_id !== customerId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  if (ctx.mode === 'impersonate' && ctx.customerId !== customerId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  const event = trackPortalVisit({
+    user: req.user,
+    customerId,
+    path: visitPath,
+    section,
+  });
+  res.status(201).json({ success: true, id: event?.id });
+});
+
+app.get('/api/customer-analytics/summary', requireAuth, (req, res) => {
+  if (!isInternalRole(req.user?.role)) {
+    return res.status(403).json({ error: 'FleetCo internal access only' });
+  }
+  const ctx = getEntityContext(req);
+  if (ctx.customerId) {
+    const summary = buildCustomerAnalytics(ctx.customerId);
+    if (!summary) return res.status(404).json({ error: 'Customer not found' });
+    return res.json({ mode: 'single', customer: summary });
+  }
+  res.json({ mode: 'all', customers: buildAllCustomersAnalytics() });
+});
+
 const ENTITY_NAMES = [
   'Customer', 'DriverLocation', 'DiagnosticCode', 'FuelLog', 'DeliveryRoute',
   'DeliveryStop', 'HOSLog', 'FuelStation', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
-  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
+  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
 ];
 
 function filterUsersForActor(actor, users) {
@@ -341,14 +404,25 @@ function filterUsersForActor(actor, users) {
   return [];
 }
 
+function getEntityContext(req) {
+  const requested = readCustomerContextHeader(req);
+  const ctx = resolveCustomerContext(req.user, requested);
+  if (ctx.customerId) {
+    ctx.scopeIndex = buildScopeIndex(ctx.customerId);
+  }
+  return ctx;
+}
+
 function handleUserEntity(req, res, action) {
   if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
 
+  const ctx = getEntityContext(req);
   const { sort, limit: limitStr } = req.query;
   const limit = limitStr ? parseInt(limitStr, 10) : undefined;
 
   if (action === 'list') {
     let users = filterUsersForActor(req.user, listUsers());
+    users = filterUsersForContext(users, ctx);
     if (sort) {
       const desc = sort.startsWith('-');
       const field = desc ? sort.slice(1) : sort;
@@ -363,13 +437,15 @@ function handleUserEntity(req, res, action) {
   }
 
   if (action === 'filter') {
-    return res.json(filterUsersForActor(req.user, filterUsers(req.body.criteria || {})));
+    return res.json(filterUsersForContext(filterUsersForActor(req.user, filterUsers(req.body.criteria || {})), ctx));
   }
 
   if (action === 'get') {
     const user = findUserById(req.params.id);
     if (!user) return res.status(404).json({ error: 'Not found' });
-    if (!filterUsersForActor(req.user, [user]).length) {
+    let allowed = filterUsersForActor(req.user, [user]);
+    allowed = filterUsersForContext(allowed, ctx);
+    if (!allowed.length) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     return res.json(user);
@@ -380,7 +456,7 @@ function handleUserEntity(req, res, action) {
     const { email, password, customer_id, customerId, ...rest } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
     if (findUserByEmail(email)) return res.status(409).json({ error: 'User exists' });
-    const effectiveCustomerId = customer_id || customerId || (canManageCustomerTeam(req.user.role) ? req.user.customer_id : null);
+    const effectiveCustomerId = customer_id || customerId || ctx.customerId || (canManageCustomerTeam(req.user.role) ? req.user.customer_id : null);
     if (canManageCustomerTeam(req.user.role) && effectiveCustomerId && effectiveCustomerId !== req.user.customer_id) {
       return res.status(403).json({ error: 'You can only add users to your own organization' });
     }
@@ -400,7 +476,9 @@ function handleUserEntity(req, res, action) {
     if (!canMutateUsers(req.user)) return res.status(403).json({ error: 'Forbidden' });
     const target = findUserById(req.params.id);
     if (!target) return res.status(404).json({ error: 'Not found' });
-    if (!filterUsersForActor(req.user, [target]).length) {
+    let allowed = filterUsersForActor(req.user, [target]);
+    allowed = filterUsersForContext(allowed, ctx);
+    if (!allowed.length) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     const updated = updateUser(req.params.id, req.body);
@@ -411,6 +489,11 @@ function handleUserEntity(req, res, action) {
   if (action === 'delete') {
     const target = findUserById(req.params.id);
     if (!target) return res.status(404).json({ error: 'Not found' });
+    try {
+      assertDeleteAllowed('User', ctx, req.user);
+    } catch (err) {
+      return res.status(err.status || 403).json({ error: err.message });
+    }
     const customerRecord = target.customer_id ? getEntity('Customer', target.customer_id) : null;
     if (!canDeleteUser(req.user, target, customerRecord)) {
       return res.status(403).json({ error: 'You do not have permission to delete this user' });
@@ -424,30 +507,44 @@ app.get('/api/entities/:type', requireAuth, (req, res) => {
   const { type } = req.params;
   if (!ENTITY_NAMES.includes(type)) return res.status(404).json({ error: 'Unknown entity' });
   if (type === 'User') return handleUserEntity(req, res, 'list');
+  const ctx = getEntityContext(req);
   const { sort, limit } = req.query;
-  res.json(listEntities(type, sort, limit ? parseInt(limit, 10) : undefined));
+  let items = listEntities(type, sort, limit ? parseInt(limit, 10) : undefined);
+  items = filterEntitiesForContext(type, items, ctx, ctx.scopeIndex);
+  res.json(items);
 });
 
 app.post('/api/entities/:type/filter', requireAuth, (req, res) => {
   const { type } = req.params;
   if (!ENTITY_NAMES.includes(type)) return res.status(404).json({ error: 'Unknown entity' });
   if (type === 'User') return handleUserEntity(req, res, 'filter');
+  const ctx = getEntityContext(req);
   const { criteria, sort, limit } = req.body;
-  res.json(filterEntities(type, criteria || {}, sort, limit));
+  let items = filterEntities(type, criteria || {}, sort, limit);
+  items = filterEntitiesForContext(type, items, ctx, ctx.scopeIndex);
+  res.json(items);
 });
 
 app.get('/api/entities/:type/:id', requireAuth, (req, res) => {
   const { type, id } = req.params;
   if (type === 'User') return handleUserEntity(req, res, 'get');
+  const ctx = getEntityContext(req);
   const item = getEntity(type, id);
   if (!item) return res.status(404).json({ error: 'Not found' });
+  try {
+    assertEntityAccess(type, item, ctx, ctx.scopeIndex);
+  } catch (err) {
+    return res.status(err.status || 403).json({ error: err.message });
+  }
   res.json(item);
 });
 
 app.post('/api/entities/:type', requireAuth, (req, res) => {
   const { type } = req.params;
   if (type === 'User') return handleUserEntity(req, res, 'create');
-  const item = createEntity(type, req.body);
+  const ctx = getEntityContext(req);
+  const payload = stampEntityForCreate(type, req.body, ctx);
+  const item = createEntity(type, payload);
   res.status(201).json(item);
 });
 
@@ -461,13 +558,21 @@ app.post('/api/entities/:type/bulk', requireAuth, (req, res) => {
   if (records.length > 500) {
     return res.status(400).json({ error: 'Maximum 500 records per import' });
   }
-  const result = bulkCreateEntities(type, records, req.user);
+  const result = bulkCreateEntities(type, records, req.user, getEntityContext(req));
   res.status(result.created ? 201 : 400).json(result);
 });
 
 app.patch('/api/entities/:type/:id', requireAuth, (req, res) => {
   const { type, id } = req.params;
   if (type === 'User') { req.params.id = id; return handleUserEntity(req, res, 'update'); }
+  const ctx = getEntityContext(req);
+  const existing = getEntity(type, id);
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  try {
+    assertEntityAccess(type, existing, ctx, ctx.scopeIndex);
+  } catch (err) {
+    return res.status(err.status || 403).json({ error: err.message });
+  }
   const item = updateEntity(type, id, req.body);
   if (!item) return res.status(404).json({ error: 'Not found' });
   res.json(item);
@@ -476,8 +581,21 @@ app.patch('/api/entities/:type/:id', requireAuth, (req, res) => {
 app.delete('/api/entities/:type/:id', requireAuth, (req, res) => {
   const { type, id } = req.params;
   if (type === 'User') { req.params.id = id; return handleUserEntity(req, res, 'delete'); }
+  const ctx = getEntityContext(req);
+  try {
+    assertDeleteAllowed(type, ctx, req.user);
+  } catch (err) {
+    return res.status(err.status || 403).json({ error: err.message });
+  }
   if (type === 'Customer' && !canProvisionCustomers(req.user.role)) {
     return res.status(403).json({ error: 'Only FleetCo staff can delete customer records' });
+  }
+  const existing = getEntity(type, id);
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  try {
+    assertEntityAccess(type, existing, ctx, ctx.scopeIndex);
+  } catch (err) {
+    return res.status(err.status || 403).json({ error: err.message });
   }
   deleteEntity(type, id);
   res.json({ success: true });

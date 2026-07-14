@@ -46,21 +46,35 @@ function _isCustomerPortal(user) {
   return isCustomerPortalAccount(user);
 }
 
-export function filterByCustomerId(records, user, field = 'customer_id') {
-  if (_isCustomerPortal(user)) {
-    return records.filter((r) => r[field] === user.customer_id);
+export function getEffectiveCustomerId(user, viewAsCustomerId = null) {
+  if (!user) return null;
+  if (user.customer_id) return user.customer_id;
+  if (INTERNAL_ROLES.includes(user.role) && viewAsCustomerId) return viewAsCustomerId;
+  return null;
+}
+
+export function filterByCustomerId(records, user, field = 'customer_id', viewAsCustomerId = null) {
+  const cid = getEffectiveCustomerId(user, viewAsCustomerId);
+  if (cid) {
+    return records.filter((r) => r[field] === cid || r.assigned_customer_id === cid);
   }
   return records;
 }
 
-export function filterVehiclesForUser(vehicles, user) {
+export function filterVehiclesForUser(vehicles, user, viewAsCustomerId = null) {
   if (!user) return vehicles;
   if (user.role === 'driver') {
     return vehicles.filter((v) => v.assigned_driver_id === user.id);
   }
+  const cid = getEffectiveCustomerId(user, viewAsCustomerId);
+  if (cid) {
+    return vehicles.filter(
+      (v) => v.customer_id === cid || v.assigned_customer_id === cid,
+    );
+  }
   if (_isCustomerPortal(user) && user.customer_id) {
     return vehicles.filter(
-      (v) => v.customer_id === user.customer_id || v.assigned_customer_id === user.customer_id
+      (v) => v.customer_id === user.customer_id || v.assigned_customer_id === user.customer_id,
     );
   }
   return vehicles;
