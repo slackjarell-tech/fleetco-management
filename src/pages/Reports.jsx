@@ -16,6 +16,7 @@ import {
   filterRowsByColumns,
   downloadReportRows,
 } from '@/lib/reportExport';
+import { buildReport, MASTER_EXPORT_SHEETS } from '@/lib/reportBuilders';
 
 // ─── Report Definitions ───────────────────────────────────────────────────────
 const REPORT_CATALOG = [
@@ -213,7 +214,7 @@ const REPORT_CATALOG = [
     id: 'fleetco_master_export',
     category: 'CRM',
     title: 'FleetCo Master Data Export',
-    description: 'All data types in one workbook — loads, fleet, fuel, work orders, invoices, inspections, HOS, payroll',
+    description: 'All data types in one workbook — 19 sheets including executive summary, P&L, compliance, and parts detail',
     icon: FileSpreadsheet,
     color: 'text-amber-600',
     bg: 'bg-amber-50',
@@ -223,39 +224,98 @@ const REPORT_CATALOG = [
     id: 'fleet_pnl',
     category: 'Financial',
     title: 'Fleet P&L Summary',
-    description: 'Revenue vs fuel + repair costs per vehicle for profit/loss',
+    description: 'Revenue vs fuel + repair costs per vehicle with margin %',
     icon: BarChart2,
     color: 'text-emerald-700',
     bg: 'bg-emerald-50',
     border: 'border-emerald-300',
   },
+  {
+    id: 'executive_summary',
+    category: 'Analytics',
+    title: 'Executive Summary',
+    description: 'KPI dashboard — loads, revenue, costs, fleet, compliance totals',
+    icon: BarChart2,
+    color: 'text-slate-800',
+    bg: 'bg-slate-100',
+    border: 'border-slate-300',
+  },
+  {
+    id: 'customer_profitability',
+    category: 'Analytics',
+    title: 'Customer Profitability',
+    description: 'Revenue, fuel, repairs, and payroll rolled up per customer account',
+    icon: TrendingUp,
+    color: 'text-emerald-700',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-300',
+  },
+  {
+    id: 'load_profitability',
+    category: 'Analytics',
+    title: 'Load Profitability',
+    description: 'Rate per mile and lane analysis for every load in range',
+    icon: Package,
+    color: 'text-blue-700',
+    bg: 'bg-blue-50',
+    border: 'border-blue-300',
+  },
+  {
+    id: 'fuel_efficiency',
+    category: 'Analytics',
+    title: 'Fuel Efficiency (MPG)',
+    description: 'Miles per gallon and cost-per-mile by vehicle from fuel logs',
+    icon: Fuel,
+    color: 'text-amber-700',
+    bg: 'bg-amber-50',
+    border: 'border-amber-300',
+  },
+  {
+    id: 'work_order_parts',
+    category: 'Fleet',
+    title: 'Work Order Parts Detail',
+    description: 'Line-item parts used on each work order with costs',
+    icon: BoxSelect,
+    color: 'text-violet-700',
+    bg: 'bg-violet-50',
+    border: 'border-violet-300',
+  },
+  {
+    id: 'incident_report',
+    category: 'Compliance',
+    title: 'Incident & Safety Report',
+    description: 'Accidents, violations, CSA points, and corrective actions',
+    icon: AlertTriangle,
+    color: 'text-red-700',
+    bg: 'bg-red-50',
+    border: 'border-red-300',
+  },
+  {
+    id: 'compliance_scorecard',
+    category: 'Compliance',
+    title: 'Compliance Scorecard',
+    description: 'Inspection pass rates, HOS violations, screening expirations',
+    icon: ShieldCheck,
+    color: 'text-green-700',
+    bg: 'bg-green-50',
+    border: 'border-green-300',
+  },
+  {
+    id: 'team_roster',
+    category: 'CRM',
+    title: 'Team Roster',
+    description: 'Portal users with roles, customer assignment, and contact info',
+    icon: Users,
+    color: 'text-indigo-700',
+    bg: 'bg-indigo-50',
+    border: 'border-indigo-300',
+  },
 ];
 
-const CATEGORIES = ['All', 'Financial', 'Operations', 'Fleet', 'Compliance', 'CRM'];
-
-// ─── State Tax Rates (for IFTA) ───────────────────────────────────────────────
-const STATE_TAX_RATES = {
-  AL: 0.280, AK: 0.095, AZ: 0.260, AR: 0.285, CA: 0.800, CO: 0.205,
-  CT: 0.490, DE: 0.220, FL: 0.330, GA: 0.320, ID: 0.320, IL: 0.467,
-  IN: 0.530, IA: 0.325, KS: 0.260, KY: 0.246, LA: 0.200, ME: 0.312,
-  MD: 0.362, MA: 0.240, MI: 0.263, MN: 0.285, MS: 0.180, MO: 0.170,
-  MT: 0.295, NE: 0.246, NV: 0.520, NH: 0.222, NJ: 0.415, NM: 0.220,
-  NY: 0.458, NC: 0.362, ND: 0.230, OH: 0.470, OK: 0.190, OR: 0.380,
-  PA: 0.747, RI: 0.340, SC: 0.250, SD: 0.280, TN: 0.270, TX: 0.200,
-  UT: 0.315, VT: 0.320, VA: 0.272, WA: 0.494, WV: 0.357, WI: 0.329, WY: 0.240,
-};
-function extractState(str) {
-  if (!str) return null;
-  const m = (str || '').toUpperCase().match(/\b([A-Z]{2})\b/);
-  return m && STATE_TAX_RATES[m[1]] ? m[1] : null;
-}
+const CATEGORIES = ['All', 'Analytics', 'Financial', 'Operations', 'Fleet', 'Compliance', 'CRM'];
 
 // ─── Excel Export Builder ─────────────────────────────────────────────────────
-function downloadMasterWorkbook(data, userMap, dateFrom, dateTo, customerLabel) {
-  const sheetIds = [
-    'load_summary', 'fleet_status', 'fuel_cost', 'work_orders', 'invoice_aging',
-    'inspections', 'hos_logs', 'payroll_summary', 'customer_list',
-  ];
+function downloadMasterWorkbook(data, userMap, dateFrom, dateTo, customerLabel, sheetIds = MASTER_EXPORT_SHEETS) {
   const wb = XLSX.utils.book_new();
   for (const id of sheetIds) {
     const result = buildReport(id, data, userMap, dateFrom, dateTo);
@@ -267,341 +327,6 @@ function downloadMasterWorkbook(data, userMap, dateFrom, dateTo, customerLabel) 
   }
   const label = customerLabel.replace(/[^\w-]+/g, '_').slice(0, 40);
   XLSX.writeFile(wb, `FleetCo_Master_Export_${label}.xlsx`);
-}
-
-// ─── Report Generators ────────────────────────────────────────────────────────
-function inRange(dateStr, from, to) {
-  if (!dateStr) return true;
-  return dateStr >= from && dateStr <= to;
-}
-
-function buildReport(reportId, data, userMap, dateFrom, dateTo) {
-  const from = dateFrom || '2000-01-01';
-  const to = dateTo || '2099-12-31';
-
-  const { loads, invoices, fuel, vehicles, workOrders, maintenance, inspections,
-    hosLogs, customers, vendors, payroll, parts, screenings } = data;
-
-  // filtered slices
-  const fLoads = loads.filter(l => inRange(l.pickup_date || l.delivery_date, from, to));
-  const fInvoices = invoices.filter(i => inRange(i.issue_date, from, to));
-  const fFuel = fuel.filter(f => inRange(f.date, from, to));
-  const fWorkOrders = workOrders.filter(w => inRange(w.opened_date, from, to));
-  const fInspections = inspections.filter(i => inRange(i.inspection_date, from, to));
-  const fHosLogs = hosLogs.filter(h => inRange(h.log_date, from, to));
-  const fPayroll = payroll.filter(p => inRange(p.pay_period_start, from, to));
-  const fScreenings = screenings.filter(s => inRange(s.ordered_date, from, to));
-  const fMaintenance = maintenance.filter(m => inRange(m.due_date, from, to));
-
-  const vehicleMap = Object.fromEntries(vehicles.map(v => [v.id, v]));
-  const vLabel = id => { const v = vehicleMap[id]; return v ? `Unit ${v.unit_number}` : id || ''; };
-
-  switch (reportId) {
-
-    case 'revenue_summary': {
-      const rows = [['Invoice #', 'Customer ID', 'Issue Date', 'Due Date', 'Subtotal', 'Tax', 'Total', 'Status', 'Type']];
-      fInvoices.filter(i => i.status === 'paid').forEach(i => {
-        rows.push([i.invoice_number, i.customer_id, i.issue_date, i.due_date,
-          i.subtotal || 0, i.tax || 0, i.total || 0, i.status, i.type]);
-      });
-      return { rows, filename: 'Revenue_Summary.xlsx', sheet: 'Revenue' };
-    }
-
-    case 'invoice_aging': {
-      const todayD = new Date();
-      const rows = [['Invoice #', 'Customer ID', 'Issue Date', 'Due Date', 'Total', 'Status', 'Days Overdue']];
-      fInvoices.forEach(i => {
-        const daysOverdue = i.due_date ? Math.max(0, Math.floor((todayD - new Date(i.due_date)) / 86400000)) : 0;
-        rows.push([i.invoice_number, i.customer_id, i.issue_date, i.due_date,
-          i.total || 0, i.status, i.status === 'paid' ? 0 : daysOverdue]);
-      });
-      return { rows, filename: 'Invoice_Aging.xlsx', sheet: 'Aging' };
-    }
-
-    case 'fuel_cost': {
-      const rows = [['Date', 'Vehicle', 'Driver ID', 'Location', 'Gallons', 'Price/Gal', 'Total Cost', 'Fuel Type', 'Odometer']];
-      fFuel.forEach(f => {
-        rows.push([f.date, vLabel(f.vehicle_id), f.driver_id, f.location,
-          f.gallons || 0, f.price_per_gallon || 0, f.total_cost || 0, f.fuel_type, f.odometer_reading || '']);
-      });
-      rows.push(['', 'TOTAL', '', '', fFuel.reduce((s, f) => s + (f.gallons || 0), 0), '',
-        fFuel.reduce((s, f) => s + (f.total_cost || 0), 0)]);
-      return { rows, filename: 'Fuel_Cost_Report.xlsx', sheet: 'Fuel' };
-    }
-
-    case 'fuel_per_vehicle': {
-      const map = {};
-      fFuel.forEach(f => {
-        if (!f.vehicle_id) return;
-        if (!map[f.vehicle_id]) map[f.vehicle_id] = { gallons: 0, cost: 0, logs: 0 };
-        map[f.vehicle_id].gallons += f.gallons || 0;
-        map[f.vehicle_id].cost += f.total_cost || 0;
-        map[f.vehicle_id].logs++;
-      });
-      const rows = [['Vehicle', 'Make/Model', 'Total Gallons', 'Total Cost', 'Avg $/Gal', 'Fill-ups']];
-      Object.entries(map).sort((a, b) => b[1].cost - a[1].cost).forEach(([id, s]) => {
-        const v = vehicleMap[id];
-        rows.push([vLabel(id), v ? `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() : '',
-          s.gallons.toFixed(3), s.cost.toFixed(2),
-          s.gallons > 0 ? (s.cost / s.gallons).toFixed(3) : 0, s.logs]);
-      });
-      return { rows, filename: 'Fuel_Per_Vehicle.xlsx', sheet: 'Fuel by Vehicle' };
-    }
-
-    case 'payroll_summary': {
-      const rows = [['Driver Name', 'Pay Type', 'Period Start', 'Period End', 'Hours', 'Miles', 'Stops',
-        'Gross Pay', 'Bonuses', 'Deductions', 'Net Pay', 'Status', 'Payment Method']];
-      fPayroll.forEach(p => {
-        rows.push([p.driver_name, p.pay_type, p.pay_period_start, p.pay_period_end,
-          p.hours_worked || 0, p.miles_driven || 0, p.stops_completed || 0,
-          p.gross_pay || 0, p.bonuses || 0, p.deductions || 0, p.net_pay || 0,
-          p.status, p.payment_method]);
-      });
-      rows.push(['TOTALS', '', '', '', '', '', '',
-        fPayroll.reduce((s, p) => s + (p.gross_pay || 0), 0), '',
-        '', fPayroll.reduce((s, p) => s + (p.net_pay || 0), 0)]);
-      return { rows, filename: 'Payroll_Summary.xlsx', sheet: 'Payroll' };
-    }
-
-    case 'load_summary': {
-      const rows = [['Load #', 'Status', 'Origin', 'Destination', 'Pickup Date', 'Delivery Date',
-        'Rate', 'Miles', 'Weight', 'Commodity', 'Driver ID', 'Vehicle', 'Broker', 'Customer ID']];
-      fLoads.forEach(l => {
-        rows.push([l.load_number, l.status, l.origin, l.destination, l.pickup_date, l.delivery_date,
-          l.rate || 0, l.miles || 0, l.weight, l.commodity,
-          l.assigned_driver_id, vLabel(l.assigned_vehicle_id), l.broker, l.customer_id]);
-      });
-      return { rows, filename: 'Load_Summary.xlsx', sheet: 'Loads' };
-    }
-
-    case 'load_revenue': {
-      const map = {};
-      fLoads.forEach(l => {
-        const key = l.assigned_driver_id || 'Unassigned';
-        if (!map[key]) map[key] = { loads: 0, miles: 0, revenue: 0 };
-        map[key].loads++;
-        map[key].miles += l.miles || 0;
-        map[key].revenue += l.rate || 0;
-      });
-      const rows = [['Driver ID', 'Driver Name', 'Total Loads', 'Total Miles', 'Total Revenue', 'Avg Rate/Load']];
-      Object.entries(map).sort((a, b) => b[1].revenue - a[1].revenue).forEach(([id, s]) => {
-        const u = userMap[id];
-        rows.push([id, u?.full_name || 'Unassigned', s.loads, s.miles,
-          s.revenue.toFixed(2), s.loads > 0 ? (s.revenue / s.loads).toFixed(2) : 0]);
-      });
-      return { rows, filename: 'Load_Revenue_By_Driver.xlsx', sheet: 'Load Revenue' };
-    }
-
-    case 'driver_performance': {
-      const driverMap = {};
-      fLoads.forEach(l => {
-        const id = l.assigned_driver_id;
-        if (!id) return;
-        if (!driverMap[id]) driverMap[id] = { loads: 0, delivered: 0, miles: 0, revenue: 0 };
-        driverMap[id].loads++;
-        if (l.status === 'delivered') driverMap[id].delivered++;
-        driverMap[id].miles += l.miles || 0;
-        driverMap[id].revenue += l.rate || 0;
-      });
-      const rows = [['Driver ID', 'Driver Name', 'Total Loads', 'Delivered', 'Completion %', 'Total Miles', 'Total Revenue']];
-      Object.entries(driverMap).sort((a, b) => b[1].revenue - a[1].revenue).forEach(([id, s]) => {
-        const u = userMap[id];
-        rows.push([id, u?.full_name || '', s.loads, s.delivered,
-          s.loads > 0 ? ((s.delivered / s.loads) * 100).toFixed(1) + '%' : '0%',
-          s.miles, s.revenue.toFixed(2)]);
-      });
-      return { rows, filename: 'Driver_Performance.xlsx', sheet: 'Drivers' };
-    }
-
-    case 'fleet_status': {
-      const rows = [['Unit #', 'Type', 'Year', 'Make', 'Model', 'VIN', 'License Plate',
-        'Status', 'Odometer', 'Purchase Price', 'Purchase Date', 'Assigned Driver', 'Notes']];
-      vehicles.forEach(v => {
-        rows.push([v.unit_number, v.unit_type, v.year, v.make, v.model, v.vin,
-          v.license_plate, v.status, v.odometer || 0, v.purchase_price || 0,
-          v.purchase_date, userMap[v.assigned_driver_id]?.full_name || '',
-          v.notes || '']);
-      });
-      return { rows, filename: 'Fleet_Status.xlsx', sheet: 'Fleet' };
-    }
-
-    case 'vehicle_downtime': {
-      const rows = [['WO #', 'Vehicle', 'Title', 'Repair Type', 'Opened Date', 'Completed Date',
-        'Days in Shop', 'Total Cost', 'Status']];
-      fWorkOrders.filter(w => w.opened_date && w.completed_date).forEach(w => {
-        const days = Math.max(0, Math.round((new Date(w.completed_date) - new Date(w.opened_date)) / 86400000));
-        rows.push([w.wo_number, vLabel(w.vehicle_id), w.title, w.repair_type,
-          w.opened_date, w.completed_date, days, w.total_cost || 0, w.status]);
-      });
-      return { rows, filename: 'Vehicle_Downtime.xlsx', sheet: 'Downtime' };
-    }
-
-    case 'maintenance_schedule': {
-      const rows = [['Vehicle', 'Service Type', 'Status', 'Due Date', 'Due Mileage',
-        'Last Service Date', 'Last Service Mileage', 'Interval Miles', 'Interval Days',
-        'Est. Cost', 'Assigned Tech', 'Notes']];
-      fMaintenance.forEach(m => {
-        rows.push([vLabel(m.vehicle_id), m.service_type, m.status, m.due_date,
-          m.due_mileage || '', m.last_service_date || '', m.last_service_mileage || '',
-          m.interval_miles || '', m.interval_days || '',
-          m.estimated_cost || 0, m.assigned_tech || '', m.notes || '']);
-      });
-      return { rows, filename: 'Maintenance_Schedule.xlsx', sheet: 'Maintenance' };
-    }
-
-    case 'work_orders': {
-      const rows = [['WO #', 'Title', 'Vehicle', 'Repair Type', 'Status', 'Priority',
-        'Opened', 'Due', 'Completed', 'Odometer', 'Labor Hours', 'Labor Cost',
-        'Parts Total', 'Total Cost', 'Tech ID', 'Shop', 'Warranty']];
-      fWorkOrders.forEach(w => {
-        rows.push([w.wo_number, w.title, vLabel(w.vehicle_id), w.repair_type,
-          w.status, w.priority, w.opened_date, w.due_date || '', w.completed_date || '',
-          w.odometer || '', w.labor_hours || 0, w.labor_cost || 0,
-          w.parts_total || 0, w.total_cost || 0,
-          userMap[w.assigned_tech_id]?.full_name || '',
-          w.shop_name || '', w.warranty_repair ? 'Yes' : 'No']);
-      });
-      rows.push(['', 'TOTAL', '', '', '', '', '', '', '', '', '',
-        fWorkOrders.reduce((s, w) => s + (w.labor_cost || 0), 0), '',
-        fWorkOrders.reduce((s, w) => s + (w.total_cost || 0), 0)]);
-      return { rows, filename: 'Work_Orders.xlsx', sheet: 'Work Orders' };
-    }
-
-    case 'parts_inventory': {
-      const rows = [['Part #', 'Description', 'Category', 'Qty on Hand', 'Reorder Point',
-        'Unit Cost', 'Total Value', 'Supplier', 'Location', 'Notes']];
-      parts.forEach(p => {
-        rows.push([p.part_number, p.description, p.category,
-          p.quantity_on_hand || 0, p.reorder_point || 0,
-          p.unit_cost || 0, ((p.quantity_on_hand || 0) * (p.unit_cost || 0)).toFixed(2),
-          p.supplier || '', p.location || '', p.notes || '']);
-      });
-      rows.push(['', 'TOTAL VALUE', '', parts.reduce((s, p) => s + (p.quantity_on_hand || 0), 0),
-        '', '', parts.reduce((s, p) => s + (p.quantity_on_hand || 0) * (p.unit_cost || 0), 0).toFixed(2)]);
-      return { rows, filename: 'Parts_Inventory.xlsx', sheet: 'Parts' };
-    }
-
-    case 'inspections': {
-      const rows = [['Vehicle', 'Type', 'Date', 'Inspector', 'Odometer', 'Status',
-        'Defects Found', 'Defects Corrected', 'Manager Signoff', 'Manager', 'Notes']];
-      fInspections.forEach(i => {
-        rows.push([vLabel(i.vehicle_id), i.inspection_type, i.inspection_date,
-          i.inspector_name, i.odometer || '', i.status,
-          i.defects_found ? 'Yes' : 'No', i.defects_corrected ? 'Yes' : 'No',
-          i.manager_signoff_required ? (i.manager_name ? 'Signed' : 'Pending') : 'N/A',
-          i.manager_name || '', i.notes || '']);
-      });
-      return { rows, filename: 'Inspections_DVIR.xlsx', sheet: 'Inspections' };
-    }
-
-    case 'hos_logs': {
-      const rows = [['Driver ID', 'Driver Name', 'Date', 'Vehicle', 'Start Location',
-        'End Location', 'Total Miles', 'Hours Driving', 'Hours On Duty',
-        'Hours Off Duty', 'Hours Sleeper', 'Status', 'Violations']];
-      fHosLogs.forEach(h => {
-        const u = userMap[h.driver_id];
-        rows.push([h.driver_id, u?.full_name || '', h.log_date, vLabel(h.vehicle_id),
-          h.starting_location || '', h.ending_location || '',
-          h.total_miles || 0, h.hours_driving || 0, h.hours_on_duty || 0,
-          h.hours_off_duty || 0, h.hours_sleeper || 0,
-          h.status, (h.violations || []).join('; ')]);
-      });
-      return { rows, filename: 'HOS_ELD_Logs.xlsx', sheet: 'HOS Logs' };
-    }
-
-    case 'ifta_fuel': {
-      const byState = {};
-      fFuel.forEach(f => {
-        const state = extractState(f.location);
-        if (!state) return;
-        if (!byState[state]) byState[state] = { gallons: 0, cost: 0, count: 0 };
-        byState[state].gallons += f.gallons || 0;
-        byState[state].cost += f.total_cost || 0;
-        byState[state].count++;
-      });
-      const rows = [['State', 'Fill-ups', 'Total Gallons', 'Tax Rate ($/gal)', 'Est. Tax Owed', 'Fuel Cost']];
-      Object.entries(byState).sort((a, b) => b[1].gallons - a[1].gallons).forEach(([state, d]) => {
-        const rate = STATE_TAX_RATES[state] || 0.25;
-        rows.push([state, d.count, d.gallons.toFixed(3), rate.toFixed(3),
-          (d.gallons * rate).toFixed(2), d.cost.toFixed(2)]);
-      });
-      rows.push(['TOTAL', fFuel.length, fFuel.reduce((s, f) => s + (f.gallons || 0), 0).toFixed(3),
-        '', Object.entries(byState).reduce((s, [st, d]) => s + d.gallons * (STATE_TAX_RATES[st] || 0.25), 0).toFixed(2),
-        fFuel.reduce((s, f) => s + (f.total_cost || 0), 0).toFixed(2)]);
-      return { rows, filename: 'IFTA_Fuel_Tax.xlsx', sheet: 'IFTA' };
-    }
-
-    case 'customer_list': {
-      const rows = [['Company', 'Contact', 'Email', 'Phone', 'City', 'State', 'ZIP',
-        'MC #', 'DOT #', 'Fleet Size', 'Status', 'Notes']];
-      customers.forEach(c => {
-        rows.push([c.company_name, c.contact_name, c.email, c.phone,
-          c.city, c.state, c.zip, c.mc_number || '', c.dot_number || '',
-          c.fleet_size || '', c.status, c.notes || '']);
-      });
-      return { rows, filename: 'Customer_List.xlsx', sheet: 'Customers' };
-    }
-
-    case 'vendor_list': {
-      const rows = [['Name', 'Type', 'POC Name', 'Phone', 'Email', 'City', 'State',
-        'Contract #', 'Contract Start', 'Contract End', 'Labor Rate', 'Discount %', 'Status']];
-      vendors.forEach(v => {
-        rows.push([v.name, v.type, v.poc_name || '', v.phone || '', v.email || '',
-          v.city || '', v.state || '', v.contract_number || '',
-          v.contract_start || '', v.contract_end || '',
-          v.labor_rate || 0, v.discount_pct || 0, v.status]);
-      });
-      return { rows, filename: 'Vendor_Contracts.xlsx', sheet: 'Vendors' };
-    }
-
-    case 'screening_records': {
-      const rows = [['Driver ID', 'Driver Name', 'Check Type', 'Provider', 'Status',
-        'Ordered Date', 'Completed Date', 'Expiration Date', 'Reference ID', 'Violations', 'Notes']];
-      fScreenings.forEach(s => {
-        rows.push([s.driver_id, s.driver_name, s.check_type, s.provider, s.status,
-          s.ordered_date, s.completed_date || '', s.expiration_date || '',
-          s.reference_id || '', (s.violations || []).join('; '), s.notes || '']);
-      });
-      return { rows, filename: 'Driver_Screening_Records.xlsx', sheet: 'Screenings' };
-    }
-
-    case 'fleet_pnl': {
-      const revenueByVehicle = {};
-      fLoads.filter(l => l.status === 'delivered').forEach(l => {
-        if (!l.assigned_vehicle_id) return;
-        revenueByVehicle[l.assigned_vehicle_id] = (revenueByVehicle[l.assigned_vehicle_id] || 0) + (l.rate || 0);
-      });
-      const fuelByVehicle = {};
-      fFuel.forEach(f => {
-        if (!f.vehicle_id) return;
-        fuelByVehicle[f.vehicle_id] = (fuelByVehicle[f.vehicle_id] || 0) + (f.total_cost || 0);
-      });
-      const repairByVehicle = {};
-      fWorkOrders.forEach(w => {
-        if (!w.vehicle_id) return;
-        repairByVehicle[w.vehicle_id] = (repairByVehicle[w.vehicle_id] || 0) + (w.total_cost || 0);
-      });
-      const allVehicleIds = new Set([
-        ...Object.keys(revenueByVehicle),
-        ...Object.keys(fuelByVehicle),
-        ...Object.keys(repairByVehicle),
-      ]);
-      const rows = [['Vehicle', 'Make/Model', 'Revenue', 'Fuel Cost', 'Repair Cost', 'Total Cost', 'Net P&L']];
-      [...allVehicleIds].forEach(id => {
-        const rev = revenueByVehicle[id] || 0;
-        const fc = fuelByVehicle[id] || 0;
-        const rc = repairByVehicle[id] || 0;
-        const v = vehicleMap[id];
-        rows.push([vLabel(id), v ? `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() : '',
-          rev.toFixed(2), fc.toFixed(2), rc.toFixed(2),
-          (fc + rc).toFixed(2), (rev - fc - rc).toFixed(2)]);
-      });
-      return { rows, filename: 'Fleet_PnL.xlsx', sheet: 'Fleet P&L' };
-    }
-
-    default:
-      return null;
-  }
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -711,7 +436,30 @@ export default function Reports() {
     await new Promise(r => setTimeout(r, 400));
 
     if (reportId === 'fleetco_master_export') {
-      downloadMasterWorkbook(filteredData, userMap, effectiveFrom, effectiveTo, customerFilterText);
+      const masterSheetMap = {
+        executive_summary: 'executive_summary',
+        customer_profitability: 'customer_profitability',
+        loads: 'load_summary',
+        load_profitability: 'load_profitability',
+        fleet: 'fleet_status',
+        fuel: 'fuel_cost',
+        fuel_efficiency: 'fuel_efficiency',
+        work_orders: 'work_orders',
+        work_order_parts: 'work_order_parts',
+        invoices: 'invoice_aging',
+        inspections: 'inspections',
+        hos: 'hos_logs',
+        incidents: 'incident_report',
+        payroll: 'payroll_summary',
+        compliance: 'compliance_scorecard',
+        parts: 'parts_inventory',
+        customers: 'customer_list',
+        team: 'team_roster',
+      };
+      const sheets = selectedKeys?.length
+        ? selectedKeys.map(k => masterSheetMap[k]).filter(Boolean)
+        : MASTER_EXPORT_SHEETS;
+      downloadMasterWorkbook(filteredData, userMap, effectiveFrom, effectiveTo, customerFilterText, sheets);
       setDone(reportId);
       setTimeout(() => { setDone(null); setConfigReport(null); }, 2500);
       setGenerating(null);

@@ -5,7 +5,8 @@ import { X, Download, Loader2, CheckCircle2, CheckSquare, Square, Calendar } fro
 const REPORT_COLUMNS = {
   revenue_summary: [
     { key: 'invoice_number', label: 'Invoice #', default: true },
-    { key: 'customer_id', label: 'Customer ID', default: true },
+    { key: 'customer_id', label: 'Customer ID', default: false },
+    { key: 'customer_name', label: 'Customer Name', default: true },
     { key: 'issue_date', label: 'Issue Date', default: true },
     { key: 'due_date', label: 'Due Date', default: true },
     { key: 'subtotal', label: 'Subtotal', default: true },
@@ -13,20 +14,24 @@ const REPORT_COLUMNS = {
     { key: 'total', label: 'Total', default: true },
     { key: 'status', label: 'Status', default: true },
     { key: 'type', label: 'Type', default: false },
+    { key: 'description', label: 'Description', default: false },
   ],
   invoice_aging: [
     { key: 'invoice_number', label: 'Invoice #', default: true },
-    { key: 'customer_id', label: 'Customer ID', default: true },
+    { key: 'customer_id', label: 'Customer ID', default: false },
+    { key: 'customer_name', label: 'Customer Name', default: true },
     { key: 'issue_date', label: 'Issue Date', default: true },
     { key: 'due_date', label: 'Due Date', default: true },
     { key: 'total', label: 'Total', default: true },
     { key: 'status', label: 'Status', default: true },
     { key: 'days_overdue', label: 'Days Overdue', default: true },
+    { key: 'description', label: 'Description', default: false },
   ],
   fuel_cost: [
     { key: 'date', label: 'Date', default: true },
     { key: 'vehicle', label: 'Vehicle', default: true },
-    { key: 'driver_id', label: 'Driver ID', default: false },
+    { key: 'customer', label: 'Customer', default: true },
+    { key: 'driver', label: 'Driver', default: true },
     { key: 'location', label: 'Location', default: true },
     { key: 'gallons', label: 'Gallons', default: true },
     { key: 'price_per_gallon', label: 'Price/Gal', default: true },
@@ -36,6 +41,7 @@ const REPORT_COLUMNS = {
   ],
   fuel_per_vehicle: [
     { key: 'vehicle', label: 'Vehicle', default: true },
+    { key: 'customer', label: 'Customer', default: true },
     { key: 'make_model', label: 'Make/Model', default: true },
     { key: 'total_gallons', label: 'Total Gallons', default: true },
     { key: 'total_cost', label: 'Total Cost', default: true },
@@ -44,6 +50,7 @@ const REPORT_COLUMNS = {
   ],
   payroll_summary: [
     { key: 'driver_name', label: 'Driver Name', default: true },
+    { key: 'customer', label: 'Customer', default: true },
     { key: 'pay_type', label: 'Pay Type', default: true },
     { key: 'pay_period_start', label: 'Period Start', default: true },
     { key: 'pay_period_end', label: 'Period End', default: true },
@@ -60,38 +67,44 @@ const REPORT_COLUMNS = {
   load_summary: [
     { key: 'load_number', label: 'Load #', default: true },
     { key: 'status', label: 'Status', default: true },
+    { key: 'customer', label: 'Customer', default: true },
     { key: 'origin', label: 'Origin', default: true },
     { key: 'destination', label: 'Destination', default: true },
     { key: 'pickup_date', label: 'Pickup Date', default: true },
     { key: 'delivery_date', label: 'Delivery Date', default: true },
     { key: 'rate', label: 'Rate', default: true },
     { key: 'miles', label: 'Miles', default: true },
+    { key: 'rate_per_mile', label: '$/Mile', default: true },
     { key: 'weight', label: 'Weight', default: false },
     { key: 'commodity', label: 'Commodity', default: false },
-    { key: 'assigned_driver_id', label: 'Driver ID', default: true },
+    { key: 'driver', label: 'Driver', default: true },
     { key: 'vehicle', label: 'Vehicle', default: true },
     { key: 'broker', label: 'Broker', default: false },
-    { key: 'customer_id', label: 'Customer ID', default: false },
   ],
   load_revenue: [
     { key: 'driver_id', label: 'Driver ID', default: false },
     { key: 'driver_name', label: 'Driver Name', default: true },
     { key: 'total_loads', label: 'Total Loads', default: true },
+    { key: 'delivered', label: 'Delivered', default: true },
     { key: 'total_miles', label: 'Total Miles', default: true },
     { key: 'total_revenue', label: 'Total Revenue', default: true },
     { key: 'avg_rate', label: 'Avg Rate/Load', default: true },
+    { key: 'rate_per_mile', label: '$/Mile', default: true },
   ],
   driver_performance: [
     { key: 'driver_id', label: 'Driver ID', default: false },
     { key: 'driver_name', label: 'Driver Name', default: true },
+    { key: 'customer', label: 'Customer', default: true },
     { key: 'total_loads', label: 'Total Loads', default: true },
     { key: 'delivered', label: 'Delivered', default: true },
     { key: 'completion_pct', label: 'Completion %', default: true },
     { key: 'total_miles', label: 'Total Miles', default: true },
     { key: 'total_revenue', label: 'Total Revenue', default: true },
+    { key: 'rate_per_mile', label: '$/Mile', default: true },
   ],
   fleet_status: [
     { key: 'unit_number', label: 'Unit #', default: true },
+    { key: 'customer', label: 'Customer', default: true },
     { key: 'unit_type', label: 'Type', default: true },
     { key: 'year', label: 'Year', default: true },
     { key: 'make', label: 'Make', default: true },
@@ -103,21 +116,26 @@ const REPORT_COLUMNS = {
     { key: 'purchase_price', label: 'Purchase Price', default: false },
     { key: 'purchase_date', label: 'Purchase Date', default: false },
     { key: 'assigned_driver', label: 'Assigned Driver', default: true },
+    { key: 'location', label: 'Location', default: true },
     { key: 'notes', label: 'Notes', default: false },
   ],
   vehicle_downtime: [
     { key: 'wo_number', label: 'WO #', default: true },
     { key: 'vehicle', label: 'Vehicle', default: true },
+    { key: 'customer', label: 'Customer', default: true },
     { key: 'title', label: 'Title', default: true },
     { key: 'repair_type', label: 'Repair Type', default: true },
+    { key: 'priority', label: 'Priority', default: true },
     { key: 'opened_date', label: 'Opened Date', default: true },
     { key: 'completed_date', label: 'Completed Date', default: true },
     { key: 'days_in_shop', label: 'Days in Shop', default: true },
+    { key: 'labor_hours', label: 'Labor Hrs', default: false },
     { key: 'total_cost', label: 'Total Cost', default: true },
     { key: 'status', label: 'Status', default: false },
   ],
   maintenance_schedule: [
     { key: 'vehicle', label: 'Vehicle', default: true },
+    { key: 'customer', label: 'Customer', default: true },
     { key: 'service_type', label: 'Service Type', default: true },
     { key: 'status', label: 'Status', default: true },
     { key: 'due_date', label: 'Due Date', default: true },
@@ -134,6 +152,7 @@ const REPORT_COLUMNS = {
     { key: 'wo_number', label: 'WO #', default: true },
     { key: 'title', label: 'Title', default: true },
     { key: 'vehicle', label: 'Vehicle', default: true },
+    { key: 'customer', label: 'Customer', default: true },
     { key: 'repair_type', label: 'Repair Type', default: true },
     { key: 'status', label: 'Status', default: true },
     { key: 'priority', label: 'Priority', default: true },
@@ -141,6 +160,8 @@ const REPORT_COLUMNS = {
     { key: 'due_date', label: 'Due', default: false },
     { key: 'completed_date', label: 'Completed', default: true },
     { key: 'odometer', label: 'Odometer', default: false },
+    { key: 'complaint', label: 'Complaint', default: true },
+    { key: 'diagnosis', label: 'Diagnosis', default: true },
     { key: 'labor_hours', label: 'Labor Hours', default: true },
     { key: 'labor_cost', label: 'Labor Cost', default: true },
     { key: 'parts_total', label: 'Parts Total', default: true },
@@ -157,12 +178,14 @@ const REPORT_COLUMNS = {
     { key: 'reorder_point', label: 'Reorder Point', default: true },
     { key: 'unit_cost', label: 'Unit Cost', default: true },
     { key: 'total_value', label: 'Total Value', default: true },
+    { key: 'below_reorder', label: 'Below Reorder?', default: true },
     { key: 'supplier', label: 'Supplier', default: true },
     { key: 'location', label: 'Location', default: false },
     { key: 'notes', label: 'Notes', default: false },
   ],
   inspections: [
     { key: 'vehicle', label: 'Vehicle', default: true },
+    { key: 'customer', label: 'Customer', default: true },
     { key: 'inspection_type', label: 'Type', default: true },
     { key: 'inspection_date', label: 'Date', default: true },
     { key: 'inspector_name', label: 'Inspector', default: true },
@@ -177,6 +200,7 @@ const REPORT_COLUMNS = {
   hos_logs: [
     { key: 'driver_id', label: 'Driver ID', default: false },
     { key: 'driver_name', label: 'Driver Name', default: true },
+    { key: 'customer', label: 'Customer', default: true },
     { key: 'log_date', label: 'Date', default: true },
     { key: 'vehicle', label: 'Vehicle', default: true },
     { key: 'starting_location', label: 'Start Location', default: true },
@@ -208,6 +232,9 @@ const REPORT_COLUMNS = {
     { key: 'mc_number', label: 'MC #', default: false },
     { key: 'dot_number', label: 'DOT #', default: false },
     { key: 'fleet_size', label: 'Fleet Size', default: true },
+    { key: 'actual_vehicles', label: 'Actual Vehicles', default: true },
+    { key: 'subscription', label: 'Subscription', default: true },
+    { key: 'payment_status', label: 'Payment Status', default: true },
     { key: 'status', label: 'Status', default: true },
     { key: 'notes', label: 'Notes', default: false },
   ],
@@ -229,6 +256,7 @@ const REPORT_COLUMNS = {
   screening_records: [
     { key: 'driver_id', label: 'Driver ID', default: false },
     { key: 'driver_name', label: 'Driver Name', default: true },
+    { key: 'customer', label: 'Customer', default: true },
     { key: 'check_type', label: 'Check Type', default: true },
     { key: 'provider', label: 'Provider', default: true },
     { key: 'status', label: 'Status', default: true },
@@ -241,23 +269,125 @@ const REPORT_COLUMNS = {
   ],
   fleet_pnl: [
     { key: 'vehicle', label: 'Vehicle', default: true },
+    { key: 'customer', label: 'Customer', default: true },
     { key: 'make_model', label: 'Make/Model', default: true },
     { key: 'revenue', label: 'Revenue', default: true },
     { key: 'fuel_cost', label: 'Fuel Cost', default: true },
     { key: 'repair_cost', label: 'Repair Cost', default: true },
     { key: 'total_cost', label: 'Total Cost', default: true },
     { key: 'net_pnl', label: 'Net P&L', default: true },
+    { key: 'margin_pct', label: 'Margin %', default: true },
+  ],
+  executive_summary: [
+    { key: 'category', label: 'Category', default: true },
+    { key: 'metric', label: 'Metric', default: true },
+    { key: 'value', label: 'Value', default: true },
+  ],
+  customer_profitability: [
+    { key: 'customer', label: 'Customer', default: true },
+    { key: 'vehicles', label: 'Vehicles', default: true },
+    { key: 'loads', label: 'Loads', default: true },
+    { key: 'miles', label: 'Miles', default: true },
+    { key: 'load_revenue', label: 'Load Revenue', default: true },
+    { key: 'invoice_revenue', label: 'Invoice Revenue', default: true },
+    { key: 'total_revenue', label: 'Total Revenue', default: true },
+    { key: 'fuel_cost', label: 'Fuel Cost', default: true },
+    { key: 'repair_cost', label: 'Repair Cost', default: true },
+    { key: 'payroll', label: 'Payroll', default: true },
+    { key: 'total_cost', label: 'Total Cost', default: true },
+    { key: 'net_margin', label: 'Net Margin', default: true },
+    { key: 'margin_pct', label: 'Margin %', default: true },
+  ],
+  load_profitability: [
+    { key: 'load_number', label: 'Load #', default: true },
+    { key: 'customer', label: 'Customer', default: true },
+    { key: 'status', label: 'Status', default: true },
+    { key: 'lane', label: 'Origin → Dest', default: true },
+    { key: 'miles', label: 'Miles', default: true },
+    { key: 'rate', label: 'Rate', default: true },
+    { key: 'rate_per_mile', label: '$/Mile', default: true },
+    { key: 'driver', label: 'Driver', default: true },
+    { key: 'vehicle', label: 'Vehicle', default: true },
+    { key: 'pickup', label: 'Pickup', default: true },
+    { key: 'delivery', label: 'Delivery', default: true },
+    { key: 'commodity', label: 'Commodity', default: false },
+  ],
+  fuel_efficiency: [
+    { key: 'vehicle', label: 'Vehicle', default: true },
+    { key: 'customer', label: 'Customer', default: true },
+    { key: 'fillups', label: 'Fill-ups', default: true },
+    { key: 'miles_tracked', label: 'Miles Tracked', default: true },
+    { key: 'gallons', label: 'Gallons', default: true },
+    { key: 'avg_mpg', label: 'Avg MPG', default: true },
+    { key: 'cost_per_mile', label: 'Cost/Mile', default: true },
+    { key: 'total_fuel_cost', label: 'Total Fuel Cost', default: true },
+  ],
+  work_order_parts: [
+    { key: 'wo_number', label: 'WO #', default: true },
+    { key: 'vehicle', label: 'Vehicle', default: true },
+    { key: 'customer', label: 'Customer', default: true },
+    { key: 'wo_title', label: 'WO Title', default: true },
+    { key: 'status', label: 'Status', default: true },
+    { key: 'opened', label: 'Opened', default: true },
+    { key: 'part_number', label: 'Part #', default: true },
+    { key: 'description', label: 'Description', default: true },
+    { key: 'qty', label: 'Qty', default: true },
+    { key: 'unit_cost', label: 'Unit Cost', default: true },
+    { key: 'line_total', label: 'Line Total', default: true },
+  ],
+  incident_report: [
+    { key: 'date', label: 'Date', default: true },
+    { key: 'type', label: 'Type', default: true },
+    { key: 'severity', label: 'Severity', default: true },
+    { key: 'status', label: 'Status', default: true },
+    { key: 'vehicle', label: 'Vehicle', default: true },
+    { key: 'customer', label: 'Customer', default: true },
+    { key: 'driver', label: 'Driver', default: true },
+    { key: 'location', label: 'Location', default: true },
+    { key: 'description', label: 'Description', default: true },
+    { key: 'dot_recordable', label: 'DOT Recordable', default: true },
+    { key: 'injuries', label: 'Injuries', default: true },
+    { key: 'tow_required', label: 'Tow Required', default: false },
+    { key: 'csa_points', label: 'CSA Points', default: true },
+    { key: 'est_damage', label: 'Est. Damage ($)', default: true },
+    { key: 'police_report', label: 'Police Report #', default: false },
+    { key: 'insurance_claim', label: 'Insurance Claim #', default: false },
+    { key: 'corrective_action', label: 'Corrective Action', default: true },
+  ],
+  compliance_scorecard: [
+    { key: 'area', label: 'Area', default: true },
+    { key: 'metric', label: 'Metric', default: true },
+    { key: 'count', label: 'Count', default: true },
+    { key: 'rate_notes', label: 'Rate / Notes', default: true },
+  ],
+  team_roster: [
+    { key: 'name', label: 'Name', default: true },
+    { key: 'email', label: 'Email', default: true },
+    { key: 'role', label: 'Role', default: true },
+    { key: 'customer', label: 'Customer', default: true },
+    { key: 'phone', label: 'Phone', default: true },
+    { key: 'status', label: 'Status', default: true },
+    { key: 'employee_number', label: 'Employee #', default: false },
   ],
   fleetco_master_export: [
-    { key: 'loads', label: 'Loads sheet', default: true },
-    { key: 'fleet', label: 'Fleet sheet', default: true },
-    { key: 'fuel', label: 'Fuel sheet', default: true },
-    { key: 'work_orders', label: 'Work orders sheet', default: true },
-    { key: 'invoices', label: 'Invoices sheet', default: true },
-    { key: 'inspections', label: 'Inspections sheet', default: true },
-    { key: 'hos', label: 'HOS sheet', default: true },
-    { key: 'payroll', label: 'Payroll sheet', default: true },
-    { key: 'customers', label: 'Customers sheet', default: true },
+    { key: 'executive_summary', label: 'Executive summary', default: true },
+    { key: 'customer_profitability', label: 'Customer P&L', default: true },
+    { key: 'loads', label: 'Loads', default: true },
+    { key: 'load_profitability', label: 'Load profitability', default: true },
+    { key: 'fleet', label: 'Fleet', default: true },
+    { key: 'fuel', label: 'Fuel', default: true },
+    { key: 'fuel_efficiency', label: 'Fuel efficiency', default: true },
+    { key: 'work_orders', label: 'Work orders', default: true },
+    { key: 'work_order_parts', label: 'WO parts detail', default: true },
+    { key: 'invoices', label: 'Invoices', default: true },
+    { key: 'inspections', label: 'Inspections', default: true },
+    { key: 'hos', label: 'HOS', default: true },
+    { key: 'incidents', label: 'Incidents', default: true },
+    { key: 'payroll', label: 'Payroll', default: true },
+    { key: 'compliance', label: 'Compliance scorecard', default: true },
+    { key: 'parts', label: 'Parts inventory', default: true },
+    { key: 'customers', label: 'Customers', default: true },
+    { key: 'team', label: 'Team roster', default: true },
   ],
 };
 
@@ -319,7 +449,8 @@ export default function ReportConfigModal({ report, onClose, onGenerate, generat
   const clearAll = () => setSelected(Object.fromEntries(allCols.map(c => [c.key, false])));
 
   const selectedKeys = allCols.filter(c => selected[c.key]).map(c => c.key);
-  const canExport = selectedKeys.length > 0;
+  const canExport = allCols.length === 0 || selectedKeys.length > 0;
+  const isFixedLayout = allCols.length === 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -369,6 +500,8 @@ export default function ReportConfigModal({ report, onClose, onGenerate, generat
         </div>
 
         {/* Column selector */}
+        {!isFixedLayout && (
+        <>
         <div className="px-5 pt-4 pb-2">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-black text-slate-700">Select Columns to Include</span>
@@ -402,6 +535,14 @@ export default function ReportConfigModal({ report, onClose, onGenerate, generat
             ))}
           </div>
         </div>
+        </>
+        )}
+
+        {isFixedLayout && (
+          <div className="px-5 py-4 text-sm text-slate-500">
+            This report includes all metrics — no column selection needed.
+          </div>
+        )}
 
         {/* Export format */}
         {!isMasterExport && (
