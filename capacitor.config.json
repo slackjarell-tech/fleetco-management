@@ -1,26 +1,22 @@
-import { Capacitor } from '@capacitor/core';
-
-const config = {
-  appId: 'org.fleetcomanagement.driver',
-  appName: 'FleetCo Driver',
-  webDir: 'dist',
-  server: {
-    androidScheme: 'https',
-    cleartext: false,
+{
+  "appId": "org.fleetcomanagement.driver",
+  "appName": "FleetCo Driver",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false
   },
-  plugins: {
-    SplashScreen: {
-      launchShowDuration: 2000,
-      backgroundColor: '#0f172a',
-      showSpinner: false,
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0f172a",
+      "showSpinner": false
     },
-    Camera: {
-      permissions: ['camera', 'photos'],
+    "Camera": {
+      "permissions": ["camera", "photos"]
     },
-    Geolocation: {
-      permissions: ['location'],
-    },
-  },
-};
-
-export default config;
+    "Geolocation": {
+      "permissions": ["location"]
+    }
+  }
+}
