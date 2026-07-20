@@ -26,7 +26,8 @@
     "marketing:video": "node scripts/generate-client-video.mjs",
     "marketing:plan": "node scripts/generate-business-plan.mjs",
     "marketing:manual": "node scripts/generate-user-manual.mjs",
-    "marketing:send": "node scripts/email-client-presentation.mjs"
+    "marketing:send": "node scripts/email-client-presentation.mjs",
+    "process:logo": "node scripts/process-logo.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^7.0.1",
@@ -133,6 +134,7 @@
     "html5-qrcode": "^2.3.8",
     "postcss": "^8.5.3",
     "puppeteer": "^24.2.0",
+    "sharp": "^0.35.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.2",
     "vite": "^6.1.0"

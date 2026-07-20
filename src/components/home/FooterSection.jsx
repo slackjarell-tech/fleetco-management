@@ -28,7 +28,7 @@ export default function FooterSection() {
           {/* Brand */}
           <div>
             <Link to="/" className="inline-block mb-4">
-              <FleetcoLogo size={56} variant="full" />
+              <FleetcoLogo size={48} variant="full" />
             </Link>
             <p className="text-slate-400 text-sm leading-relaxed mb-4">
               Quality, low-cost fleet management services for owner operators and small fleet owners across the nation.

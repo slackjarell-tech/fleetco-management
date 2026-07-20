@@ -8,7 +8,7 @@ export default function AuthLayout({ title, subtitle, footer, children }) {
       {/* Left panel — branding */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-slate-950 border-r border-slate-800">
         <Link to="/" className="inline-block">
-          <FleetcoLogo size={56} variant="full" />
+          <FleetcoLogo size={48} variant="full" />
         </Link>
 
         <div>
@@ -42,7 +42,7 @@ export default function AuthLayout({ title, subtitle, footer, children }) {
       <div className="flex-1 flex flex-col justify-center items-center px-6 py-12">
         {/* Mobile logo */}
         <Link to="/" className="inline-block mb-10 lg:hidden">
-          <FleetcoLogo size={48} variant="full" />
+          <FleetcoLogo size={40} variant="full" />
         </Link>
 
         <div className="w-full max-w-md">

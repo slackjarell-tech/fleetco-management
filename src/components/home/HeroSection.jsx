@@ -117,8 +117,8 @@ export default function HeroSection() {
           {/* Right: Client portal sign-in */}
           <div className="hidden lg:block">
             <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8">
-              <div className="flex justify-center mb-5">
-                <FleetcoLogo size={48} variant="full" />
+              <div className="flex justify-center mb-4">
+                <FleetcoLogo size={40} variant="full" />
               </div>
               <div className="flex items-center gap-2 text-amber-400 font-bold text-sm tracking-widest uppercase mb-2">
                 <LogIn className="w-4 h-4" />
