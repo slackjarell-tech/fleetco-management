@@ -2,12 +2,27 @@ import bcrypt from 'bcryptjs';
 import {
   createUser,
   findUserByEmail,
+  getUserRowByEmail,
+  updateUser,
   createEntity,
   filterEntities,
   listEntities,
   nowIso,
 } from './db.js';
 import { computeNextDueDate } from './billing.js';
+import { defaultSidebarModulesForRole } from './customerRoles.js';
+
+/** Shared demo password for all tester driver accounts */
+export const DEMO_DRIVER_PASSWORD = 'demo123';
+
+/** Five demo drivers for mobile app / field testing — safe to share publicly */
+export const DEMO_DRIVERS = [
+  { email: 'driver1@fleetco.com', fullName: 'Demo Driver 1', employeeNumber: 'DRV-90001' },
+  { email: 'driver2@fleetco.com', fullName: 'Demo Driver 2', employeeNumber: 'DRV-90002' },
+  { email: 'driver3@fleetco.com', fullName: 'Demo Driver 3', employeeNumber: 'DRV-90003' },
+  { email: 'driver4@fleetco.com', fullName: 'Demo Driver 4', employeeNumber: 'DRV-90004' },
+  { email: 'driver5@fleetco.com', fullName: 'Demo Driver 5', employeeNumber: 'DRV-90005' },
+];
 
 function daysAgo(n) {
   const d = new Date();
@@ -21,28 +36,89 @@ function dateOnly(daysOffset = 0) {
   return d.toISOString().split('T')[0];
 }
 
-function ensureUser(email, { fullName, role, password = 'demo123' }) {
+function ensureUser(email, { fullName, role, password = DEMO_DRIVER_PASSWORD }) {
   if (findUserByEmail(email)) return findUserByEmail(email);
   const hash = bcrypt.hashSync(password, 10);
   return createUser({ email, passwordHash: hash, fullName, role });
 }
 
+/** Create or refresh demo driver accounts (idempotent — safe on production). */
+export function ensureDemoDrivers(customerId = null) {
+  const demoCustomer =
+    customerId ||
+    listEntities('Customer').find((c) => c.company_name === 'Lone Star Freight LLC')?.id ||
+    listEntities('Customer')[0]?.id ||
+    null;
+
+  const hash = bcrypt.hashSync(DEMO_DRIVER_PASSWORD, 10);
+  const sidebarModules = defaultSidebarModulesForRole('driver');
+  const ensured = [];
+
+  for (const spec of DEMO_DRIVERS) {
+    const existing = getUserRowByEmail(spec.email);
+    if (!existing) {
+      createUser({
+        email: spec.email,
+        passwordHash: hash,
+        fullName: spec.fullName,
+        role: 'driver',
+        customerId: demoCustomer,
+        employeeNumber: spec.employeeNumber,
+        sidebarModules,
+      });
+    } else {
+      const patch = {
+        full_name: spec.fullName,
+        role: 'driver',
+        employee_number: spec.employeeNumber,
+        password_hash: hash,
+        sidebar_modules: sidebarModules,
+        status: 'active',
+      };
+      if (demoCustomer && !existing.customer_id) patch.customer_id = demoCustomer;
+      updateUser(existing.id, patch);
+    }
+    ensured.push(findUserByEmail(spec.email));
+  }
+
+  return { customerId: demoCustomer, drivers: ensured };
+}
+
+export function getDemoDriverLogins() {
+  return DEMO_DRIVERS.map((d, i) => ({
+    number: i + 1,
+    name: d.fullName,
+    email: d.email,
+    password: DEMO_DRIVER_PASSWORD,
+    driverNumber: d.employeeNumber,
+    loginUrl: 'https://fleetcomanagement.org/login?app=driver',
+  }));
+}
+
 export function seedDemoData(options = {}) {
   const fillGaps = options?.fillGaps === true;
+  const ensureDrivers = options?.ensureDrivers === true;
   const hasCustomers = filterEntities('Customer').length > 0;
+
+  if (ensureDrivers) {
+    const result = ensureDemoDrivers(options?.customerId);
+    if (fillGaps && hasCustomers) seedGapDemoEntities();
+    return { created: true, drivers: result.drivers.length, customerId: result.customerId };
+  }
 
   if (!hasCustomers) {
     seedCoreDemoData();
     seedGapDemoEntities();
-    return true;
+    return { created: true };
   }
 
   if (fillGaps) {
+    ensureDemoDrivers();
     seedGapDemoEntities();
-    return true;
+    return { created: true };
   }
 
-  return false;
+  return { created: false };
 }
 
 function seedCoreDemoData() {
@@ -56,15 +132,6 @@ function seedCoreDemoData() {
     fullName: 'Marcus Webb',
     role: 'fleet_coordinator',
   });
-  ensureUser('driver1@fleetco.com', {
-    fullName: 'Mike Rodriguez',
-    role: 'driver',
-  });
-  ensureUser('driver2@fleetco.com', {
-    fullName: 'Lisa Thompson',
-    role: 'driver',
-  });
-
   const ts = nowIso();
   const monthlyDue = computeNextDueDate(ts, 'monthly');
   const overdueDue = new Date();
@@ -174,6 +241,8 @@ function seedCoreDemoData() {
 
   const c1 = customers[0].id;
   const c2 = customers[1].id;
+
+  ensureDemoDrivers(c1);
 
   const vehicles = [
     { unit_number: 'T-101', unit_type: 'truck', make: 'Freightliner', model: 'Cascadia', year: 2022, vin: '1FUJGHDV8NLBT1234', license_plate: 'TX-FLT101', status: 'active', odometer: 125400, customer_id: c1 },
@@ -315,7 +384,7 @@ function seedCoreDemoData() {
     vehicles: vehicleRecords.length,
     workOrders: workOrders.length,
     loads: loads.length,
-    demoLogins: 'manager@fleetco.com / demo123, driver1@fleetco.com / demo123',
+    demoLogins: 'manager@fleetco.com / demo123, driver1@fleetco.com … driver5@fleetco.com / demo123',
   });
 }
 

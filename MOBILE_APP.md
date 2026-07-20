@@ -15,8 +15,22 @@ The **FleetCo Driver** app uses the same backend as [fleetcomanagement.org](http
 ## Try on mobile browser (no app store yet)
 
 1. Open **https://fleetcomanagement.org/login?app=driver**
-2. Sign in as a driver (e.g. `driver1@fleetco.com` / `demo123`)
+2. Sign in with any demo driver below (password **`demo123`** for all)
 3. You get the mobile driver UI at `/driver`
+
+### Demo driver logins (for testers)
+
+| # | Name | Email | Password | Driver # | Login URL |
+|---|------|-------|----------|----------|-----------|
+| 1 | Demo Driver 1 | driver1@fleetco.com | demo123 | DRV-90001 | https://fleetcomanagement.org/login?app=driver |
+| 2 | Demo Driver 2 | driver2@fleetco.com | demo123 | DRV-90002 | https://fleetcomanagement.org/login?app=driver |
+| 3 | Demo Driver 3 | driver3@fleetco.com | demo123 | DRV-90003 | https://fleetcomanagement.org/login?app=driver |
+| 4 | Demo Driver 4 | driver4@fleetco.com | demo123 | DRV-90004 | https://fleetcomanagement.org/login?app=driver |
+| 5 | Demo Driver 5 | driver5@fleetco.com | demo123 | DRV-90005 | https://fleetcomanagement.org/login?app=driver |
+
+All demo drivers are linked to the **Lone Star Freight LLC** demo customer when demo data is seeded.
+
+**Production:** run `node scripts/seed-demo-drivers.mjs` (owner login required) to create or refresh these accounts on https://fleetcomanagement.org.
 
 ## Build for App Store & Google Play
 

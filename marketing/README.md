@@ -27,8 +27,8 @@ On first server start, the app seeds realistic demo data:
 
 **Demo logins** (password `demo123`):
 - `manager@fleetco.com` — fleet manager
-- `driver1@fleetco.com` — driver
+- `driver1@fleetco.com` … `driver5@fleetco.com` — drivers (DRV-90001 … DRV-90005)
 
 **Executive login:** `admin@fleetco.com` / `admin123`
 
-To re-seed on an existing database (executive only), invoke the `seedDemoData` function from the portal or API.
+To re-seed on an existing database (owner/executive), invoke the `seedDemoData` function from the portal or API. For driver accounts only: `node scripts/seed-demo-drivers.mjs`.

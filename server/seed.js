@@ -135,8 +135,9 @@ export function seedDatabase() {
   const allowDemoSeed =
     process.env.SEED_DEMO_DATA === 'true' ||
     (process.env.NODE_ENV !== 'production' && process.env.SEED_DEMO_DATA !== 'false');
-  if (allowDemoSeed && seedDemoData()) {
-    console.log('Demo fleet data ready for client presentations');
+  if (allowDemoSeed) {
+    const result = seedDemoData();
+    if (result?.created) console.log('Demo fleet data ready for client presentations');
   } else if (process.env.NODE_ENV === 'production' && filterEntities('Customer').length === 0) {
     console.log('[seed] Production startup — skipping demo customers (add real customers in the portal)');
   }

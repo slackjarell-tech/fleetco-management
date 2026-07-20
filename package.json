@@ -11,6 +11,8 @@
     "build:mobile": "vite build --mode mobile",
     "test:functions": "node scripts/full-functions-test.mjs",
     "test:functions:prod": "node scripts/full-functions-test.mjs --production",
+    "seed:demo-drivers": "node scripts/seed-demo-drivers.mjs",
+    "seed:production-demo": "node scripts/seed-production-demo.mjs",
     "cap:sync": "npm run build:mobile && npx cap sync",
     "cap:open:ios": "npx cap open ios",
     "cap:open:android": "npx cap open android",

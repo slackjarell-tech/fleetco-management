@@ -154,15 +154,23 @@ export async function invokeFunction(name, body, user) {
       return { success: true, message: 'Fuel prices refreshed (local mode)' };
     case 'seedDemoData': {
       if (!user || !['owner', 'executive'].includes(user.role)) throw new Error('Owner or executive access required');
-      const { seedDemoData, getDemoSeedSummary } = await import('./seedDemo.js');
-      const created = seedDemoData(body);
+      const { seedDemoData, getDemoSeedSummary, getDemoDriverLogins } = await import('./seedDemo.js');
+      const result = seedDemoData(body);
+      const created = !!result?.created;
+      let message = created
+        ? (body?.ensureDrivers
+          ? 'Demo driver accounts ensured'
+          : body?.fillGaps
+            ? 'Demo gap data added for system test'
+            : 'Demo data seeded successfully')
+        : 'Demo data already exists — pass fillGaps: true or ensureDrivers: true';
       return {
         success: true,
-        created: !!created,
-        message: created
-          ? (body?.fillGaps ? 'Demo gap data added for system test' : 'Demo data seeded successfully')
-          : 'Demo data already exists — pass fillGaps: true to add missing records',
+        created,
+        message,
+        drivers: body?.ensureDrivers ? getDemoDriverLogins() : undefined,
         summary: getDemoSeedSummary(),
+        ...result,
       };
     }
     default:
