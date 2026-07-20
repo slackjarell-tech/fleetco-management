@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Truck, Eye, EyeOff, Copy, CheckCircle2, AlertTriangle, Upload, Plus, Trash2 } from 'lucide-react';
-import { api } from '@/api/apiClient';
+import { api, getViewAsCustomerId } from '@/api/apiClient';
 import { DRIVER_DOC_TYPES } from '@/components/drivers/DriverDocuments';
 
 function generateTempPassword() {
@@ -75,39 +75,36 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
     setLoading(true);
     setError('');
     try {
+      const customerId = currentUser?.customer_id || getViewAsCustomerId() || undefined;
       const payload = {
         email: form.email.trim(),
         tempPassword: form.temp_password,
         role: 'driver',
         fullName: form.full_name.trim(),
-      };
-      if (currentUser?.customer_id) payload.customerId = currentUser.customer_id;
-
-      await api.functions.invoke('createUserAccount', payload);
-
-      const allUsers = await api.entities.User.list();
-      const newUser = allUsers.find(u => u.email.toLowerCase() === form.email.trim().toLowerCase());
-      if (!newUser) throw new Error('Account created but user record not found.');
-
-      await api.entities.User.update(newUser.id, {
         phone: form.phone || undefined,
         license_number: form.license_number || undefined,
         license_state: form.license_state || undefined,
         license_expiry: form.license_expiry || undefined,
         status: form.status,
-      });
+      };
+      if (customerId) payload.customerId = customerId;
+
+      const result = await api.functions.invoke('createUserAccount', payload);
+      const driverId = result?.user_id;
+      if (!driverId) throw new Error('Account created but user ID was not returned.');
 
       if (pendingDocs.some(d => d.file)) {
-        await uploadPendingDocs(newUser.id);
+        await uploadPendingDocs(driverId);
       }
 
       setSuccess({
         email: form.email,
         temp_password: form.temp_password,
         full_name: form.full_name,
+        driver_number: result.employee_number || null,
         docsUploaded: pendingDocs.filter(d => d.file).length,
       });
-      if (onCreated) onCreated(newUser.id);
+      if (onCreated) onCreated(driverId);
     } catch (err) {
       setError(err?.data?.error || err?.message || 'Failed to create driver account.');
     } finally {
@@ -136,6 +133,11 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
             <div className="flex items-center gap-2 text-emerald-700 font-black text-sm">
               <CheckCircle2 className="w-5 h-5" /> Driver account created successfully!
             </div>
+            {success.driver_number && (
+              <p className="text-sm text-slate-700">
+                System driver number: <span className="font-mono font-bold text-amber-700">{success.driver_number}</span>
+              </p>
+            )}
             {success.docsUploaded > 0 && (
               <p className="text-sm text-slate-600">{success.docsUploaded} document{success.docsUploaded > 1 ? 's' : ''} uploaded.</p>
             )}

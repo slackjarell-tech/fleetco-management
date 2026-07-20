@@ -100,7 +100,8 @@ export default function Drivers() {
     drivers.filter(d =>
       !search ||
       (d.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
-      (d.email || '').toLowerCase().includes(search.toLowerCase())
+      (d.email || '').toLowerCase().includes(search.toLowerCase()) ||
+      (d.employee_number || '').toLowerCase().includes(search.toLowerCase())
     ), [drivers, search]);
 
   if (loading) return (
@@ -166,7 +167,7 @@ export default function Drivers() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <input
           className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-          placeholder="Search by name or email..."
+          placeholder="Search by name, email, or driver #..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />

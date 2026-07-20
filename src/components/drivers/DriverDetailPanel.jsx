@@ -36,8 +36,13 @@ export default function DriverDetailPanel({ driver, assignedVehicles, stats, fue
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-black text-slate-900">{driver.full_name || '—'}</h2>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
+            <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
               <Mail className="w-3 h-3" /> {driver.email}
+              {driver.employee_number && (
+                <span className="font-mono font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                  {driver.employee_number}
+                </span>
+              )}
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1">

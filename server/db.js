@@ -120,6 +120,24 @@ export function getUserRowByEmail(email) {
   return loadStore().users.find((u) => u.email.toLowerCase() === email.toLowerCase()) || null;
 }
 
+/** System-wide unique driver ID — format DRV-00001, stored on User.employee_number */
+export function generateNextDriverNumber() {
+  let max = 0;
+  for (const u of loadStore().users) {
+    const match = String(u.employee_number || '').match(/^DRV-(\d+)$/i);
+    if (match) max = Math.max(max, parseInt(match[1], 10));
+  }
+  return `DRV-${String(max + 1).padStart(5, '0')}`;
+}
+
+export function isDriverNumberTaken(number, excludeUserId = null) {
+  const normalized = String(number || '').trim().toUpperCase();
+  if (!normalized) return false;
+  return loadStore().users.some(
+    (u) => u.id !== excludeUserId && String(u.employee_number || '').trim().toUpperCase() === normalized,
+  );
+}
+
 export function createUser({ email, passwordHash, fullName, role = 'user', customerId, employeeNumber, sidebarModules, phone, license_number, license_state, license_expiry }) {
   const id = newId();
   const ts = nowIso();

@@ -15,7 +15,14 @@ export default function DriverCard({ driver, assignedVehicles, stats, onClick })
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-bold text-slate-900 truncate">{driver.full_name || '—'}</div>
-          <div className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Driver</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Driver</span>
+            {driver.employee_number && (
+              <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                {driver.employee_number}
+              </span>
+            )}
+          </div>
         </div>
         <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
       </div>

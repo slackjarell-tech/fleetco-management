@@ -5,6 +5,8 @@ import {
   filterEntities,
   findUserByEmail,
   findUserById,
+  generateNextDriverNumber,
+  isDriverNumberTaken,
   getUserRowByEmail,
   getEntity,
   updateUser,
@@ -298,10 +300,32 @@ function provisionInternalPortalUser({ email, tempPassword, role, employeeNumber
 
 async function createUserAccount(body, user) {
   if (!user) throw new Error('Unauthorized');
-  const { email, tempPassword, role, customerId, employeeNumber, fullName, sendWelcomeEmail } = body;
+  const {
+    email,
+    tempPassword,
+    role,
+    customerId: bodyCustomerId,
+    employeeNumber: bodyEmployeeNumber,
+    fullName,
+    sendWelcomeEmail,
+    phone,
+    license_number,
+    license_state,
+    license_expiry,
+    status,
+  } = body;
   if (!email || !tempPassword || !role) {
     throw new Error('Email, tempPassword, and role are required');
   }
+
+  let employeeNumber = bodyEmployeeNumber?.trim() || null;
+  if (role === 'driver' && !employeeNumber) {
+    employeeNumber = generateNextDriverNumber();
+  } else if (employeeNumber && isDriverNumberTaken(employeeNumber)) {
+    throw new Error(`Driver number ${employeeNumber} is already assigned`);
+  }
+
+  const customerId = bodyCustomerId;
 
   const internalRoles = ['executive', 'fleet_manager', 'fleet_coordinator'];
   const customerRoles = [...CUSTOMER_TEAM_ROLES, CUSTOMER_LEGACY_ROLE];
@@ -340,6 +364,13 @@ async function createUserAccount(body, user) {
 
   let existing = getUserRowByEmail(normalizedEmail);
   const sidebarModules = body.sidebar_modules || defaultSidebarModulesForRole(role);
+  const profileFields = {
+    ...(phone ? { phone } : {}),
+    ...(license_number ? { license_number } : {}),
+    ...(license_state ? { license_state } : {}),
+    ...(license_expiry ? { license_expiry } : {}),
+    ...(status ? { status } : {}),
+  };
   if (!existing) {
     const hash = bcrypt.hashSync(tempPassword, 10);
     createUser({
@@ -350,8 +381,12 @@ async function createUserAccount(body, user) {
       employeeNumber,
       fullName,
       sidebarModules,
+      ...profileFields,
     });
   } else {
+    if (employeeNumber && isDriverNumberTaken(employeeNumber, existing.id)) {
+      throw new Error(`Driver number ${employeeNumber} is already assigned`);
+    }
     updateUser(existing.id, {
       role,
       customer_id: effectiveCustomerId,
@@ -359,6 +394,7 @@ async function createUserAccount(body, user) {
       password_hash: bcrypt.hashSync(tempPassword, 10),
       sidebar_modules: sidebarModules,
       ...(fullName ? { full_name: fullName } : {}),
+      ...profileFields,
     });
   }
 
@@ -413,6 +449,7 @@ async function createUserAccount(body, user) {
     success: true,
     email: normalizedEmail,
     user_id: portalUser?.id,
+    employee_number: portalUser?.employee_number || employeeNumber || null,
     welcomeEmail,
     message: `${normalizedEmail} account created. They can sign in with the temporary password and will be asked to set a new password on first login.${emailNote}`,
   };
