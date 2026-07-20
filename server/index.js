@@ -71,6 +71,34 @@ const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const app = express();
+
+// Render / nginx sit behind a reverse proxy — needed for correct HTTPS detection
+app.set('trust proxy', 1);
+
+const CANONICAL_ORIGIN = (process.env.APP_ORIGIN || process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org').replace(/\/$/, '');
+const CANONICAL_HOST = new URL(CANONICAL_ORIGIN).hostname;
+
+if (process.env.NODE_ENV === 'production') {
+  // http:// → https:// and www. → apex
+  app.use((req, res, next) => {
+    const host = (req.get('host') || '').split(':')[0].toLowerCase();
+    const proto = (req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim();
+
+    if (host === `www.${CANONICAL_HOST}`) {
+      return res.redirect(301, `${CANONICAL_ORIGIN}${req.originalUrl}`);
+    }
+    if (proto === 'http') {
+      return res.redirect(301, `${CANONICAL_ORIGIN}${req.originalUrl}`);
+    }
+    next();
+  });
+
+  app.use((_req, res, next) => {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    next();
+  });
+}
+
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '50mb' }));
 app.use('/uploads', express.static(uploadsDir));
@@ -393,7 +421,7 @@ const ENTITY_NAMES = [
   'DeliveryStop', 'HOSLog', 'FuelStation', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
-  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
+  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
 ];
 
 function filterUsersForActor(actor, users) {
@@ -738,7 +766,9 @@ if (process.env.NODE_ENV === 'production' && fs.existsSync(distDir)) {
   });
 }
 
-const siteUrl = process.env.APP_ORIGIN || `http://localhost:${PORT}`;
+const siteUrl = process.env.NODE_ENV === 'production'
+  ? CANONICAL_ORIGIN
+  : (process.env.APP_ORIGIN || `http://localhost:${PORT}`);
 
 async function startServer() {
   const { beginStartupPhase, endStartupPhase } = await import('./dataIntegrity.js');

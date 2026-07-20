@@ -3,8 +3,11 @@ import { api } from '@/api/apiClient';
 import { useCustomerContext } from '@/lib/CustomerContext';
 import { filterVehiclesForUser } from '@/lib/roles';
 import {
+  nhtsaVinDecoderUrl, rockAutoCatalogUrl, autoZoneRepairGuidesUrl, nhtsaRecallsUrl,
+} from '@/lib/vehicleExternalLinks';
+import {
   Search, Loader2, Truck, Package, Wrench, ClipboardList, Shield,
-  Plus, Edit2, AlertTriangle, CheckCircle, Hash,
+  Plus, Edit2, AlertTriangle, CheckCircle, Hash, ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -217,6 +220,20 @@ export default function VehiclePartsResearch() {
 
           {vinResult && (
             <>
+              <div className="flex flex-wrap gap-3 text-xs font-bold">
+                <a href={nhtsaVinDecoderUrl(vinResult.vin)} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline inline-flex items-center gap-1">
+                  NHTSA VIN Decoder <ExternalLink className="w-3 h-3" />
+                </a>
+                <a href={rockAutoCatalogUrl({ year: specs?.year || vehicle?.year, make: specs?.make || vehicle?.make, model: specs?.model || vehicle?.model })} target="_blank" rel="noopener noreferrer" className="text-indigo-700 hover:underline inline-flex items-center gap-1">
+                  RockAuto Parts <ExternalLink className="w-3 h-3" />
+                </a>
+                <a href={autoZoneRepairGuidesUrl({ year: specs?.year || vehicle?.year, make: specs?.make || vehicle?.make, model: specs?.model || vehicle?.model })} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline inline-flex items-center gap-1">
+                  AutoZone Service Guides <ExternalLink className="w-3 h-3" />
+                </a>
+                <a href={nhtsaRecallsUrl(vinResult.vin)} target="_blank" rel="noopener noreferrer" className="text-red-700 hover:underline inline-flex items-center gap-1">
+                  NHTSA Recalls <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <Card>
                   <CardHeader className="pb-2">
@@ -279,6 +296,20 @@ export default function VehiclePartsResearch() {
                   </CardContent>
                 </Card>
               </div>
+
+              {(vinResult.recalls || []).length > 0 && (
+                <Section title="NHTSA Recalls" icon={AlertTriangle} count={vinResult.recalls.length}>
+                  <ul className="space-y-2 text-sm">
+                    {vinResult.recalls.map((r, i) => (
+                      <li key={i} className="border border-red-100 bg-red-50/50 rounded-lg p-3">
+                        <span className="font-mono text-xs font-bold text-red-800">{r.nhtsa_campaign}</span>
+                        {r.component && <span className="text-xs text-slate-600 ml-2">{r.component}</span>}
+                        <p className="mt-1 text-slate-800">{r.summary}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
 
               <Section title="Compatible Parts" icon={Package} count={vinResult.compatible_parts?.length}>
                 {(vinResult.compatible_parts || []).length === 0 ? (

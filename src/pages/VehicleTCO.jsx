@@ -1,9 +1,15 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/api/apiClient';
-import { DollarSign, Truck, TrendingDown, Wrench, Fuel, ChevronDown, ChevronUp, Search, BarChart2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { DollarSign, Truck, TrendingDown, Wrench, Fuel, ChevronDown, ChevronUp, Search, BarChart2, Gauge, Info } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const USEFUL_LIFE_YEARS = { truck: 10, trailer: 15 };
+
+const MILE_SOURCE_LABEL = {
+  fuel_odometer: 'Fuel log odometer readings',
+  loads: 'Load mileage totals',
+  odometer: 'Current vehicle odometer',
+};
 
 function calcDepreciation(vehicle) {
   if (!vehicle.purchase_price || !vehicle.purchase_date) return null;
@@ -15,8 +21,48 @@ function calcDepreciation(vehicle) {
   return { yearsOwned: yearsOwned.toFixed(1), annualDep, accumulated, currentValue };
 }
 
+/** Best available mileage for cost-per-mile (fuel odometer delta → load miles → unit odometer). */
+function calcVehicleMiles(vehicle, vFuel, vLoads) {
+  const fuelWithOdo = vFuel
+    .filter(f => f.odometer_reading != null && f.odometer_reading !== '')
+    .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+
+  if (fuelWithOdo.length >= 2) {
+    const miles = Number(fuelWithOdo[fuelWithOdo.length - 1].odometer_reading) - Number(fuelWithOdo[0].odometer_reading);
+    if (miles > 0) return { miles, source: 'fuel_odometer' };
+  }
+
+  const loadMiles = vLoads.reduce((s, l) => s + (Number(l.miles) || 0), 0);
+  if (loadMiles > 0) return { miles: loadMiles, source: 'loads' };
+
+  if (vehicle.odometer > 0) return { miles: Number(vehicle.odometer), source: 'odometer' };
+
+  return { miles: 0, source: null };
+}
+
+function calcCostPerMile(costs, miles) {
+  if (!miles || miles <= 0) return null;
+  return {
+    total: costs.total / miles,
+    fuel: costs.fuel / miles,
+    repair: costs.repair / miles,
+    depreciation: costs.depreciation / miles,
+    operating: (costs.fuel + costs.repair) / miles,
+  };
+}
+
 function fmt(n) {
   return `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
+function fmtPerMile(n) {
+  if (n == null || Number.isNaN(n)) return '—';
+  return `$${n.toFixed(3)}/mi`;
+}
+
+function fmtPerMileShort(n) {
+  if (n == null || Number.isNaN(n)) return '—';
+  return `$${n.toFixed(2)}/mi`;
 }
 
 export default function VehicleTCO() {
@@ -53,28 +99,32 @@ export default function VehicleTCO() {
     return vehicles.map(v => {
       const vFuel = fuelLogs.filter(f => f.vehicle_id === v.id);
       const vWork = workOrders.filter(w => w.vehicle_id === v.id);
-      const vLoads = loads.filter(l => l.assigned_vehicle_id === v.id && l.status === 'delivered');
+      const vLoads = loads.filter(l => l.assigned_vehicle_id === v.id);
 
       const totalFuelCost = vFuel.reduce((s, f) => s + (f.total_cost || 0), 0);
       const totalRepairCost = vWork.reduce((s, w) => s + (w.total_cost || 0), 0);
-      const totalMiles = vLoads.reduce((s, l) => s + (l.miles || 0), 0);
-      const totalRevenue = vLoads.reduce((s, l) => s + (l.rate || 0), 0);
+      const deliveredLoads = vLoads.filter(l => l.status === 'delivered');
+      const totalRevenue = deliveredLoads.reduce((s, l) => s + (l.rate || 0), 0);
+      const { miles: totalMiles, source: mileSource } = calcVehicleMiles(v, vFuel, vLoads);
       const dep = calcDepreciation(v);
       const depCost = dep?.accumulated || 0;
       const tco = totalFuelCost + totalRepairCost + depCost;
-      const costPerMile = totalMiles > 0 ? tco / totalMiles : null;
+      const cpm = calcCostPerMile(
+        { total: tco, fuel: totalFuelCost, repair: totalRepairCost, depreciation: depCost },
+        totalMiles,
+      );
       const repairRatio = v.purchase_price > 0 ? (totalRepairCost / v.purchase_price) * 100 : null;
 
       return {
-        vehicle: v, totalFuelCost, totalRepairCost, totalMiles, totalRevenue,
-        depCost, tco, costPerMile, repairRatio, dep,
+        vehicle: v, totalFuelCost, totalRepairCost, totalMiles, totalRevenue, mileSource,
+        depCost, tco, cpm, repairRatio, dep,
         netPnL: totalRevenue - tco,
         fuelLogs: vFuel.length, workOrderCount: vWork.length,
       };
     }).filter(d => d.tco > 0 || d.vehicle.purchase_price > 0)
       .sort((a, b) =>
         sortBy === 'tco' ? b.tco - a.tco :
-        sortBy === 'cpm' ? (b.costPerMile || 0) - (a.costPerMile || 0) :
+        sortBy === 'cpm' ? (b.cpm?.total || 0) - (a.cpm?.total || 0) :
         sortBy === 'repair' ? b.totalRepairCost - a.totalRepairCost : 0
       );
   }, [vehicles, fuelLogs, workOrders, loads, sortBy]);
@@ -85,12 +135,16 @@ export default function VehicleTCO() {
       `${d.vehicle.year} ${d.vehicle.make} ${d.vehicle.model}`.toLowerCase().includes(search.toLowerCase())
     ), [tcoData, search]);
 
-  const totals = useMemo(() => ({
-    tco: filtered.reduce((s, d) => s + d.tco, 0),
-    fuel: filtered.reduce((s, d) => s + d.totalFuelCost, 0),
-    repair: filtered.reduce((s, d) => s + d.totalRepairCost, 0),
-    revenue: filtered.reduce((s, d) => s + d.totalRevenue, 0),
-  }), [filtered]);
+  const totals = useMemo(() => {
+    const tco = filtered.reduce((s, d) => s + d.tco, 0);
+    const fuel = filtered.reduce((s, d) => s + d.totalFuelCost, 0);
+    const repair = filtered.reduce((s, d) => s + d.totalRepairCost, 0);
+    const depreciation = filtered.reduce((s, d) => s + d.depCost, 0);
+    const revenue = filtered.reduce((s, d) => s + d.totalRevenue, 0);
+    const miles = filtered.reduce((s, d) => s + d.totalMiles, 0);
+    const cpm = calcCostPerMile({ total: tco, fuel, repair, depreciation }, miles);
+    return { tco, fuel, repair, depreciation, revenue, miles, cpm };
+  }, [filtered]);
 
   const chartData = filtered.slice(0, 10).map(d => ({
     name: `Unit ${d.vehicle.unit_number}`,
@@ -112,7 +166,55 @@ export default function VehicleTCO() {
         <h1 className="text-xl font-black flex items-center gap-2">
           <DollarSign className="w-5 h-5 text-amber-400" /> Total Cost of Ownership (TCO)
         </h1>
-        <p className="text-slate-300 text-xs mt-1">Fuel + Repair + Depreciation per vehicle — drives replace-vs-repair decisions</p>
+        <p className="text-slate-300 text-xs mt-1">
+          Fuel + repair + depreciation per vehicle — including cost-per-mile to keep each unit on the road
+        </p>
+      </div>
+
+      {/* Cost Per Mile — owner headline */}
+      <div className="bg-white rounded-2xl border-2 border-amber-200 p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h2 className="font-black text-slate-900 flex items-center gap-2">
+              <Gauge className="w-5 h-5 text-amber-500" /> Cost Per Mile — On the Road
+            </h2>
+            <p className="text-xs text-slate-500 mt-1 max-w-xl">
+              Total ownership cost divided by miles driven. Uses fuel-log odometer readings when available,
+              otherwise load miles or the unit odometer.
+            </p>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <div className="text-3xl font-black text-orange-600">{fmtPerMileShort(totals.cpm?.total)}</div>
+            <div className="text-xs text-slate-500">Fleet avg · full TCO</div>
+            {totals.cpm?.operating != null && (
+              <div className="text-xs text-slate-400 mt-1">
+                Operating only (fuel + repair): {fmtPerMileShort(totals.cpm.operating)}
+              </div>
+            )}
+          </div>
+        </div>
+        {totals.cpm ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+            {[
+              { label: 'Fuel / Mile', value: totals.cpm.fuel, color: 'text-amber-700', bg: 'bg-amber-50' },
+              { label: 'Repair / Mile', value: totals.cpm.repair, color: 'text-red-600', bg: 'bg-red-50' },
+              { label: 'Depreciation / Mile', value: totals.cpm.depreciation, color: 'text-slate-600', bg: 'bg-slate-50' },
+              { label: 'Miles Tracked', value: totals.miles.toLocaleString(), color: 'text-blue-700', bg: 'bg-blue-50', isMiles: true },
+            ].map(({ label, value, color, bg, isMiles }) => (
+              <div key={label} className={`${bg} rounded-xl px-4 py-3 border border-slate-100`}>
+                <div className={`text-lg font-black ${color}`}>
+                  {isMiles ? `${value} mi` : fmtPerMile(value)}
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">{label}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            Log fuel with odometer readings, assign load miles, or enter unit odometer to calculate cost per mile.
+          </div>
+        )}
       </div>
 
       {/* Fleet Totals */}
@@ -192,12 +294,17 @@ export default function VehicleTCO() {
                     <span className="flex items-center gap-1"><Fuel className="w-3 h-3 text-amber-500" /> Fuel: {fmt(d.totalFuelCost)}</span>
                     <span className="flex items-center gap-1"><Wrench className="w-3 h-3 text-red-400" /> Repairs: {fmt(d.totalRepairCost)}</span>
                     <span className="flex items-center gap-1"><TrendingDown className="w-3 h-3 text-slate-400" /> Dep: {fmt(d.depCost)}</span>
-                    {d.costPerMile && <span className="text-slate-500">• {d.costPerMile.toFixed(2)}/mi</span>}
+                    {d.cpm?.total != null && (
+                      <span className="font-bold text-orange-600">• {fmtPerMileShort(d.cpm.total)} on road</span>
+                    )}
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <div className="text-xl font-black text-red-600">{fmt(d.tco)}</div>
-                  <div className="text-xs text-slate-400">Total TCO</div>
+                  {d.cpm?.total != null && (
+                    <div className="text-lg font-black text-orange-600">{fmtPerMileShort(d.cpm.total)}</div>
+                  )}
+                  <div className={`${d.cpm?.total != null ? 'text-base' : 'text-xl'} font-black text-red-600`}>{fmt(d.tco)}</div>
+                  <div className="text-xs text-slate-400">{d.cpm?.total != null ? 'Total TCO' : 'Total TCO'}</div>
                   {d.netPnL !== 0 && (
                     <div className={`text-xs font-bold ${d.netPnL >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                       Net: {fmt(d.netPnL)}
@@ -208,16 +315,63 @@ export default function VehicleTCO() {
               </div>
 
               {isExpanded && (
-                <div className="border-t border-slate-100 bg-slate-50 px-5 py-4">
+                <div className="border-t border-slate-100 bg-slate-50 px-5 py-4 space-y-4">
+                  {d.cpm && (
+                    <div className="bg-white rounded-xl border border-orange-200 p-4">
+                      <div className="text-xs font-black text-slate-500 uppercase mb-3 flex items-center gap-2">
+                        <Gauge className="w-4 h-4 text-orange-500" /> Cost Per Mile Breakdown
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
+                        <div>
+                          <div className="text-xs text-slate-400">Total / Mile</div>
+                          <div className="font-black text-orange-700 text-lg">{fmtPerMile(d.cpm.total)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-400">Fuel / Mile</div>
+                          <div className="font-black text-amber-700">{fmtPerMile(d.cpm.fuel)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-400">Repair / Mile</div>
+                          <div className="font-black text-red-600">{fmtPerMile(d.cpm.repair)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-400">Depreciation / Mile</div>
+                          <div className="font-black text-slate-600">{fmtPerMile(d.cpm.depreciation)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-400">Operating / Mile</div>
+                          <div className="font-black text-blue-700">{fmtPerMile(d.cpm.operating)}</div>
+                          <div className="text-[10px] text-slate-400">fuel + repair only</div>
+                        </div>
+                      </div>
+                      {d.totalMiles > 0 && d.cpm.total > 0 && (
+                        <div className="mt-3 h-3 rounded-full overflow-hidden flex bg-slate-100">
+                          <div className="bg-amber-400 h-full" style={{ width: `${(d.cpm.fuel / d.cpm.total) * 100}%` }} title="Fuel" />
+                          <div className="bg-red-400 h-full" style={{ width: `${(d.cpm.repair / d.cpm.total) * 100}%` }} title="Repairs" />
+                          <div className="bg-slate-400 h-full" style={{ width: `${(d.cpm.depreciation / d.cpm.total) * 100}%` }} title="Depreciation" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                     <div><div className="text-xs text-slate-400">Purchase Price</div><div className="font-black text-slate-700">{fmt(d.vehicle.purchase_price)}</div></div>
                     <div><div className="text-xs text-slate-400">Est. Current Value</div><div className="font-black text-emerald-700">{d.dep ? fmt(d.dep.currentValue) : '—'}</div></div>
                     <div><div className="text-xs text-slate-400">Years Owned</div><div className="font-black text-slate-700">{d.dep?.yearsOwned || '—'} yrs</div></div>
                     <div><div className="text-xs text-slate-400">Annual Depreciation</div><div className="font-black text-slate-700">{d.dep ? fmt(d.dep.annualDep) : '—'}</div></div>
-                    <div><div className="text-xs text-slate-400">Total Miles (Delivered)</div><div className="font-black text-blue-700">{d.totalMiles.toLocaleString()} mi</div></div>
-                    <div><div className="text-xs text-slate-400">Cost Per Mile</div><div className="font-black text-orange-700">{d.costPerMile ? `$${d.costPerMile.toFixed(3)}` : '—'}</div></div>
+                    <div>
+                      <div className="text-xs text-slate-400">Miles Used</div>
+                      <div className="font-black text-blue-700">{d.totalMiles > 0 ? `${d.totalMiles.toLocaleString()} mi` : '—'}</div>
+                      {d.mileSource && <div className="text-[10px] text-slate-400">{MILE_SOURCE_LABEL[d.mileSource]}</div>}
+                    </div>
                     <div><div className="text-xs text-slate-400">Repair / Purchase %</div><div className={`font-black ${repairWarning ? 'text-red-600' : 'text-slate-700'}`}>{d.repairRatio !== null ? `${d.repairRatio.toFixed(1)}%` : '—'}</div></div>
                     <div><div className="text-xs text-slate-400">Total Revenue</div><div className="font-black text-emerald-700">{fmt(d.totalRevenue)}</div></div>
+                    {d.totalMiles > 0 && d.totalRevenue > 0 && (
+                      <div>
+                        <div className="text-xs text-slate-400">Revenue / Mile</div>
+                        <div className="font-black text-emerald-600">{fmtPerMile(d.totalRevenue / d.totalMiles)}</div>
+                      </div>
+                    )}
                   </div>
                   {repairWarning && (
                     <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-semibold">

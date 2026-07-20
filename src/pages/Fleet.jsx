@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/api/apiClient';
-import { Plus, Search, Edit, Trash2, Truck, FolderOpen, History, Container, BookOpen } from 'lucide-react';
+import VehicleDetailPanel from '@/components/fleet/VehicleDetailPanel';
+import { Plus, Search, Edit, Trash2, Truck, FolderOpen, History, Container, BookOpen, ClipboardList } from 'lucide-react';
 import RepairManualsPanel from '@/components/fleet/RepairManualsPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,6 +49,7 @@ export default function Fleet() {
   const [docsVehicle, setDocsVehicle] = useState(null);
   const [historyVehicle, setHistoryVehicle] = useState(null);
   const [manualsVehicle, setManualsVehicle] = useState(null);
+  const [detailVehicle, setDetailVehicle] = useState(null);
 
   useEffect(() => {
     api.auth.me().then(async (u) => {
@@ -198,6 +200,9 @@ export default function Fleet() {
               {v.notes && <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-100">{v.notes}</p>}
 
               <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-100">
+                <Button size="sm" className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold" onClick={() => setDetailVehicle(v)}>
+                  <ClipboardList className="w-3.5 h-3.5 mr-1" /> Specs & Parts
+                </Button>
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => setHistoryVehicle(v)}>
                   <History className="w-3.5 h-3.5 mr-1" /> History
                 </Button>
@@ -230,6 +235,15 @@ export default function Fleet() {
           </div>
         )}
       </div>
+
+      {detailVehicle && (
+        <VehicleDetailPanel
+          vehicle={detailVehicle}
+          vehicles={vehicles}
+          user={user}
+          onClose={() => setDetailVehicle(null)}
+        />
+      )}
 
       {historyVehicle && (
         <VehicleHistory vehicle={historyVehicle} onClose={() => setHistoryVehicle(null)} />

@@ -24,6 +24,8 @@
     "preview": "vite preview",
     "marketing:deck": "node scripts/generate-client-deck.js",
     "marketing:video": "node scripts/generate-client-video.mjs",
+    "marketing:plan": "node scripts/generate-business-plan.mjs",
+    "marketing:manual": "node scripts/generate-user-manual.mjs",
     "marketing:send": "node scripts/email-client-presentation.mjs"
   },
   "dependencies": {

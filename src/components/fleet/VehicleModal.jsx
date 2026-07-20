@@ -61,12 +61,11 @@ export default function VehicleModal({ vehicle, users, customers = [], onSave, o
     setDecodeResult(null);
     try {
       const res = await api.functions.invoke('decodeVin', { vin: form.vin.trim() });
-      const data = res.data;
-      if (data.specs) {
-        setDecodeResult(data);
+      if (res?.specs) {
+        setDecodeResult(res);
 
         // Auto-fill form fields from decoded specs
-        const specs = data.specs;
+        const specs = res.specs;
         const updates = {};
         if (specs.make && !form.make) updates.make = specs.make;
         if (specs.model && !form.model) updates.model = specs.model;

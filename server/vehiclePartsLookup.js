@@ -85,6 +85,53 @@ async function fetchVinDecode(vin) {
   };
 }
 
+async function fetchVinRecalls(vin) {
+  const cleanVin = normalizeVin(vin);
+  try {
+    const recallRes = await fetch(`https://api.nhtsa.gov/recalls/recallsByVin?vin=${cleanVin}`);
+    const recallData = await recallRes.json();
+    const items = recallData?.results || recallData?.Results || [];
+    return items.map((r) => ({
+      nhtsa_campaign: r.NHTSACampaignNumber || r.nhtsaCampaignNumber || '',
+      component: r.Component || r.component || '',
+      summary: r.Summary || r.summary || '',
+      remedy: r.Remedy || r.remedy || '',
+      report_date: r.ReportReceivedDate || r.reportReceivedDate || null,
+      manufacturer: r.Manufacturer || r.manufacturer || '',
+    }));
+  } catch {
+    try {
+      const alt = await fetch(`https://api.nhtsa.gov/vehicles/${cleanVin}/recalls?format=json`);
+      const altData = await alt.json();
+      return (altData?.results || []).map((r) => ({
+        nhtsa_campaign: r.NHTSACampaignNumber || '',
+        component: r.Component || '',
+        summary: r.Summary || '',
+        remedy: r.Remedy || '',
+        report_date: r.ReportReceivedDate || null,
+        manufacturer: r.Manufacturer || '',
+      }));
+    } catch {
+      return [];
+    }
+  }
+}
+
+function enrichPartsWithVendors(parts) {
+  const vendors = listEntities('Vendor');
+  return parts.map((part) => {
+    const supplier = (part.supplier || '').trim().toLowerCase();
+    let vendor = null;
+    if (supplier) {
+      vendor = vendors.find((v) => {
+        const name = (v.name || '').trim().toLowerCase();
+        return name === supplier || name.includes(supplier) || supplier.includes(name);
+      }) || null;
+    }
+    return { ...part, vendor_name: part.supplier || null, vendor };
+  });
+}
+
 function resolveLookupContext(user, requestedCustomerId) {
   const ctx = resolveCustomerContext(user, requestedCustomerId);
   if (ctx.customerId) {
@@ -134,19 +181,34 @@ export async function vehiclePartsLookup(body, user) {
 
   const specs = decode.specs || {};
   const allParts = listEntities('PartInventory');
-  const compatibleParts = allParts.filter((p) => partMatchesVehicle(p, specs, vehicle));
+  const compatibleParts = enrichPartsWithVendors(
+    allParts.filter((p) => partMatchesVehicle(p, specs, vehicle)),
+  );
 
-  const vehicleIds = vehicle ? [vehicle.id] : [];
-  const maintenance = vehicleIds.length
-    ? listEntities('MaintenanceSchedule').filter((m) => vehicleIds.includes(m.vehicle_id))
-    : [];
-  const workOrders = vehicleIds.length
-    ? listEntities('WorkOrder').filter((wo) => vehicleIds.includes(wo.vehicle_id))
-    : [];
+  let maintenance = listEntities('MaintenanceSchedule');
+  let workOrders = listEntities('WorkOrder');
+  if (vehicle?.id) {
+    maintenance = maintenance.filter((m) => m.vehicle_id === vehicle.id);
+    workOrders = workOrders.filter((wo) => wo.vehicle_id === vehicle.id);
+  } else {
+    maintenance = [];
+    workOrders = [];
+  }
+  maintenance = filterEntitiesForContext('MaintenanceSchedule', maintenance, ctx, ctx.scopeIndex);
+  workOrders = filterEntitiesForContext('WorkOrder', workOrders, ctx, ctx.scopeIndex);
 
   const templates = listEntities('ServiceTemplate').filter((t) =>
     templateMatchesVehicle(t, specs, vehicle),
   );
+
+  const recalls = await fetchVinRecalls(effectiveVin);
+
+  const vendorParts = compatibleParts.reduce((acc, part) => {
+    const key = part.vendor_name || part.supplier || 'Unknown vendor';
+    if (!acc[key]) acc[key] = { vendor_name: key, vendor: part.vendor, parts: [] };
+    acc[key].parts.push(part);
+    return acc;
+  }, {});
 
   let accessories = listEntities('VehicleAccessory');
   if (vehicle?.id) {
@@ -160,7 +222,9 @@ export async function vehiclePartsLookup(body, user) {
     vin: effectiveVin,
     decode,
     vehicle,
+    recalls,
     compatible_parts: compatibleParts,
+    vendor_parts: Object.values(vendorParts),
     maintenance_schedules: maintenance,
     work_orders: workOrders,
     service_templates: templates,

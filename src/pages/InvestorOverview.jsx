@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import FleetcoLogo from '@/components/home/FleetcoLogo';
 import {
   Truck, Shield, TrendingUp, Users, DollarSign, BarChart2, CheckCircle,
   MapPin, Wrench, FileText, Fuel, Package, ArrowRight, Globe, Target,
@@ -59,15 +60,9 @@ export default function InvestorOverview() {
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-amber-500 p-1.5 rounded">
-              <Truck className="w-5 h-5 text-slate-900" />
-            </div>
-            <div>
-              <span className="text-white font-bold text-lg leading-none">FLEETCO</span>
-              <span className="block text-amber-400 text-xs font-medium tracking-widest">MANAGEMENT LLC</span>
-            </div>
-          </div>
+          <Link to="/" className="flex items-center">
+            <FleetcoLogo size={48} variant="full" />
+          </Link>
           <div className="flex items-center gap-4">
             <Link to="/" className="text-slate-400 hover:text-amber-400 text-sm font-medium transition-colors">← Back to Home</Link>
             <Link to="/portal" className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-sm px-4 py-2 rounded transition-colors">

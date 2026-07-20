@@ -4,6 +4,7 @@ import { ChevronDown, Shield, Truck, Star, ArrowRight, Loader2, LogIn } from 'lu
 import { Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import PortalLoginForm from '@/components/auth/PortalLoginForm';
+import FleetcoLogo from '@/components/home/FleetcoLogo';
 
 const DEFAULTS = {
   hero_badge: 'Dallas, TX — Serving Owner Operators Nationwide',
@@ -116,6 +117,9 @@ export default function HeroSection() {
           {/* Right: Client portal sign-in */}
           <div className="hidden lg:block">
             <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8">
+              <div className="flex justify-center mb-5">
+                <FleetcoLogo size={48} variant="full" />
+              </div>
               <div className="flex items-center gap-2 text-amber-400 font-bold text-sm tracking-widest uppercase mb-2">
                 <LogIn className="w-4 h-4" />
                 Client Portal

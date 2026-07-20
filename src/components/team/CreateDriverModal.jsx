@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
-import { X, Truck, Eye, EyeOff, Copy, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { X, Truck, Eye, EyeOff, Copy, CheckCircle2, AlertTriangle, Upload, Plus, Trash2 } from 'lucide-react';
 import { api } from '@/api/apiClient';
+import { DRIVER_DOC_TYPES } from '@/components/drivers/DriverDocuments';
 
 function generateTempPassword() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
   return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function emptyPendingDoc() {
+  return { id: crypto.randomUUID(), doc_type: DRIVER_DOC_TYPES[0], name: '', expiration_date: '', file: null };
 }
 
 export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
@@ -18,6 +23,7 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
     temp_password: generateTempPassword(),
     status: 'active',
   });
+  const [pendingDocs, setPendingDocs] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,6 +41,31 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const addPendingDoc = () => setPendingDocs(d => [...d, emptyPendingDoc()]);
+
+  const updatePendingDoc = (id, patch) => {
+    setPendingDocs(d => d.map(row => (row.id === id ? { ...row, ...patch } : row)));
+  };
+
+  const removePendingDoc = (id) => {
+    setPendingDocs(d => d.filter(row => row.id !== id));
+  };
+
+  const uploadPendingDocs = async (driverId) => {
+    const withFiles = pendingDocs.filter(d => d.file);
+    for (const doc of withFiles) {
+      const { file_url } = await api.integrations.Core.UploadFile({ file: doc.file });
+      await api.entities.DriverDocument.create({
+        driver_id: driverId,
+        customer_id: currentUser?.customer_id || undefined,
+        doc_type: doc.doc_type,
+        name: doc.name || doc.file.name,
+        file_url,
+        expiration_date: doc.expiration_date || undefined,
+      });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.full_name || !form.email || !form.temp_password) {
@@ -44,60 +75,70 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
     setLoading(true);
     setError('');
     try {
-      // Invite the user with driver role
-      await api.users.inviteUser(form.email, 'driver');
+      const payload = {
+        email: form.email.trim(),
+        tempPassword: form.temp_password,
+        role: 'driver',
+        fullName: form.full_name.trim(),
+      };
+      if (currentUser?.customer_id) payload.customerId = currentUser.customer_id;
 
-      // Save driver metadata (name, phone, license, temp_password, status)
-      // We update the user record after invitation
+      await api.functions.invoke('createUserAccount', payload);
+
       const allUsers = await api.entities.User.list();
-      const newUser = allUsers.find(u => u.email === form.email);
-      if (newUser) {
-        await api.entities.User.update(newUser.id, {
-          phone: form.phone,
-          license_number: form.license_number,
-          license_state: form.license_state,
-          license_expiry: form.license_expiry,
-          temp_password: form.temp_password,
-          status: form.status,
-        });
+      const newUser = allUsers.find(u => u.email.toLowerCase() === form.email.trim().toLowerCase());
+      if (!newUser) throw new Error('Account created but user record not found.');
+
+      await api.entities.User.update(newUser.id, {
+        phone: form.phone || undefined,
+        license_number: form.license_number || undefined,
+        license_state: form.license_state || undefined,
+        license_expiry: form.license_expiry || undefined,
+        status: form.status,
+      });
+
+      if (pendingDocs.some(d => d.file)) {
+        await uploadPendingDocs(newUser.id);
       }
 
       setSuccess({
         email: form.email,
         temp_password: form.temp_password,
         full_name: form.full_name,
+        docsUploaded: pendingDocs.filter(d => d.file).length,
       });
-      if (onCreated) onCreated();
+      if (onCreated) onCreated(newUser.id);
     } catch (err) {
-      setError(err?.message || 'Failed to create driver account.');
+      setError(err?.data?.error || err?.message || 'Failed to create driver account.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl">
-        {/* Header */}
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl my-6">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
               <Truck className="w-4 h-4 text-amber-600" />
             </div>
             <div>
-              <h2 className="text-base font-black text-slate-900">Create Driver Account</h2>
-              <p className="text-xs text-slate-500">Admin-provisioned driver login</p>
+              <h2 className="text-base font-black text-slate-900">Add Driver</h2>
+              <p className="text-xs text-slate-500">Account, CDL info & document uploads</p>
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
         </div>
 
         {success ? (
-          /* Success screen */
           <div className="p-6 space-y-4">
             <div className="flex items-center gap-2 text-emerald-700 font-black text-sm">
               <CheckCircle2 className="w-5 h-5" /> Driver account created successfully!
             </div>
+            {success.docsUploaded > 0 && (
+              <p className="text-sm text-slate-600">{success.docsUploaded} document{success.docsUploaded > 1 ? 's' : ''} uploaded.</p>
+            )}
             <div className="bg-slate-900 rounded-xl p-4 space-y-2">
               <p className="text-slate-400 text-xs font-bold uppercase tracking-wide mb-3">Login Credentials — Share Securely</p>
               <div className="flex justify-between items-center">
@@ -109,7 +150,7 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
                 <span className="text-amber-400 font-mono text-sm font-bold">{success.temp_password}</span>
               </div>
               <div className="mt-3 pt-3 border-t border-slate-700">
-                <p className="text-xs text-slate-500">⚠ Driver should change password after first login.</p>
+                <p className="text-xs text-slate-500">Driver should change password after first login.</p>
               </div>
             </div>
             <button
@@ -127,8 +168,7 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {/* Name & Email */}
+          <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[calc(100vh-8rem)] overflow-y-auto">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Full Name *</label>
@@ -148,7 +188,6 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
               </div>
             </div>
 
-            {/* Phone */}
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">Phone</label>
               <input
@@ -158,7 +197,6 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
               />
             </div>
 
-            {/* CDL */}
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-1">
                 <label className="block text-xs font-bold text-slate-600 mb-1">CDL #</label>
@@ -178,7 +216,7 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Expiry</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">CDL Expiry</label>
                 <input
                   type="date" value={form.license_expiry} onChange={e => set('license_expiry', e.target.value)}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
@@ -186,7 +224,6 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
               </div>
             </div>
 
-            {/* Temp Password */}
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">Temporary Password *</label>
               <div className="flex gap-2">
@@ -208,10 +245,75 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
                   Regenerate
                 </button>
               </div>
-              <p className="text-xs text-slate-400 mt-1">Driver will use this to log in. Remind them to change it.</p>
             </div>
 
-            {/* Status toggle */}
+            {/* Document uploads */}
+            <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-black text-slate-700 uppercase">Documents</div>
+                  <p className="text-xs text-slate-500 mt-0.5">DL, insurance card, medical card, etc.</p>
+                </div>
+                <button type="button" onClick={addPendingDoc}
+                  className="flex items-center gap-1 text-xs font-bold text-amber-700 hover:text-amber-600">
+                  <Plus className="w-3.5 h-3.5" /> Add file
+                </button>
+              </div>
+
+              {pendingDocs.length === 0 && (
+                <button type="button" onClick={addPendingDoc}
+                  className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-lg py-3 text-xs text-slate-500 hover:border-amber-400 hover:text-amber-600">
+                  <Upload className="w-4 h-4" /> Upload driver&apos;s license, insurance card…
+                </button>
+              )}
+
+              {pendingDocs.map(doc => (
+                <div key={doc.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                  <div className="flex gap-2">
+                    <select
+                      value={doc.doc_type}
+                      onChange={e => updatePendingDoc(doc.id, { doc_type: e.target.value })}
+                      className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white"
+                    >
+                      {DRIVER_DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <button type="button" onClick={() => removePendingDoc(doc.id)}
+                      className="p-1.5 text-slate-400 hover:text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={doc.name}
+                      onChange={e => updatePendingDoc(doc.id, { name: e.target.value })}
+                      placeholder="Label (optional)"
+                      className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs"
+                    />
+                    <input
+                      type="date"
+                      value={doc.expiration_date}
+                      onChange={e => updatePendingDoc(doc.id, { expiration_date: e.target.value })}
+                      className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs"
+                    />
+                  </div>
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        updatePendingDoc(doc.id, {
+                          file,
+                          name: doc.name || file.name.replace(/\.[^.]+$/, ''),
+                        });
+                      }
+                    }}
+                    className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-700"
+                  />
+                </div>
+              ))}
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-2">Account Status</label>
               <div className="flex gap-2">
@@ -244,7 +346,7 @@ export default function CreateDriverModal({ onClose, onCreated, currentUser }) {
               </button>
               <button type="submit" disabled={loading}
                 className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-900 font-black py-2.5 rounded-lg text-sm">
-                {loading ? 'Creating...' : 'Create Driver Account'}
+                {loading ? 'Creating...' : 'Create Driver'}
               </button>
             </div>
           </form>

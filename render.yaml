@@ -51,7 +51,10 @@ services:
       sizeGB: 1
     healthCheckPath: /api/public-settings
 
-# IMPORTANT — apply this Blueprint or manually configure on Render:
+# HTTPS: Render provisions TLS automatically when custom domains are verified.
+# Ensure fleetcomanagement.org + www are added under Settings → Custom Domains.
+# APP_ORIGIN / PUBLIC_APP_URL must use https:// (see envVars below).
+# The Node app also redirects http→https and www→apex in production.
 # 1. Create/link PostgreSQL database "fleetco-db"
 # 2. Set DATABASE_URL on fleetco-management (from database Internal Connection String)
 # 3. Set JWT_SECRET, DATA_PATH, SEED_DEMO_DATA=false

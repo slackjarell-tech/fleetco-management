@@ -1,12 +1,18 @@
 /** FleetCo brand constants (shared with marketing/brand.js) */
+export const SOCIAL = {
+  facebook: 'https://www.facebook.com/fleetcomanagement',
+  linkedin: 'https://www.linkedin.com/company/fleetco-management',
+  youtube: 'https://www.youtube.com/@fleetcomanagement',
+};
+
 export const BRAND = {
-  company: 'Fleetco Management LLC',
+  company: 'FleetCo Management LLC',
   shortName: 'FleetCo Management',
   phone: '(360) 952-1249',
   phoneTel: '+13609521249',
   email: 'support@fleetcomanagement.org',
   supportEmail: 'support@fleetcomanagement.org',
-  website: 'fleetcomanagement.org',
+  website: 'https://fleetcomanagement.org',
   url: 'https://fleetcomanagement.org',
   location: 'Dallas, TX',
   tagline: 'Move freight. We handle the rest.',
@@ -20,6 +26,10 @@ export const BRAND = {
 
 export const CLIENT_DECK_DOWNLOAD = '/marketing/FleetCo-Client-Presentation.pptx';
 export const CLIENT_VIDEO_URL = '/marketing/FleetCo-Client-Presentation.mp4';
+export const BUSINESS_PLAN_PDF = '/marketing/FleetCo-Business-Plan.pdf';
+export const REVENUE_PROJECTIONS_PDF = '/marketing/FleetCo-Revenue-Projections-10Year.pdf';
+export const REVENUE_PANDL_PDF = '/marketing/FleetCo-Revenue-PandL-Scenarios.pdf';
+export const USER_MANUAL_PDF = '/marketing/FleetCo-User-Manual.pdf';
 
 export const LEGAL = {
   company: 'FleetCo Management LLC',

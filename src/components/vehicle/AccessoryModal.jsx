@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import { X, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-const ACCESSORY_TYPES = [
-  'crane', 'welder', 'reefer', 'liftgate', 'apu', 'pto', 'compressor', 'generator', 'other',
-];
+import { VEHICLE_ACCESSORY_TYPES } from '@/lib/vehicleAccessoryTypes';
 
 export default function AccessoryModal({ accessory, vehicles, customerId, onSave, onDelete, onClose }) {
   const [form, setForm] = useState({
@@ -52,8 +50,8 @@ export default function AccessoryModal({ accessory, vehicles, customerId, onSave
                 value={form.accessory_type}
                 onChange={(e) => set('accessory_type', e.target.value)}
               >
-                {ACCESSORY_TYPES.map((t) => (
-                  <option key={t} value={t} className="capitalize">{t}</option>
+                {VEHICLE_ACCESSORY_TYPES.map((t) => (
+                  <option key={t.id} value={t.id}>{t.label}</option>
                 ))}
               </select>
             </div>

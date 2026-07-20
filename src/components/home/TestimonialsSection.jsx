@@ -30,7 +30,7 @@ export default function TestimonialsSection() {
           <span className="text-amber-500 font-bold text-sm tracking-widest uppercase">Testimonials</span>
           <h2 className="text-3xl sm:text-4xl font-black text-white mt-2">Trusted by Drivers Nationwide</h2>
           <p className="text-slate-400 mt-3 max-w-2xl mx-auto">
-            Real stories from owner operators who rely on FleetCo to keep their business moving.
+            Representative outcomes from owner-operators using FleetCo services and the portal.
           </p>
         </div>
 

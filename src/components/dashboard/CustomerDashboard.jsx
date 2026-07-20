@@ -1,11 +1,14 @@
 import React from 'react';
 import { FileText, Truck, AlertCircle, CheckCircle } from 'lucide-react';
+import GettingStartedChecklist from '@/components/dashboard/GettingStartedChecklist';
 
 export default function CustomerDashboard({ user, data }) {
-  const { invoices, vehicles } = data;
+  const customerId = user?.customer_id;
+  const { invoices, vehicles, loads } = data;
 
-  const myInvoices = invoices.filter(i => i.customer_id === user?.id);
-  const myVehicles = vehicles.filter(v => v.assigned_customer_id === user?.id);
+  const myInvoices = invoices.filter(i => i.customer_id === customerId);
+  const myVehicles = vehicles.filter(v => v.customer_id === customerId || v.assigned_customer_id === customerId);
+  const myLoads = (loads || []).filter(l => l.customer_id === customerId);
   const unpaid = myInvoices.filter(i => ['sent', 'overdue'].includes(i.status));
   const paid = myInvoices.filter(i => i.status === 'paid');
   const totalOwed = unpaid.reduce((s, i) => s + (i.total || 0), 0);
@@ -18,10 +21,12 @@ export default function CustomerDashboard({ user, data }) {
         <p className="text-slate-400 text-sm">Customer Portal</p>
       </div>
 
+      <GettingStartedChecklist user={user} />
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: 'My Vehicles', value: myVehicles.length, icon: Truck, color: 'text-yellow-400', bg: 'bg-yellow-900/30' },
-          { label: 'Total Invoices', value: myInvoices.length, icon: FileText, color: 'text-blue-400', bg: 'bg-blue-900/30' },
+          { label: 'Active Loads', value: myLoads.filter(l => l.status !== 'delivered').length, icon: FileText, color: 'text-blue-400', bg: 'bg-blue-900/30' },
           { label: 'Amount Owed', value: `$${totalOwed.toFixed(0)}`, icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-900/30' },
           { label: 'Total Paid', value: `$${totalPaid.toFixed(0)}`, icon: CheckCircle, color: 'text-green-400', bg: 'bg-green-900/30' },
         ].map(s => (
@@ -57,7 +62,7 @@ export default function CustomerDashboard({ user, data }) {
         <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
           <div className="text-yellow-400 text-xs font-bold uppercase tracking-widest mb-3">My Fleet</div>
           {myVehicles.length === 0 ? (
-            <div className="text-slate-500 text-sm text-center py-8">No vehicles assigned</div>
+            <div className="text-slate-500 text-sm text-center py-8">No vehicles yet — add your first unit under Fleet Units</div>
           ) : myVehicles.map(v => (
             <div key={v.id} className="flex items-center justify-between py-2.5 border-b border-slate-700 last:border-0">
               <div>

@@ -127,6 +127,10 @@ export function entityBelongsToCustomer(type, item, customerId, scopeIndex) {
     return true;
   }
 
+  if (type === 'DriverDocument' && item.driver_id && userIds?.has(item.driver_id)) {
+    return true;
+  }
+
   if (type === 'VehicleAccessory') {
     if (matchesCustomerField(item, customerId)) return true;
     if (item.vehicle_id && vehicleIds?.has(item.vehicle_id)) return true;
@@ -183,6 +187,10 @@ export function stampEntityForCreate(type, data, ctx) {
   }
 
   if (type === 'VehicleAccessory' && !next.customer_id) {
+    next.customer_id = ctx.customerId;
+  }
+
+  if (type === 'DriverDocument' && !next.customer_id) {
     next.customer_id = ctx.customerId;
   }
 

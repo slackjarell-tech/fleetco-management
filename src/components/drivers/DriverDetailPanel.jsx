@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Mail, Truck, Fuel, TrendingUp, Wrench, ClipboardCheck, AlertTriangle, FileCheck, ShieldCheck } from 'lucide-react';
+import { X, Mail, Truck, Fuel, TrendingUp, Wrench, ClipboardCheck, AlertTriangle, FileCheck, ShieldCheck, FileText, Phone, CreditCard } from 'lucide-react';
 
 function StatBlock({ icon: Icon, label, value, sub, color = 'text-slate-700' }) {
   return (
@@ -14,7 +14,7 @@ function StatBlock({ icon: Icon, label, value, sub, color = 'text-slate-700' }) 
   );
 }
 
-export default function DriverDetailPanel({ driver, assignedVehicles, stats, fuelLogs, loads, workOrders, inspections, onClose }) {
+export default function DriverDetailPanel({ driver, assignedVehicles, stats, fuelLogs, loads, workOrders, inspections, onClose, onOpenDocuments }) {
   const recentLoads = loads.slice(0, 5);
   const recentFuel = fuelLogs.slice(0, 5);
   const defectInspections = inspections.filter(i => i.status === 'failed' || i.status === 'needs_attention');
@@ -45,7 +45,44 @@ export default function DriverDetailPanel({ driver, assignedVehicles, stats, fue
           </button>
         </div>
 
+        <div className="px-6 py-3 border-b border-slate-100 flex gap-2">
+          {onOpenDocuments && (
+            <button
+              onClick={onOpenDocuments}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-sm rounded-lg"
+            >
+              <FileText className="w-4 h-4" /> Documents (DL, Insurance…)
+            </button>
+          )}
+        </div>
+
         <div className="p-6 space-y-6">
+          {/* Contact & CDL */}
+          {(driver.phone || driver.license_number) && (
+            <div>
+              <div className="text-xs font-black text-slate-400 uppercase mb-2">Driver Info</div>
+              <div className="bg-slate-50 rounded-xl p-4 space-y-2 text-sm">
+                {driver.phone && (
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <Phone className="w-4 h-4 text-slate-400" /> {driver.phone}
+                  </div>
+                )}
+                {driver.license_number && (
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <CreditCard className="w-4 h-4 text-slate-400" />
+                    CDL {driver.license_number}
+                    {driver.license_state && ` (${driver.license_state})`}
+                    {driver.license_expiry && (
+                      <span className={`text-xs font-bold ml-1 ${new Date(driver.license_expiry) < new Date() ? 'text-red-600' : 'text-slate-500'}`}>
+                        · exp {new Date(driver.license_expiry).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Assigned Vehicle */}
           <div>
             <div className="text-xs font-black text-slate-400 uppercase mb-2">Assigned Vehicle</div>

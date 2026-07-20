@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Truck, Phone, Mail, Globe, ChevronRight, Printer, Download, Shield, Fuel, Wrench, FileText } from 'lucide-react';
+import { Truck, Phone, Mail, Globe, ChevronRight, Printer, Download, Shield, Fuel, Wrench, FileText, TrendingUp, BarChart3 } from 'lucide-react';
+import { BUSINESS_PLAN_PDF, REVENUE_PROJECTIONS_PDF, REVENUE_PANDL_PDF } from '@/lib/brand';
 
 export default function MarketingMaterials() {
   return (
@@ -335,6 +336,55 @@ export default function MarketingMaterials() {
             <button onClick={() => window.print()} className="px-5 py-2.5 text-sm font-bold bg-slate-800 hover:bg-slate-700 text-white rounded-lg inline-flex items-center gap-2">
               <Download className="w-4 h-4" /> Print Business Cards
             </button>
+          </div>
+        </div>
+
+        {/* Business Plan & Financial PDFs */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:hidden">
+          <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white px-6 py-4">
+            <h2 className="font-black text-lg">Business Plan & Financial Projections</h2>
+            <p className="text-slate-400 text-xs mt-1">10-year growth plan · revenue projections · P&amp;L scenarios</p>
+          </div>
+          <div className="p-6 grid md:grid-cols-3 gap-4">
+            {[
+              {
+                title: 'Full Business Plan',
+                desc: 'Executive summary, market analysis, products, GTM strategy, operations, risks, and financial overview.',
+                href: BUSINESS_PLAN_PDF,
+                icon: FileText,
+                file: 'FleetCo-Business-Plan.pdf',
+              },
+              {
+                title: '10-Year Revenue Projections',
+                desc: 'Year-by-year customers, ARPU, annual revenue, ARR, and growth rates — base case 2026–2035.',
+                href: REVENUE_PROJECTIONS_PDF,
+                icon: TrendingUp,
+                file: 'FleetCo-Revenue-Projections-10Year.pdf',
+              },
+              {
+                title: 'Revenue P&L & Scenarios',
+                desc: 'Profit & loss by year plus conservative, base, and optimistic scenarios at Year 5 and Year 10.',
+                href: REVENUE_PANDL_PDF,
+                icon: BarChart3,
+                file: 'FleetCo-Revenue-PandL-Scenarios.pdf',
+              },
+            ].map(({ title, desc, href, icon: Icon, file }) => (
+              <div key={file} className="border border-slate-200 rounded-xl p-5 flex flex-col">
+                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center mb-3">
+                  <Icon className="w-5 h-5 text-amber-600" />
+                </div>
+                <h3 className="font-black text-sm text-slate-900">{title}</h3>
+                <p className="text-xs text-slate-500 mt-2 flex-1 leading-relaxed">{desc}</p>
+                <a
+                  href={href}
+                  download
+                  className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-lg"
+                >
+                  <Download className="w-4 h-4" /> Download PDF
+                </a>
+                <p className="text-[10px] text-slate-400 mt-2 text-center">{file}</p>
+              </div>
+            ))}
           </div>
         </div>
 

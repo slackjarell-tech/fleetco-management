@@ -60,7 +60,7 @@ export default function DriverMobileLayout() {
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col max-w-lg mx-auto shadow-xl">
       <header className="bg-slate-900 text-white px-4 py-3 flex items-center gap-3 sticky top-0 z-30">
-        <FleetcoLogo size={32} variant="icon" />
+        <FleetcoLogo size={36} variant="icon" />
         <div className="flex-1 min-w-0">
           <div className="font-black text-sm truncate">FleetCo Driver</div>
           <div className="text-xs text-slate-400 truncate">{user.full_name}</div>

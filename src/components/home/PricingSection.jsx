@@ -111,6 +111,26 @@ export default function PricingSection() {
           <p className="text-slate-400 mt-3 max-w-xl mx-auto">
             No hidden fees. Cancel anytime. Pay monthly or save 10% with annual billing.
           </p>
+          <p className="text-slate-500 text-sm mt-4 max-w-2xl mx-auto leading-relaxed">
+            Every plan includes full access to the FleetCo portal — fleet tracking, fuel, maintenance, drivers, and reports.
+            Optional hands-on managed services (parts sourcing, repair coordination, safety support) scale with Growth and Enterprise.
+          </p>
+        </div>
+
+        {/* Headline prices */}
+        <div className="flex flex-wrap justify-center gap-4 mb-8">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl px-6 py-3 text-center">
+            <div className="text-2xl font-black text-white">$299<span className="text-sm font-bold text-slate-400">/mo</span></div>
+            <div className="text-xs text-amber-400 font-bold mt-1">Starter · 1–5 vehicles</div>
+          </div>
+          <div className="bg-amber-500 rounded-xl px-6 py-3 text-center shadow-lg shadow-amber-500/20">
+            <div className="text-2xl font-black text-slate-900">$599<span className="text-sm font-bold text-slate-700">/mo</span></div>
+            <div className="text-xs text-slate-800 font-bold mt-1">Growth · 6–15 vehicles</div>
+          </div>
+          <div className="bg-slate-800 border border-slate-700 rounded-xl px-6 py-3 text-center">
+            <div className="text-lg font-black text-white">Custom</div>
+            <div className="text-xs text-slate-400 font-bold mt-1">Enterprise · 16+ vehicles</div>
+          </div>
         </div>
 
         {/* Billing toggle */}

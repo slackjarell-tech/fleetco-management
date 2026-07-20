@@ -17,7 +17,7 @@ const ENTITY_TYPES = [
   'DeliveryStop', 'HOSLog', 'FuelStation', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
-  'UsageFeedback', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'Vendor', 'TimeClockEntry', 'WorkOrder',
+  'UsageFeedback', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder',
 ];
 
 const WRITE_ROLES = new Set(['owner', 'executive', 'fleet_manager', 'fleet_coordinator', 'employee']);

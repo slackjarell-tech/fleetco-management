@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '@/api/apiClient';
-import { Search, Shield, Users, Truck, UserCheck } from 'lucide-react';
+import { Search, Shield, Users, Truck, UserCheck, UserPlus } from 'lucide-react';
 import DriverCard from '@/components/drivers/DriverCard';
 import DriverDetailPanel from '@/components/drivers/DriverDetailPanel';
+import DriverDocuments from '@/components/drivers/DriverDocuments';
+import CreateDriverModal from '@/components/team/CreateDriverModal';
 import ScreeningTab from '@/components/drivers/ScreeningTab';
+import { canManageCustomerTeam } from '@/lib/customerRoles';
 
 export default function Drivers() {
   const [user, setUser] = useState(null);
@@ -16,7 +19,20 @@ export default function Drivers() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedDriver, setSelectedDriver] = useState(null);
+  const [docsDriver, setDocsDriver] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeTab, setActiveTab] = useState('drivers');
+
+  const reloadDrivers = useCallback(async () => {
+    const [u, users] = await Promise.all([
+      api.auth.me().catch(() => null),
+      api.entities.User.list(),
+    ]);
+    let driverList = users.filter(x => x.role === 'driver');
+    if (u?.customer_id) driverList = driverList.filter(d => d.customer_id === u.customer_id);
+    setDrivers(driverList);
+    return driverList;
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -94,12 +110,23 @@ export default function Drivers() {
   );
 
   const assigned = Object.keys(vehiclesByDriver).length;
+  const canAddDriver = user && (canManageCustomerTeam(user.role) || ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(user.role));
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-black text-slate-900">Driver Management</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Contact details, assignments, performance records & screening</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900">Driver Management</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Contact details, documents, assignments, performance & screening</p>
+        </div>
+        {canAddDriver && activeTab === 'drivers' && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-black px-4 py-2.5 rounded-lg text-sm"
+          >
+            <UserPlus className="w-4 h-4" /> Add Driver
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -176,9 +203,29 @@ export default function Drivers() {
             workOrders={s._workOrders || []}
             inspections={s._inspections || []}
             onClose={() => setSelectedDriver(null)}
+            onOpenDocuments={() => setDocsDriver(selectedDriver)}
           />
         );
       })()}
+
+      {docsDriver && (
+        <DriverDocuments
+          driver={docsDriver}
+          customerId={user?.customer_id}
+          onClose={() => setDocsDriver(null)}
+        />
+      )}
+
+      {showCreateModal && (
+        <CreateDriverModal
+          currentUser={user}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={async () => {
+            await reloadDrivers();
+            setShowCreateModal(false);
+          }}
+        />
+      )}
       </>}
     </div>
   );

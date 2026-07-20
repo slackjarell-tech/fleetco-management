@@ -28,8 +28,21 @@ export default function Home() {
     <div className="min-h-screen bg-white font-body">
       <NavBar />
       {paymentStatus?.type === 'success' && (
-        <div className="bg-green-600 text-white text-center py-3 px-4">
-          🎉 Payment successful! Welcome to the {paymentStatus.plan} plan. We'll be in touch shortly.
+        <div className="bg-green-600 text-white py-4 px-4">
+          <div className="max-w-3xl mx-auto text-center">
+            <p className="font-black text-lg">Payment successful — welcome to FleetCo{paymentStatus.plan ? ` (${paymentStatus.plan})` : ''}!</p>
+            <p className="text-green-100 text-sm mt-2">
+              Check your email for login credentials, then sign in to the Client Portal to add your first vehicle and invite drivers.
+            </p>
+            <div className="flex flex-wrap justify-center gap-3 mt-4">
+              <a href="/login" className="bg-white text-green-800 font-bold px-5 py-2 rounded-lg text-sm hover:bg-green-50">
+                Sign In to Portal
+              </a>
+              <a href="/manual" className="border border-green-200 text-white font-bold px-5 py-2 rounded-lg text-sm hover:bg-green-700">
+                Read Getting Started Guide
+              </a>
+            </div>
+          </div>
         </div>
       )}
       {paymentStatus?.type === 'cancelled' && (

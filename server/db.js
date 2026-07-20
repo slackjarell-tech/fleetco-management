@@ -90,6 +90,10 @@ export function parseUser(row) {
     status: row.status,
     sidebar_modules: row.sidebar_modules,
     employee_number: row.employee_number,
+    phone: row.phone || null,
+    license_number: row.license_number || null,
+    license_state: row.license_state || null,
+    license_expiry: row.license_expiry || null,
     created_date: row.created_date,
     updated_date: row.updated_date,
   };
@@ -116,7 +120,7 @@ export function getUserRowByEmail(email) {
   return loadStore().users.find((u) => u.email.toLowerCase() === email.toLowerCase()) || null;
 }
 
-export function createUser({ email, passwordHash, fullName, role = 'user', customerId, employeeNumber, sidebarModules }) {
+export function createUser({ email, passwordHash, fullName, role = 'user', customerId, employeeNumber, sidebarModules, phone, license_number, license_state, license_expiry }) {
   const id = newId();
   const ts = nowIso();
   const user = {
@@ -127,6 +131,10 @@ export function createUser({ email, passwordHash, fullName, role = 'user', custo
     role,
     customer_id: customerId || null,
     employee_number: employeeNumber || null,
+    phone: phone || null,
+    license_number: license_number || null,
+    license_state: license_state || null,
+    license_expiry: license_expiry || null,
     status: 'active',
     sidebar_modules: sidebarModules || null,
     created_date: ts,
@@ -139,7 +147,7 @@ export function createUser({ email, passwordHash, fullName, role = 'user', custo
 }
 
 export function updateUser(id, fields) {
-  const allowed = ['email', 'full_name', 'role', 'customer_id', 'status', 'sidebar_modules', 'employee_number', 'password_hash'];
+  const allowed = ['email', 'full_name', 'role', 'customer_id', 'status', 'sidebar_modules', 'employee_number', 'password_hash', 'phone', 'license_number', 'license_state', 'license_expiry'];
   const safeFields = sanitizeUserPatch(id, fields, (userId) => {
     const row = loadStore().users.find((u) => u.id === userId);
     return row || null;

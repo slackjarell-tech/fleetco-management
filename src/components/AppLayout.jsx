@@ -23,7 +23,7 @@ const isInternalRole = (role) => {
   return ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(role);
 };
 
-import { canManageCustomerTeam } from '@/lib/customerRoles';
+import { canManageCustomerTeam, isCustomerPortalUser } from '@/lib/customerRoles';
 
 const isFleetCoAdmin = (role) => ['owner', 'executive', 'fleet_manager'].includes(role);
 
@@ -42,12 +42,12 @@ const NAV_GROUPS = [
     icon: Package,
     items: [
       { label: 'Load Board', icon: Package, path: '/portal/loads' },
-      { label: 'PD Command Tower', icon: Map, path: '/portal/pd-command' },
-      { label: 'Route Builder', icon: Route, path: '/portal/route-builder' },
-      { label: 'Route Dashboard', icon: Route, path: '/portal/route-dashboard' },
+      { label: 'PD Command Tower', icon: Map, path: '/portal/pd-command', advancedOnly: true },
+      { label: 'Route Builder', icon: Route, path: '/portal/route-builder', advancedOnly: true },
+      { label: 'Route Dashboard', icon: Route, path: '/portal/route-dashboard', advancedOnly: true },
       { label: 'My Delivery Route', icon: Route, path: '/portal/my-route' },
-      { label: 'Navigation', icon: Navigation, path: '/portal/navigation' },
-      { label: 'Fleet Map', icon: Map, path: '/portal/fleet-map' },
+      { label: 'Navigation', icon: Navigation, path: '/portal/navigation', advancedOnly: true },
+      { label: 'Fleet Map', icon: Map, path: '/portal/fleet-map', advancedOnly: true },
       { label: 'Yard Management', icon: Warehouse, path: '/portal/yard-management' },
     ]
   },
@@ -121,11 +121,11 @@ const NAV_GROUPS = [
       { label: 'Data Backup', icon: Database, path: '/portal/data-backup', sltOnly: true },
       { label: 'Messages', icon: MessageCircle, path: '/portal/messages' },
       { label: 'Site Commander AI', icon: Bot, path: '/portal/assistant' },
-      { label: 'Revan', icon: Zap, path: '/portal/revan' },
-      { label: 'Advertisement', icon: Megaphone, path: '/portal/advertisement' },
-      { label: 'Marketing Gallery', icon: Megaphone, path: '/portal/marketing-gallery' },
-      { label: 'AI Dev Feedback', icon: Lightbulb, path: '/portal/dev-feedback' },
-      { label: 'Competitive Analysis', icon: Globe, path: '/portal/competitive-analysis' },
+      { label: 'Revan', icon: Zap, path: '/portal/revan', advancedOnly: true },
+      { label: 'Advertisement', icon: Megaphone, path: '/portal/advertisement', advancedOnly: true },
+      { label: 'Marketing Gallery', icon: Megaphone, path: '/portal/marketing-gallery', advancedOnly: true },
+      { label: 'AI Dev Feedback', icon: Lightbulb, path: '/portal/dev-feedback', advancedOnly: true },
+      { label: 'Competitive Analysis', icon: Globe, path: '/portal/competitive-analysis', advancedOnly: true },
     ]
   },
 ];
@@ -256,13 +256,12 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 flex flex-col transform transition-transform duration-200 ${open ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
         {/* Brand */}
         <div className="p-5 border-b border-slate-800 flex items-center gap-3">
-          <Link to="/portal">
-            <FleetcoLogo size={36} variant="icon" />
+          <Link to="/portal" className="flex-shrink-0">
+            <FleetcoLogo size={44} variant="full" />
           </Link>
-          <div>
-            <div className="text-white font-bold text-sm leading-none">FLEETCO</div>
-            <div className="text-amber-400 text-xs tracking-widest">
-              {user && isInternalRole(user.role) ? 'PORTAL' : 'CUSTOMER'}
+          <div className="min-w-0">
+            <div className="text-amber-400 text-xs tracking-widest font-bold uppercase">
+              {user && isInternalRole(user.role) ? 'Portal' : 'Customer'}
             </div>
           </div>
           <Button size="icon" variant="ghost" className="ml-auto lg:hidden text-slate-400" onClick={() => setOpen(false)}>
@@ -312,6 +311,7 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
               if (item.internalOnly && !isInternal) return false;
               if (item.sltOnly && !['owner', 'executive', 'fleet_manager'].includes(user?.role)) return false;
               if (item.ownerOnly && user?.role !== 'owner') return false;
+              if (item.advancedOnly && isCustomerPortalUser(user) && !isInternal) return false;
 
               if (isViewingAsCustomer) {
                 if (item.internalOnly || !isCustomerFacingPath(item.path)) return false;
@@ -421,8 +421,8 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
             <Menu className="w-5 h-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <FleetcoLogo size={28} variant="icon" />
-            <span className="font-bold text-slate-900 text-sm">Fleetco Portal</span>
+            <FleetcoLogo size={32} variant="icon" />
+            <span className="font-bold text-slate-900 text-sm">FleetCo</span>
           </div>
         </header>
         <PaymentDueBanner user={user} />

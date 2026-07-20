@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
 import { Menu, X, LogIn, Loader2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
 
 export default function NavBar() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const location = useLocation();
+  const onHome = location.pathname === '/';
 
   const scrollTo = (id) => {
+    if (!onHome) {
+      window.location.href = `/#${id}`;
+      return;
+    }
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
     setOpen(false);
   };
@@ -38,7 +44,7 @@ export default function NavBar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex-shrink-0">
-            <FleetcoLogo size={48} />
+            <FleetcoLogo size={52} />
           </Link>
 
           {/* Desktop nav */}
@@ -61,14 +67,14 @@ export default function NavBar() {
             >
               Services
             </button>
-            <Link to="/about" className="text-slate-300 hover:text-amber-400 text-sm font-medium capitalize transition-colors">About</Link>
-            <Link to="/contact" className="text-slate-300 hover:text-amber-400 text-sm font-medium transition-colors">Contact</Link>
-            <Link
-              to="/overview"
+            <button
+              onClick={() => scrollTo('pricing')}
               className="text-slate-300 hover:text-amber-400 text-sm font-medium transition-colors"
             >
-              Investors
-            </Link>
+              Pricing
+            </button>
+            <Link to="/about" className="text-slate-300 hover:text-amber-400 text-sm font-medium capitalize transition-colors">About</Link>
+            <Link to="/contact" className="text-slate-300 hover:text-amber-400 text-sm font-medium transition-colors">Contact</Link>
             <button
               onClick={handleCheckout}
               disabled={loading}
@@ -97,8 +103,9 @@ export default function NavBar() {
           <button onClick={() => scrollTo('platform-tour')} className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium capitalize py-2">Platform Tour</button>
           <button onClick={() => scrollTo('yard-management')} className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium capitalize py-2">Yard Management</button>
           <button onClick={() => scrollTo('services')} className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium capitalize py-2">Services</button>
+          <button onClick={() => scrollTo('pricing')} className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium py-2">Pricing</button>
           <Link to="/about" className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium capitalize py-2" onClick={() => setOpen(false)}>About</Link>
-          <Link to="/contact" className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium py-2" onClick={() => setOpen(false)}>Contact / Get a Quote</Link>
+          <Link to="/contact" className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium py-2" onClick={() => setOpen(false)}>Contact</Link>
           <button
             onClick={handleCheckout}
             disabled={loading}
@@ -106,8 +113,8 @@ export default function NavBar() {
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin inline" /> : 'Get Started'}
           </button>
-          <Link to="/overview" className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium py-2">
-            Investors / Overview
+          <Link to="/overview" className="block w-full text-left text-slate-300 hover:text-amber-400 text-sm font-medium py-2" onClick={() => setOpen(false)}>
+            Investors
           </Link>
           <Link to="/login" className="w-full flex items-center justify-center gap-2 border border-slate-600 text-slate-300 text-sm font-medium px-4 py-2 rounded">
             <LogIn className="w-4 h-4" /> Client Portal

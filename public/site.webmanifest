@@ -1,17 +1,22 @@
 {
-  "name": "Fleetco Management",
-  "short_name": "Fleetco",
+  "name": "FleetCo Management",
+  "short_name": "FleetCo",
   "description": "Fleet operations portal for owner-operators and small fleets",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#f59e0b",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
   "icons": [
     {
       "src": "/assets/fleetco-icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
     }
   ]
 }
