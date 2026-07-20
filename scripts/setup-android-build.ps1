@@ -3,13 +3,13 @@
 
 $ErrorActionPreference = "Stop"
 $Base = Join-Path $env:LOCALAPPDATA "fleetco-android"
-$JdkDir = Join-Path $Base "jdk-17"
+$JdkDir = Join-Path $Base "jdk-21"
 $SdkDir = Join-Path $Base "android-sdk"
 $CmdTools = Join-Path $SdkDir "cmdline-tools\latest"
 
 New-Item -ItemType Directory -Force -Path $Base | Out-Null
 
-# --- JDK 17 (Eclipse Temurin zip) ---
+# --- JDK 21 (Eclipse Temurin zip; required by Capacitor 7 / Android Gradle) ---
 if (-not (Test-Path (Join-Path $JdkDir "bin\java.exe"))) {
   # Recover from a partial install (nested jdk-* folder or interrupted download).
   $nested = Get-ChildItem $JdkDir -Directory -ErrorAction SilentlyContinue |
@@ -20,9 +20,9 @@ if (-not (Test-Path (Join-Path $JdkDir "bin\java.exe"))) {
     Remove-Item $nested.FullName -Recurse -Force -ErrorAction SilentlyContinue
     Write-Host "JDK recovered from nested folder at $JdkDir"
   } else {
-    Write-Host "Downloading JDK 17..."
-    $jdkZip = Join-Path $env:TEMP "temurin-jdk17-$(Get-Random).zip"
-    $jdkUrl = "https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jdk/hotspot/normal/eclipse?project=jdk"
+    Write-Host "Downloading JDK 21..."
+    $jdkZip = Join-Path $env:TEMP "temurin-jdk21-$(Get-Random).zip"
+    $jdkUrl = "https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse?project=jdk"
     Invoke-WebRequest -Uri $jdkUrl -OutFile $jdkZip -UseBasicParsing
     New-Item -ItemType Directory -Force -Path $JdkDir | Out-Null
     Expand-Archive -Path $jdkZip -DestinationPath $JdkDir -Force
@@ -62,11 +62,17 @@ $env:PATH = "$CmdTools\bin;$SdkDir\platform-tools;$env:PATH"
 Write-Host "Installing SDK packages (platform 35, build-tools)..."
 $yes = ("y`n" * 20)
 $yes | & sdkmanager.bat --licenses 2>$null | Out-Null
-& sdkmanager.bat "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+& sdkmanager.bat "platform-tools" "platforms;android-35" "build-tools;34.0.0" "build-tools;35.0.0"
 
 # local.properties for Gradle
 $localProps = Join-Path $PSScriptRoot "..\android\local.properties"
-"sdk.dir=$($SdkDir -replace '\\','\\')" | Set-Content -Path $localProps -Encoding ASCII
+$sdkDirEscaped = $SdkDir -replace '\\', '\\'
+$propsLine = "sdk.dir=$sdkDirEscaped"
+try {
+  [System.IO.File]::WriteAllText($localProps, "$propsLine`n")
+} catch {
+  Write-Warning "Could not write local.properties: $_"
+}
 
 Write-Host ""
 Write-Host "Android build environment ready."

@@ -9,7 +9,7 @@ $Props = Join-Path $Android "keystore.properties"
 & (Join-Path $PSScriptRoot "setup-android-build.ps1")
 
 $Base = Join-Path $env:LOCALAPPDATA "fleetco-android"
-$env:JAVA_HOME = Join-Path $Base "jdk-17"
+$env:JAVA_HOME = Join-Path $Base "jdk-21"
 $env:ANDROID_HOME = Join-Path $Base "android-sdk"
 $env:PATH = "$env:JAVA_HOME\bin;$env:ANDROID_HOME\cmdline-tools\latest\bin;$env:ANDROID_HOME\platform-tools;$env:PATH"
 
@@ -48,7 +48,7 @@ if (-not (Test-Path $Props)) {
     "storePassword=$pass"
     "keyPassword=$pass"
     "keyAlias=fleetco-driver"
-    "storeFile=fleetco-driver-release.keystore"
+    "storeFile=../fleetco-driver-release.keystore"
   ) -join "`n"
   Set-Content -Path $Props -Value $propsContent -Encoding ASCII
 }
