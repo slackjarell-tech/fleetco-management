@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { CheckCircle2, Circle, Truck, Users, Fuel, Package, X } from 'lucide-react';
 import { api } from '@/api/apiClient';
 import { canManageCustomerTeam } from '@/lib/customerRoles';
+import DriverAppDownload from '@/components/shared/DriverAppDownload';
 
 const STORAGE_KEY = 'fleetco_getting_started_dismissed';
 
@@ -84,9 +85,12 @@ export default function GettingStartedChecklist({ user }) {
         })}
       </div>
 
-      <p className="text-xs text-slate-500 mt-4">
-        Need help? Open the <Link to="/manual" className="text-amber-400 hover:underline">Customer Manual</Link> or email support@fleetcomanagement.org
-      </p>
+      <div className="mt-4 space-y-3">
+        <DriverAppDownload variant="compact" />
+        <p className="text-xs text-slate-500">
+          Need help? Open the <Link to="/manual" className="text-amber-400 hover:underline">Customer Manual</Link> or email support@fleetcomanagement.org
+        </p>
+      </div>
     </div>
   );
 }

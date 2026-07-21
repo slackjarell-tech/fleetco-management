@@ -2,6 +2,7 @@ import React from 'react';
 import { Play, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { CLIENT_DECK_DOWNLOAD, CLIENT_VIDEO_URL } from '@/lib/brand';
+import DriverAppDownload from '@/components/shared/DriverAppDownload';
 
 export default function VideoPresentationSection() {
   return (
@@ -44,6 +45,11 @@ export default function VideoPresentationSection() {
           >
             <Download className="w-5 h-5" /> Download Client Deck (PPTX)
           </a>
+        </div>
+
+        <div className="mt-10 flex flex-col items-center gap-3">
+          <p className="text-slate-500 text-sm">Drivers — get the mobile app</p>
+          <DriverAppDownload variant="badges" />
         </div>
       </div>
     </section>

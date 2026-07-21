@@ -7,8 +7,9 @@ import {
   Archive, Calendar, Cpu, Store, Bot, Crown, MessageCircle, Navigation, TrendingUp,
   Map, Route, DollarSign, Globe, Clock, ShieldCheck, AlertTriangle, Award, Lightbulb,
   MapPin, Megaphone, Zap, Mail, ScanLine, Video, Upload, Warehouse, Search,
-  ChevronDown, KeyRound, Bell, Database, Calculator,
+  ChevronDown, KeyRound, Bell, Database, Calculator, Smartphone,
 } from 'lucide-react';
+import { DRIVER_APP } from '@/lib/platform';
 import { Button } from '@/components/ui/button';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
 import PaymentDueBanner from '@/components/billing/PaymentDueBanner';
@@ -390,6 +391,14 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-800 space-y-2">
+          <a
+            href={DRIVER_APP.android}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-slate-400 hover:text-amber-400 text-sm px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            <Smartphone className="w-4 h-4" /> Download Driver App
+          </a>
           <Link to="/" className="flex items-center gap-2 text-slate-400 hover:text-white text-sm px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors">
             ← Back to Website
           </Link>

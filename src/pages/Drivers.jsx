@@ -7,6 +7,7 @@ import DriverDocuments from '@/components/drivers/DriverDocuments';
 import CreateDriverModal from '@/components/team/CreateDriverModal';
 import ScreeningTab from '@/components/drivers/ScreeningTab';
 import { canManageCustomerTeam } from '@/lib/customerRoles';
+import DriverAppDownload from '@/components/shared/DriverAppDownload';
 
 export default function Drivers() {
   const [user, setUser] = useState(null);
@@ -129,6 +130,8 @@ export default function Drivers() {
           </button>
         )}
       </div>
+
+      <DriverAppDownload variant="light" />
 
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">

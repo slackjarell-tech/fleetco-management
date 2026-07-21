@@ -22,7 +22,22 @@ export function isDriverAppContext() {
     || new URLSearchParams(window.location.search).get('app') === 'driver';
 }
 
+const DEFAULT_ANDROID_URL = 'https://play.google.com/store/apps/details?id=org.fleetcomanagement.driver';
+
+/**
+ * FleetCo Driver app store links.
+ * Override VITE_DRIVER_APP_ANDROID_URL for internal testing (Play Console opt-in / closed track)
+ * before the app is publicly listed on the Play Store.
+ * Set VITE_DRIVER_APP_IOS_URL when the iOS app ships on the App Store.
+ */
+export const DRIVER_APP = {
+  android: import.meta.env.VITE_DRIVER_APP_ANDROID_URL || DEFAULT_ANDROID_URL,
+  ios: import.meta.env.VITE_DRIVER_APP_IOS_URL || null,
+  iosComingSoon: !import.meta.env.VITE_DRIVER_APP_IOS_URL,
+};
+
+/** @deprecated Prefer DRIVER_APP */
 export const DRIVER_APP_STORE = {
-  ios: 'https://apps.apple.com/app/fleetco-driver/id0000000000',
-  android: 'https://play.google.com/store/apps/details?id=org.fleetcomanagement.driver',
+  android: DRIVER_APP.android,
+  ios: DRIVER_APP.ios,
 };

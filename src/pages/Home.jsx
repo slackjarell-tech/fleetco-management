@@ -9,6 +9,7 @@ import NavBar from '@/components/home/NavBar';
 import AboutSection from '@/components/home/AboutSection';
 import VideoPresentationSection from '@/components/home/VideoPresentationSection';
 import TestimonialsSection from '@/components/home/TestimonialsSection';
+import DriverAppDownload from '@/components/shared/DriverAppDownload';
 
 export default function Home() {
   const [paymentStatus, setPaymentStatus] = useState(null);
@@ -52,6 +53,7 @@ export default function Home() {
       )}
       <HeroSection />
       <VideoPresentationSection />
+      <DriverAppDownload />
       <ServicesSection />
       <YmsSection />
       <PricingSection />

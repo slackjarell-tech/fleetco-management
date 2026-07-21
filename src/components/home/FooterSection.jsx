@@ -4,6 +4,8 @@ import { Mail, MapPin, Phone, Facebook, Linkedin, Youtube } from 'lucide-react';
 import SiteLegalNotice from '@/components/home/SiteLegalNotice';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
 import { BRAND, SOCIAL, USER_MANUAL_PDF } from '@/lib/brand';
+import { DRIVER_APP } from '@/lib/platform';
+import DriverAppDownload from '@/components/shared/DriverAppDownload';
 
 const SERVICE_LINKS = [
   { label: 'Fleet Management', href: '/#services' },
@@ -57,7 +59,12 @@ export default function FooterSection() {
               <li><Link to="/#pricing" className="hover:text-amber-400 transition-colors">Pricing</Link></li>
               <li><Link to="/contact" className="hover:text-amber-400 transition-colors">Contact</Link></li>
               <li><Link to="/login" className="hover:text-amber-400 transition-colors">Client Portal</Link></li>
-              <li><Link to="/driver" className="hover:text-amber-400 transition-colors">Driver App</Link></li>
+              <li>
+                <a href={DRIVER_APP.android} target="_blank" rel="noopener noreferrer" className="hover:text-amber-400 transition-colors">
+                  Download Driver App (Android)
+                </a>
+              </li>
+              <li><Link to="/login?app=driver" className="hover:text-amber-400 transition-colors">Driver Sign In</Link></li>
               <li><Link to="/manual" className="hover:text-amber-400 transition-colors">Customer Manual</Link></li>
               <li><a href={USER_MANUAL_PDF} className="hover:text-amber-400 transition-colors">Download User Guide (PDF)</a></li>
               <li><Link to="/overview" className="hover:text-amber-400 transition-colors">Investors</Link></li>
@@ -94,6 +101,10 @@ export default function FooterSection() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="mb-10">
+          <DriverAppDownload variant="compact" />
         </div>
 
         <div className="border-t border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
