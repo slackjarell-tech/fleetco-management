@@ -22,7 +22,7 @@ export function isDriverAppContext() {
     || new URLSearchParams(window.location.search).get('app') === 'driver';
 }
 
-const DEFAULT_ANDROID_URL = 'https://play.google.com/store/apps/details?id=org.fleetcomanagement.driver';
+const DEFAULT_ANDROID_URL = 'https://play.google.com/apps/internaltest/4701271726337402202';
 
 /**
  * FleetCo Driver app store links.
