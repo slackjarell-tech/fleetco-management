@@ -18,8 +18,12 @@ import {
   SCENARIOS_Y5,
   SCENARIOS_Y10,
   ASSUMPTIONS,
+  SHOP_ASSUMPTIONS,
+  SHOP_PROJECTION,
+  COMBINED_PROJECTION,
   PRICING,
   CUMULATIVE_REVENUE,
+  CUMULATIVE_COMBINED_REVENUE,
   MILESTONES,
   formatCurrency,
   formatPct,
@@ -188,9 +192,35 @@ function businessPlanHtml() {
     `<tr><td>Y${row.year} (${row.calendar})</td><td class="num">${row.customersEoy}</td><td class="num">${formatCurrency(row.annualRevenue, true)}</td><td class="num">${formatCurrency(row.arrEoy, true)}</td><td class="num">${formatPct(row.yoyGrowthPct)}</td></tr>`
   ).join('');
 
+  const combinedFinRows = COMBINED_PROJECTION.map((row) =>
+    `<tr><td>Y${row.year} (${row.calendar})</td><td class="num">${formatCurrency(row.saasRevenue, true)}</td><td class="num">${formatCurrency(row.shopRevenue, true)}</td><td class="num"><strong>${formatCurrency(row.annualRevenue, true)}</strong></td><td class="num">${row.locationsEoy}</td></tr>`
+  ).join('');
+
+  const fsiServiceRows = bp.productsAndServices.fsiShopServices.map((s) =>
+    `<tr><td><strong>${s.name}</strong></td><td>${s.pricing}</td><td>${s.desc}</td></tr>`
+  ).join('');
+
+  const shopPhaseRows = bp.shopIntegration.expansionModel.map((p) =>
+    `<tr><td><span class="badge">${p.phase}</span></td><td>${p.detail}</td></tr>`
+  ).join('');
+
+  const revenueStreamRows = bp.revenueModel.streams.map((s) =>
+    `<tr><td><strong>${s.name}</strong></td><td>${s.desc}</td></tr>`
+  ).join('');
+
+  const roadmapRows = bp.roadmap.map((r) =>
+    `<tr><td><strong>${r.when}</strong></td><td>${r.item}</td></tr>`
+  ).join('');
+
+  const orgRows = [
+    ...bp.teamAndOrg.leadership.map((l) => `<tr><td>Leadership</td><td>${l}</td></tr>`),
+    `<tr><td>FleetCo</td><td>${bp.teamAndOrg.fleetCoFunctions.join(' · ')}</td></tr>`,
+    `<tr><td>${SHOP_ASSUMPTIONS.entity}</td><td>${bp.teamAndOrg.fsiFunctions.join(' · ')}</td></tr>`,
+  ].join('');
+
   return `${coverHtml({
-    kicker: 'Business Plan',
-    title: 'FleetCo Management',
+    kicker: 'Integrated Business Plan',
+    title: 'FleetCo + FSI',
     subtitle: bp.subtitle,
   })}
   ${pageHeader('Business Plan')}
@@ -199,15 +229,25 @@ function businessPlanHtml() {
   ${bp.executiveSummary.map((p) => `<p>${p}</p>`).join('')}
 
   <div class="metric-grid">
-    <div class="metric-card"><div class="label">Year 10 ARR</div><div class="value">${formatCurrency(BASE_PROJECTION[9].arrEoy, true)}</div><div class="sub">780 customers · base case</div></div>
-    <div class="metric-card"><div class="label">10-Year Revenue</div><div class="value">${formatCurrency(CUMULATIVE_REVENUE, true)}</div><div class="sub">Cumulative recognized revenue</div></div>
-    <div class="metric-card"><div class="label">EBITDA Break-Even</div><div class="value">Year 5</div><div class="sub">${formatCurrency(BASE_PROJECTION[9].ebitda, true)} EBITDA by Y10</div></div>
+    <div class="metric-card"><div class="label">Year 10 SaaS ARR</div><div class="value">${formatCurrency(BASE_PROJECTION[9].arrEoy, true)}</div><div class="sub">780 customers · base case</div></div>
+    <div class="metric-card"><div class="label">Year 10 Combined Revenue</div><div class="value">${formatCurrency(COMBINED_PROJECTION[9].annualRevenue, true)}</div><div class="sub">${SHOP_PROJECTION[9].locationsEoy} FSI locations</div></div>
+    <div class="metric-card"><div class="label">10-Year Combined</div><div class="value">${formatCurrency(CUMULATIVE_COMBINED_REVENUE, true)}</div><div class="sub">SaaS ${formatCurrency(CUMULATIVE_REVENUE, true)} + shops</div></div>
   </div>
 
-  <h2>2. Company Overview</h2>
+  <h2>2. Corporate Structure</h2>
+  <p>${bp.corporateStructure.overview}</p>
+  <div class="two-col">
+    <div class="callout"><strong>FleetCo Management LLC</strong><br/>${bp.corporateStructure.fleetCoRole}</div>
+    <div class="callout"><strong>${SHOP_ASSUMPTIONS.entity}</strong><br/>${bp.corporateStructure.fsiRole}</div>
+    <div class="callout"><strong>FSI corporate (fleetservicesint.com)</strong><br/>${bp.corporateStructure.fsiCorporateRole}</div>
+  </div>
+  <p><strong>Customer promise:</strong> ${bp.corporateStructure.customerPromise}</p>
+
+  <h2>3. Company Overview</h2>
   <div class="two-col">
     <div>
-      <p><strong>Legal name:</strong> ${bp.companyOverview.legalName}</p>
+      <p><strong>SaaS entity:</strong> ${bp.companyOverview.legalName}</p>
+      <p><strong>FSI dealer entity:</strong> ${bp.companyOverview.affiliateEntity}</p>
       <p><strong>Headquarters:</strong> ${bp.companyOverview.headquarters}</p>
       <p><strong>Founded:</strong> ${bp.companyOverview.founded}</p>
       <p><strong>Ownership:</strong> ${bp.companyOverview.ownership}</p>
@@ -220,11 +260,36 @@ function businessPlanHtml() {
   <h3>Mission</h3><p>${bp.companyOverview.mission}</p>
   <h3>Vision</h3><p>${bp.companyOverview.vision}</p>
   <h3>Core Values</h3><ul>${bp.companyOverview.values.map((v) => `<li>${v}</li>`).join('')}</ul>
+  ${bp.companyOverview.affiliateEntityNote ? `<div class="callout"><strong>Entity note:</strong> ${bp.companyOverview.affiliateEntityNote}</div>` : ''}
+
+  <h2>3a. Online research — verified vs assumptions</h2>
+  <p><em>Researched ${bp.onlineResearch.researchedAt}. Full memo: ${bp.onlineResearch.researchDoc}</em></p>
+  <div class="callout"><strong>Integrated stack:</strong> ${bp.onlineResearch.integratedStack}</div>
+  <h3>Verified — Fleet Services International (fleetservicesint.com)</h3>
+  <ul>
+    <li><strong>Brand:</strong> ${bp.onlineResearch.publicFsi.brandName}</li>
+    <li><strong>Role:</strong> ${bp.onlineResearch.publicFsi.role}</li>
+    <li><strong>Phone:</strong> ${bp.onlineResearch.publicFsi.corporatePhone}</li>
+    <li><strong>Site:</strong> ${bp.onlineResearch.publicFsi.website}</li>
+    <li><strong>Founded (site claim):</strong> ${bp.onlineResearch.publicFsi.foundedClaim}</li>
+    <li><strong>Capital band (site):</strong> ${bp.onlineResearch.publicFsi.capitalBandUsd}</li>
+    <li><strong>Model:</strong> ${bp.onlineResearch.publicFsi.notFranchiseClaim}</li>
+    <li><strong>Richard Petty / Petty's Garage co-brand:</strong> ${bp.onlineResearch.publicFsi.pettyGarageCoBrand ? 'Yes (site)' : 'No'}</li>
+  </ul>
+  <h3>Verified — FleetCo (this plan)</h3>
+  <ul>
+    <li><strong>Entity:</strong> ${bp.onlineResearch.fleetCoVerified.legalName}</li>
+    <li><strong>Site:</strong> ${bp.onlineResearch.fleetCoVerified.website}</li>
+    <li><strong>HQ:</strong> ${bp.onlineResearch.fleetCoVerified.headquarters} · Founded ${bp.onlineResearch.fleetCoVerified.founded}</li>
+    <li><strong>Ownership:</strong> ${bp.onlineResearch.fleetCoVerified.ownership}</li>
+  </ul>
+  <h3>Plan assumptions (internal projections)</h3>
+  <ul>${bp.onlineResearch.planAssumptions.map((a) => `<li>${a}</li>`).join('')}</ul>
 
   <div class="section-break"></div>
   ${pageHeader('Business Plan')}
 
-  <h2>3. Market Analysis</h2>
+  <h2>4. Market Analysis</h2>
   <h3>Problem</h3>
   <ul>${bp.marketAnalysis.problem.map((p) => `<li>${p}</li>`).join('')}</ul>
   <h3>Target Segments</h3>
@@ -236,12 +301,17 @@ function businessPlanHtml() {
   <h3>Industry Trends</h3>
   <ul>${bp.marketAnalysis.trends.map((t) => `<li>${t}</li>`).join('')}</ul>
 
-  <h2>4. Products & Services</h2>
-  <h3>Platform Capabilities</h3>
+  <h2>5. Products & Services</h2>
+  <h3>FleetCo SaaS Platform</h3>
   <ul>${bp.productsAndServices.platform.map((p) => `<li>${p}</li>`).join('')}</ul>
-  <h3>Managed Services</h3>
+  <h3>Managed Services (FleetCo)</h3>
   <ul>${bp.productsAndServices.managedServices.map((p) => `<li>${p}</li>`).join('')}</ul>
-  <h3>Pricing</h3>
+  <h3>${SHOP_ASSUMPTIONS.entity} — Shop Services</h3>
+  <table>
+    <tr><th>Service</th><th>Pricing</th><th>Description</th></tr>
+    ${fsiServiceRows}
+  </table>
+  <h3>SaaS Subscription Pricing</h3>
   <table>
     <tr><th>Plan</th><th>Price</th><th>Fleet Size</th></tr>
     ${pricingRows}
@@ -252,10 +322,22 @@ function businessPlanHtml() {
   <div class="section-break"></div>
   ${pageHeader('Business Plan')}
 
-  <h2>5. Competitive Advantage</h2>
+  <h2>6. Shop Operations & Platform Integration</h2>
+  <h3>Workflow (portal ↔ bay)</h3>
+  <ol>${bp.shopIntegration.workflow.map((w) => `<li>${w}</li>`).join('')}</ol>
+  <h3>Strategic Advantages</h3>
+  <ul>${bp.shopIntegration.advantages.map((a) => `<li>${a}</li>`).join('')}</ul>
+  <h3>FSI Expansion Roadmap</h3>
+  <table><tr><th>Phase</th><th>Plan</th></tr>${shopPhaseRows}</table>
+
+  <h2>7. Revenue Model</h2>
+  <table><tr><th>Stream</th><th>Description</th></tr>${revenueStreamRows}</table>
+  <div class="callout"><strong>Year 10 base case:</strong> ${bp.revenueModel.combinedY10}</div>
+
+  <h2>8. Competitive Advantage</h2>
   <ul>${bp.competitiveAdvantage.map((a) => `<li>${a}</li>`).join('')}</ul>
 
-  <h2>6. Go-to-Market Strategy</h2>
+  <h2>9. Marketing & Sales (Go-to-Market)</h2>
   <table>
     <tr><th>Phase</th><th>Tactics</th></tr>
     ${bp.goToMarket.channels.map((c) => `<tr><td><span class="badge">${c.phase}</span></td><td>${c.tactics}</td></tr>`).join('')}
@@ -263,7 +345,7 @@ function businessPlanHtml() {
   <p><strong>Sales funnel:</strong> ${bp.goToMarket.funnel}</p>
   <p><strong>Retention:</strong> ${bp.goToMarket.retention}</p>
 
-  <h2>7. Operations & Technology</h2>
+  <h2>10. Operations & Technology</h2>
   <p><strong>Stack:</strong> ${bp.operations.technology}</p>
   <p><strong>Delivery model:</strong> ${bp.operations.delivery}</p>
   <p><strong>Support tiers:</strong> ${bp.operations.support}</p>
@@ -273,38 +355,54 @@ function businessPlanHtml() {
     ${bp.operations.headcount.map((h) => `<tr><td>${h.year}</td><td>${h.fte}</td><td>${h.roles}</td></tr>`).join('')}
   </table>
 
-  <h2>8. Financial Summary (Base Case)</h2>
+  <h2>11. Team & Organization</h2>
+  <table><tr><th>Function</th><th>Structure</th></tr>${orgRows}</table>
+  <p><strong>Governance:</strong> ${bp.teamAndOrg.governance}</p>
+
+  <h2>12. Financial Summary — SaaS (Base Case)</h2>
   <table>
     <tr><th>Year</th><th class="num">Customers</th><th class="num">Revenue</th><th class="num">ARR (EoY)</th><th class="num">YoY</th></tr>
     ${finSummaryRows}
     <tr class="total"><td colspan="2"><strong>10-Year Cumulative</strong></td><td class="num"><strong>${formatCurrency(CUMULATIVE_REVENUE, true)}</strong></td><td colspan="2"></td></tr>
   </table>
-  <p><em>See companion PDFs: Revenue Projections (10-Year) and Revenue P&amp;L &amp; Scenarios for full detail.</em></p>
+  <p><em>SaaS-only model; companion PDFs include full P&amp;L scenarios. Shop revenue is additive below.</em></p>
 
-  <div class="chart-bar-wrap"><h3>Revenue Growth Trajectory</h3>${chartBars}</div>
+  <h2>13. Financial Summary — Combined (SaaS + FSI Shops)</h2>
+  <table>
+    <tr><th>Year</th><th class="num">SaaS Revenue</th><th class="num">Dealer Service Revenue</th><th class="num">Total</th><th class="num">FSI Territories</th></tr>
+    ${combinedFinRows}
+    <tr class="total"><td colspan="3"><strong>10-Year Cumulative Combined</strong></td><td class="num"><strong>${formatCurrency(CUMULATIVE_COMBINED_REVENUE, true)}</strong></td><td></td></tr>
+  </table>
+  <p><em>Dealer service assumptions: ${SHOP_ASSUMPTIONS.grossMarginPct}% gross margin; ~${SHOP_ASSUMPTIONS.mobileWorkstationsPerTerritory} mobile workstations per territory; phased territory openings per expansion table. FSI corporate capital guidance: ${SHOP_ASSUMPTIONS.fsiTypicalCapitalUsd.replace('-', '–')} USD (territory-dependent, per fleetservicesint.com).</em></p>
+
+  <div class="chart-bar-wrap"><h3>SaaS Revenue Growth Trajectory</h3>${chartBars}</div>
 
   <div class="section-break"></div>
   ${pageHeader('Business Plan')}
 
-  <h2>9. Key Milestones</h2>
+  <h2>14. Product & Shop Roadmap</h2>
+  <table><tr><th>When</th><th>Milestone</th></tr>${roadmapRows}</table>
+
+  <h2>15. Key Milestones</h2>
   <ul>${milestoneItems}</ul>
 
-  <h2>10. Risk Analysis & Mitigation</h2>
+  <h2>16. Risk Analysis & Mitigation</h2>
   <table>
     <tr><th>Risk</th><th>Mitigation</th></tr>
     ${bp.risks.map((r) => `<tr><td>${r.risk}</td><td>${r.mitigation}</td></tr>`).join('')}
   </table>
 
-  <h2>11. Use of Funds</h2>
+  <h2>17. Use of Funds</h2>
   <ul>${bp.useOfFunds.map((u) => `<li>${u}</li>`).join('')}</ul>
 
-  <h2>12. Assumptions</h2>
+  <h2>18. Assumptions</h2>
   <ul>
     <li>Model start year: ${ASSUMPTIONS.modelStartYear} (Year 1 = first commercial year)</li>
-    <li>Gross margin: ${ASSUMPTIONS.grossMarginPct}%</li>
+    <li>SaaS gross margin: ${ASSUMPTIONS.grossMarginPct}% · Shop gross margin: ${SHOP_ASSUMPTIONS.grossMarginPct}%</li>
     <li>Churn: ${ASSUMPTIONS.churnStartPct}% (early) declining to ${ASSUMPTIONS.churnEndPct}% (Year 10)</li>
     <li>Billing mix: ${ASSUMPTIONS.billingMix.monthly * 100}% monthly / ${ASSUMPTIONS.billingMix.yearly * 100}% yearly (${ASSUMPTIONS.yearlyDiscountPct}% annual discount)</li>
-    <li>Blended ARPU rises from $450/mo (Y1) to $610/mo (Y10) as mix shifts toward Growth and Enterprise</li>
+    <li>Blended SaaS ARPU rises from $450/mo (Y1) to $610/mo (Y10) as mix shifts toward Growth and Enterprise</li>
+    <li>${SHOP_ASSUMPTIONS.entity} reflects Slack-affiliated FSI dealership operation (mobile territory model per fleetservicesint.com), integrated with FleetCo software — confirm legal entity and territory award before external use</li>
   </ul>
 
   <div class="footer-note">${BRAND.company} · ${BRAND.website} · ${BRAND.phone} · ${BRAND.email} · ${BUSINESS_PLAN.confidential}</div>

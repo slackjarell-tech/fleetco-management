@@ -43,13 +43,65 @@ export const SCENARIOS_Y5 = {
 };
 
 export const MILESTONES = [
-  { when: 'Month 14 (~Year 2)', metric: 'First $100K ARR' },
-  { when: 'Year 5', metric: '$1M+ ARR · EBITDA break-even' },
-  { when: 'Year 7', metric: '$2.5M+ ARR · 410 customers' },
-  { when: 'Year 10', metric: '$5.7M ARR · ~780 customers · ~4,500+ vehicles under management' },
+  { when: '2026 H2', metric: 'FleetCo Driver on Google Play · FSI dealership territory pilot (mobile PM/repair, Dallas metro)' },
+  { when: 'Month 14 (~Year 2)', metric: 'First $100K SaaS ARR · primary FSI territory at target fleet-account capacity' },
+  { when: 'Year 5', metric: '$1.36M+ SaaS ARR · 4 FSI dealer territories · combined revenue $3.2M+ · EBITDA break-even (SaaS base case)' },
+  { when: 'Year 7', metric: '$2.7M+ SaaS ARR · 6 FSI territories · iOS App Store parity with Android' },
+  { when: 'Year 10', metric: '$5.7M SaaS ARR · 12 FSI territories · $12.4M combined revenue · ~4,500+ vehicles under management' },
 ];
 
 export const CUMULATIVE_REVENUE = BASE_PROJECTION.reduce((sum, row) => sum + row.annualRevenue, 0);
+
+/**
+ * Affiliated FSI dealership service revenue (mobile on-site PM + repair per fleetservicesint.com model).
+ * FSI corporate is separate; this models FleetCo-affiliated dealer territory P&L — complements SaaS ARR.
+ */
+export const SHOP_ASSUMPTIONS = {
+  entity: 'Fleet Services International LTD (FSI authorized dealer · affiliated with FleetCo)',
+  fsiCorporateSite: 'https://www.fleetservicesint.com',
+  modelSummary:
+    'Protected territory · mobile workstation · preventative maintenance + breakdown calls · not a franchise (no royalties per FSI site)',
+  fsiTypicalCapitalUsd: '150000-500000',
+  grossMarginPct: 42,
+  avgLaborRate: 125,
+  mobileWorkstationsPerTerritory: 2,
+  /** @deprecated alias for PDF templates — means mobile capacity units per territory, not fixed bays */
+  baysPerLocation: 2,
+  shopMarginNote:
+    'On-site parts + labor; FSI vendor discounts; lower GM% than SaaS but recurring B2B fleet contracts and break-fix upside',
+};
+
+export const SHOP_PROJECTION = [
+  { year: 1, calendar: 2026, locationsEoy: 1, annualRevenue: 185000, grossProfit: 77700, avgLocations: 0.6 },
+  { year: 2, calendar: 2027, locationsEoy: 1, annualRevenue: 420000, grossProfit: 176400, avgLocations: 1 },
+  { year: 3, calendar: 2028, locationsEoy: 2, annualRevenue: 880000, grossProfit: 369600, avgLocations: 1.5 },
+  { year: 4, calendar: 2029, locationsEoy: 3, annualRevenue: 1450000, grossProfit: 609000, avgLocations: 2.5 },
+  { year: 5, calendar: 2030, locationsEoy: 4, annualRevenue: 2100000, grossProfit: 882000, avgLocations: 3.5 },
+  { year: 6, calendar: 2031, locationsEoy: 5, annualRevenue: 2750000, grossProfit: 1155000, avgLocations: 4.5 },
+  { year: 7, calendar: 2032, locationsEoy: 6, annualRevenue: 3400000, grossProfit: 1428000, avgLocations: 5.5 },
+  { year: 8, calendar: 2033, locationsEoy: 8, annualRevenue: 4550000, grossProfit: 1911000, avgLocations: 7 },
+  { year: 9, calendar: 2034, locationsEoy: 10, annualRevenue: 5800000, grossProfit: 2436000, avgLocations: 9 },
+  { year: 10, calendar: 2035, locationsEoy: 12, annualRevenue: 7200000, grossProfit: 3024000, avgLocations: 11 },
+];
+
+export const COMBINED_PROJECTION = BASE_PROJECTION.map((saas, i) => {
+  const shop = SHOP_PROJECTION[i];
+  const annualRevenue = saas.annualRevenue + shop.annualRevenue;
+  const grossProfit = saas.grossProfit + shop.grossProfit;
+  return {
+    year: saas.year,
+    calendar: saas.calendar,
+    saasRevenue: saas.annualRevenue,
+    shopRevenue: shop.annualRevenue,
+    annualRevenue,
+    grossProfit,
+    customersEoy: saas.customersEoy,
+    locationsEoy: shop.locationsEoy,
+    arrEoy: saas.arrEoy,
+  };
+});
+
+export const CUMULATIVE_COMBINED_REVENUE = COMBINED_PROJECTION.reduce((sum, row) => sum + row.annualRevenue, 0);
 
 export function formatCurrency(n, compact = false) {
   if (compact) {
