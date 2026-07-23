@@ -289,6 +289,54 @@ const agents = {
   },
 };
 
+const MARKETING_GUEST_KEY = 'fleetco_marketing_guest_id';
+
+function getMarketingGuestId() {
+  try {
+    let id = localStorage.getItem(MARKETING_GUEST_KEY);
+    if (!id) {
+      id = `g_${Math.random().toString(36).slice(2)}_${Date.now().toString(36)}`;
+      localStorage.setItem(MARKETING_GUEST_KEY, id);
+    }
+    return id;
+  } catch {
+    return `g_${Date.now()}`;
+  }
+}
+
+async function publicMarketingFetch(path, options = {}) {
+  const API_ROOT = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
+  const url = `${API_ROOT}/api${path.startsWith('/') ? path : `/${path}`}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Marketing-Guest': getMarketingGuestId(),
+    ...options.headers,
+  };
+  const res = await fetch(url, { ...options, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || res.statusText || 'Request failed');
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+const marketingAi = {
+  getStatus() {
+    return publicMarketingFetch('/marketing-ai/status');
+  },
+  createConversation() {
+    return publicMarketingFetch('/marketing-ai/conversations', { method: 'POST', body: '{}' });
+  },
+  addMessage(conversation, { role, content }) {
+    return publicMarketingFetch(`/marketing-ai/conversations/${conversation.id}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ role, content }),
+    });
+  },
+};
+
 const billing = {
   getStatus() {
     return apiFetch('/billing/status');
@@ -340,6 +388,12 @@ const sltMarketing = {
       body: JSON.stringify({ force }),
     });
   },
+  emailPlatformGuide(to) {
+    return apiFetch('/slt-marketing/platform-guide-email', {
+      method: 'POST',
+      body: JSON.stringify(to ? { to } : {}),
+    });
+  },
 };
 
 const sltBilling = {
@@ -357,7 +411,7 @@ const sltBilling = {
   },
 };
 
-export const api = { auth, entities, functions, integrations, agents, billing, payroll, sltMarketing, sltBilling, reports: {
+export const api = { auth, entities, functions, integrations, agents, marketingAi, billing, payroll, sltMarketing, sltBilling, reports: {
   listEntity(entityName, sort, limit) {
     const params = new URLSearchParams();
     if (sort) params.set('sort', sort);

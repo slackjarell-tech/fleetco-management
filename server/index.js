@@ -315,6 +315,57 @@ app.get('/api/public-settings', (_req, res) => {
 
 const conversations = new Map();
 
+app.get('/api/marketing-ai/status', async (_req, res) => {
+  const { getAiStatus } = await import('./aiProvider.js');
+  res.json({ ...getAiStatus(), public_agent: 'fleetco_guide', free_tier: 'groq_or_gemini' });
+});
+
+app.post('/api/marketing-ai/conversations', async (req, res) => {
+  try {
+    const { createPublicMarketingConversation, guestKey } = await import('./marketingAiSessions.js');
+    const guestId = guestKey(req);
+    const conversation = createPublicMarketingConversation(guestId);
+    res.json(conversation);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/marketing-ai/conversations/:id/messages', async (req, res) => {
+  try {
+    const { appendPublicMessage } = await import('./marketingAiSessions.js');
+    const { content } = req.body || {};
+    const result = appendPublicMessage(req, req.params.id, content);
+    if (result.error) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+
+    const { conversation, guestId } = result;
+    const { message, actions, ai_status } = await runAgent({
+      user: null,
+      guest: { id: guestId },
+      messages: conversation.messages,
+      agentName: 'fleetco_guide',
+    });
+
+    conversation.messages.push({
+      role: 'assistant',
+      content: message.content,
+      actions: actions?.length ? actions : undefined,
+    });
+    conversation.updated_at = new Date().toISOString();
+
+    res.json({
+      ...conversation,
+      ai_status,
+      last_actions: actions || [],
+    });
+  } catch (err) {
+    console.error('[marketing-ai public]', err);
+    res.status(500).json({ error: err.message || 'Marketing AI failed' });
+  }
+});
+
 app.get('/api/agents/status', requireAuth, async (_req, res) => {
   const { getAiStatus } = await import('./aiProvider.js');
   res.json(getAiStatus());
@@ -330,7 +381,7 @@ app.post('/api/agents/conversations', requireAuth, (req, res) => {
     agent_name === 'revan'
       ? 'Revan online — executive commander with Cursor-style control. I can change fleetcomanagement.org content, manage fleet records, run audits, and update users. Try: "Run a system health audit" or "Change the homepage headline to …"'
       : agent_name === 'slt_marketing'
-        ? 'SLT Marketing Commander online. I can manage leads, queue social posts, send follow-up emails, and schedule sales calls. Daily interested-lead reports go to SLT at 3:00 PM CST. Try: "Show interested leads" or "Queue a Facebook post about our fleet platform."'
+        ? 'FleetCo Marketing AI online — SLT command center. Website prospects talk to FleetCo Guide; their leads appear here. I can manage pipeline, email follow-ups, social posts, and schedule calls. Daily interested-lead report at 3:00 PM CST.'
         : 'Site Commander online. I can read your fleet data and make real changes — like Cursor for your portal. Try: "Show open work orders" or "Change the homepage headline to …"';
   const conversation = {
     id,
@@ -401,6 +452,23 @@ app.post('/api/slt-marketing/daily-report', requireAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/slt-marketing/platform-guide-email', requireAuth, async (req, res) => {
+  try {
+    const { assertSltMarketingAccess } = await import('./sltMarketing.js');
+    assertSltMarketingAccess(req.user);
+    const { sendMarketingPlatformGuideEmail } = await import('./marketingPlatformGuideEmail.js');
+    const to = (req.body?.to || req.user?.email || '').trim().toLowerCase();
+    if (!to) return res.status(400).json({ error: 'Recipient email required' });
+    const result = await sendMarketingPlatformGuideEmail(to);
+    if (!result.success) {
+      return res.status(result.skipped ? 503 : 502).json(result);
+    }
+    res.json({ success: true, to, id: result.id });
+  } catch (err) {
+    res.status(err.message?.includes('SLT') ? 403 : 400).json({ error: err.message });
   }
 });
 

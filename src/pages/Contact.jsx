@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/api/apiClient';
+import MarketingAiWidget from '@/components/marketing/MarketingAiWidget';
 
 export default function Contact() {
   const [form, setForm] = useState({ name: '', email: '', company: '', message: '' });
@@ -166,6 +167,7 @@ export default function Contact() {
       </section>
 
       <FooterSection />
+      <MarketingAiWidget />
     </div>
   );
 }

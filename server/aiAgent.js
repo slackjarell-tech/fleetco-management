@@ -1,6 +1,7 @@
 import { chatCompletion, getAiStatus } from './aiProvider.js';
 import { executeTool, getToolsForUser } from './aiTools.js';
 import { executeMarketingTool, getMarketingToolsForUser } from './marketingAiTools.js';
+import { executePublicMarketingTool, getPublicMarketingTools, PUBLIC_MARKETING_AGENT } from './publicMarketingAiTools.js';
 import { SLT_MARKETING_ROLES } from './sltMarketing.js';
 
 const MAX_TOOL_ROUNDS = 6;
@@ -9,10 +10,36 @@ function buildSystemPrompt(user, agentName) {
   const role = user?.role || 'user';
   const isRevan = agentName === 'revan';
   const isSltMarketing = agentName === 'slt_marketing';
+  const isPublicGuide = agentName === PUBLIC_MARKETING_AGENT;
+
+  if (isPublicGuide) {
+    return `You are FleetCo Guide — the friendly, professional AI on fleetcomanagement.org for owner-operators and small fleet owners considering FleetCo Management.
+
+You are NOT a generic chatbot. You represent FleetCo Management LLC (Dallas, TX): fleet portal, driver app, payroll, compliance, and subscription SaaS.
+
+Pricing (always accurate):
+- Starter: $299/month, up to 5 fleet units
+- Growth: $599/month, up to 15 fleet units
+- Yearly billing available at register/checkout
+
+Use tools for facts — never invent pricing or features:
+- get_fleetco_pricing / get_fleetco_features / get_contact_options
+- capture_visitor_lead when they give name + email and want demo, quote, or signup help
+
+Behavior:
+1. Be warm, concise, and industry-aware (trucking, DOT, owner-operators).
+2. Ask one clarifying question at a time (fleet size, pain points).
+3. When they show buying intent, collect name, email, company, fleet size, then call capture_visitor_lead.
+4. Offer human contact: support@fleetcomanagement.org, (360) 952-1249, or /contact.
+5. Never disparage competitors; focus on FleetCo value.
+6. Do not discuss internal SLT tools or portal admin features.`;
+  }
 
   if (isSltMarketing) {
-    return `You are FleetCo SLT Marketing Commander — an AI for the Senior Leadership Team at fleetcomanagement.org.
+    return `You are FleetCo Marketing AI — the internal growth assistant for the Senior Leadership Team at fleetcomanagement.org.
 You help grow the business: manage leads, draft and queue social posts, send follow-up emails, and schedule sales calls.
+
+The public website also runs FleetCo Guide (marketing AI) for prospects — leads appear in your dashboard as Inquiries with source marketing_ai.
 
 Current user: ${user?.email} (role: ${role})
 
@@ -92,7 +119,9 @@ function parseToolCalls(message) {
 
 function offlineReply(agentName, userMessage) {
   const label =
-    agentName === 'revan' ? 'Revan' : agentName === 'slt_marketing' ? 'SLT Marketing Commander' : 'Site Commander';
+    agentName === 'revan' ? 'Revan'
+      : agentName === PUBLIC_MARKETING_AGENT ? 'FleetCo Guide'
+        : agentName === 'slt_marketing' ? 'FleetCo Marketing AI' : 'Site Commander';
   const setup = `**Free AI not configured yet.** Add a free API key to enable ${label}:
 
 1. Get a free key at [console.groq.com](https://console.groq.com) (recommended) or [aistudio.google.com](https://aistudio.google.com)
@@ -107,16 +136,19 @@ Until then I can only show this setup guide.`;
       agentName === 'revan'
         ? '\n- "Run a full system health audit"\n- "Change the homepage headline to Welcome to FleetCo"\n- "List all customers and their fleet size"\n- "Update the contact email on the website"'
         : agentName === 'slt_marketing'
-          ? '\n- "List all interested leads and draft follow-up emails"\n- "Queue a LinkedIn post about our driver app"\n- "Schedule a call tomorrow at 2pm with Robert Kim"\n- "Send a demo invite to every new lead this week"'
-          : '\n- "Change the homepage headline to Welcome to FleetCo"\n- "List all open work orders"\n- "Add a work order for unit 104 brake inspection"';
+          ? '\n- "List interested leads from the website AI"\n- "Queue a LinkedIn post about our driver app"\n- "Schedule a call tomorrow at 2pm with Robert Kim"\n- "Send a demo invite to every new lead this week"'
+          : agentName === PUBLIC_MARKETING_AGENT
+            ? '\n- "What does FleetCo cost for 8 trucks?"\n- "Do you handle IFTA and payroll?"\n- "I want a demo — my email is …"'
+            : '\n- "Change the homepage headline to Welcome to FleetCo"\n- "List all open work orders"\n- "Add a work order for unit 104 brake inspection"';
     return `${setup}\n\nOnce enabled, ask things like:${examples}`;
   }
   return setup;
 }
 
-export async function runAgent({ user, messages, agentName = 'site_commander' }) {
+export async function runAgent({ user, messages, agentName = 'site_commander', guest = null }) {
   const status = getAiStatus();
   const actions = [];
+  const isPublicGuide = agentName === PUBLIC_MARKETING_AGENT;
 
   if (!status.configured) {
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
@@ -132,14 +164,17 @@ export async function runAgent({ user, messages, agentName = 'site_commander' })
     return {
       message: {
         role: 'assistant',
-        content: 'SLT Marketing Commander is for owner, executive, and fleet manager roles only.',
+        content: 'FleetCo Marketing AI (SLT mode) is for owner, executive, and fleet manager roles only.',
       },
       actions: [],
       ai_status: status,
     };
   }
 
-  const tools = isSltMarketing ? getMarketingToolsForUser(user) : getToolsForUser(user, agentName);
+  let tools;
+  if (isPublicGuide) tools = getPublicMarketingTools();
+  else if (isSltMarketing) tools = getMarketingToolsForUser(user);
+  else tools = getToolsForUser(user, agentName);
   const chatMessages = [
     { role: 'system', content: buildSystemPrompt(user, agentName) },
     ...messages.filter((m) => m.role === 'user' || m.role === 'assistant'),
@@ -178,9 +213,14 @@ export async function runAgent({ user, messages, agentName = 'site_commander' })
     });
 
     for (const call of toolCalls) {
-      const result = isSltMarketing
-        ? await executeMarketingTool(user, call.name, call.args)
-        : executeTool(user, call.name, call.args);
+      let result;
+      if (isPublicGuide) {
+        result = await executePublicMarketingTool(guest, call.name, call.args);
+      } else if (isSltMarketing) {
+        result = await executeMarketingTool(user, call.name, call.args);
+      } else {
+        result = executeTool(user, call.name, call.args);
+      }
       actions.push({ tool: call.name, args: call.args, result });
       chatMessages.push({
         role: 'tool',

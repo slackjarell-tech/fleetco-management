@@ -320,6 +320,7 @@ export function getMarketingDashboard(user) {
     ['interested', 'contacted', 'call_scheduled', 'qualified'].includes(l.lead_status),
   );
   const newLeads = leads.filter((l) => l.lead_status === 'new');
+  const aiLeads = leads.filter((l) => l.source === 'marketing_ai');
   const socialQueue = listEntities('MarketingSocialPost', '-created_at', 30);
   const upcomingCalls = filterEntities('MarketingScheduledCall', { status: 'scheduled' })
     .sort((a, b) => (a.scheduled_at || '').localeCompare(b.scheduled_at || ''))
@@ -335,6 +336,7 @@ export function getMarketingDashboard(user) {
       total_leads: leads.length,
       interested_count: interested.length,
       new_count: newLeads.length,
+      marketing_ai_leads: aiLeads.length,
       social_draft: socialQueue.filter((p) => p.status === 'draft').length,
       social_scheduled: socialQueue.filter((p) => ['approved', 'manual'].includes(p.status)).length,
       upcoming_calls: upcomingCalls.length,

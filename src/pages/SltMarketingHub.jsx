@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '@/api/apiClient';
-import { Loader2, Megaphone, Mail, Calendar, Users, RefreshCw, Send } from 'lucide-react';
+import { Loader2, Megaphone, Calendar, Users, RefreshCw, Send, Globe, Bot } from 'lucide-react';
 import AssistantChat from '@/components/assistant/AssistantChat';
 import PortalPageShell from '@/components/layout/PortalPageShell';
 import { Button } from '@/components/ui/button';
@@ -71,7 +71,7 @@ export default function SltMarketingHub() {
           <Megaphone className="w-12 h-12 mx-auto mb-4 text-slate-700" />
           <p className="text-slate-300 text-lg font-medium">SLT access required</p>
           <p className="text-slate-500 text-sm mt-2">
-            Marketing Commander is for owner, executive, and fleet manager roles.
+            FleetCo Marketing AI is for owner, executive, and fleet manager roles.
           </p>
         </div>
       </PortalPageShell>
@@ -80,6 +80,7 @@ export default function SltMarketingHub() {
 
   const summary = dashboard?.summary;
   const social = dashboard?.social_config || {};
+  const aiLeads = summary?.marketing_ai_leads ?? '—';
 
   return (
     <PortalPageShell variant="fullBleed">
@@ -89,9 +90,9 @@ export default function SltMarketingHub() {
             <div>
               <h1 className="text-white font-bold text-lg flex items-center gap-2">
                 <Megaphone className="w-5 h-5 text-cyan-400" />
-                SLT Marketing
+                FleetCo Marketing AI
               </h1>
-              <p className="text-slate-500 text-xs mt-0.5">Daily lead report · 3:00 PM CST</p>
+              <p className="text-slate-500 text-xs mt-0.5">SLT command · website AI · 3:00 PM CST report</p>
             </div>
             <button
               type="button"
@@ -103,13 +104,21 @@ export default function SltMarketingHub() {
             </button>
           </div>
 
+          <div className="mb-4 p-3 rounded-lg border border-slate-800 bg-slate-900/80 text-xs text-slate-400">
+            <div className="flex items-center gap-2 text-cyan-400 font-semibold mb-1">
+              <Globe className="w-3.5 h-3.5" />
+              Public FleetCo Guide
+            </div>
+            Prospects chat on the website via <strong className="text-slate-300">Ask FleetCo AI</strong>. Leads save to your pipeline automatically.
+          </div>
+
           {loadingDash && !summary ? (
             <Loader2 className="w-6 h-6 text-cyan-500 animate-spin mx-auto my-8" />
           ) : (
             <>
               <div className="grid grid-cols-2 gap-2 mb-4">
                 <StatCard label="Interested" value={summary?.interested_count ?? '—'} icon={Users} />
-                <StatCard label="New leads" value={summary?.new_count ?? '—'} icon={Mail} />
+                <StatCard label="Website AI" value={aiLeads} icon={Bot} />
                 <StatCard label="Social drafts" value={summary?.social_draft ?? '—'} icon={Megaphone} />
                 <StatCard label="Calls booked" value={summary?.upcoming_calls ?? '—'} icon={Calendar} />
               </div>
@@ -149,7 +158,10 @@ export default function SltMarketingHub() {
                       <li key={l.id} className="text-xs bg-slate-900 border border-slate-800 rounded-lg p-2">
                         <div className="text-white font-medium truncate">{l.name}</div>
                         <div className="text-slate-500 truncate">{l.email}</div>
-                        <div className="text-cyan-500/80 mt-0.5">{l.lead_status}</div>
+                        <div className="text-cyan-500/80 mt-0.5 flex gap-2">
+                          <span>{l.lead_status}</span>
+                          {l.source === 'marketing_ai' && <span className="text-amber-500/80">· website AI</span>}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -167,17 +179,17 @@ export default function SltMarketingHub() {
           <AssistantChat
             agentName="slt_marketing"
             variant="slt_marketing"
-            title="SLT Marketing Commander"
-            subtitle="Leads · email · social queue · scheduled calls"
-            placeholder="Ask to follow up on leads, draft posts, or schedule a sales call…"
+            channel="portal"
+            title="SLT Command Center"
+            subtitle="Leads · email · social · calls · website AI pipeline"
+            placeholder="Ask to follow up on website leads, draft posts, or schedule sales calls…"
             emptyTitle="Grow FleetCo"
-            emptySubtitle="I queue social content for approval, send lead emails via Resend, schedule calls, and sync with the daily 3 PM CST interested-lead report."
+            emptySubtitle="Manage leads from FleetCo Guide on the website, queue social content, send emails via Resend, and schedule discovery calls."
             suggestedQuestions={[
-              'Show all interested leads and summarize their messages',
-              'Draft a follow-up email for each new lead and send the first one',
+              'Show leads captured by the website marketing AI',
+              'Draft a follow-up email for each interested lead',
               'Queue a Facebook post about our driver app and fleet portal',
               'Schedule a discovery call next Tuesday at 10am for Patricia Nguyen',
-              'Approve and publish the latest Facebook draft if connected',
             ]}
           />
         </div>

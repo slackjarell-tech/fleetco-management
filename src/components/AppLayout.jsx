@@ -127,7 +127,7 @@ const NAV_GROUPS = [
       { label: 'Messages', icon: MessageCircle, path: '/portal/messages' },
       { label: 'Site Commander AI', icon: Bot, path: '/portal/assistant' },
       { label: 'Revan', icon: Zap, path: '/portal/revan', advancedOnly: true },
-      { label: 'SLT Marketing AI', icon: Megaphone, path: '/portal/slt-marketing', sltOnly: true },
+      { label: 'FleetCo Marketing AI', icon: Megaphone, path: '/portal/slt-marketing', sltOnly: true },
       { label: 'Advertisement', icon: Megaphone, path: '/portal/advertisement', advancedOnly: true },
       { label: 'Marketing Gallery', icon: Megaphone, path: '/portal/marketing-gallery', advancedOnly: true },
       { label: 'AI Dev Feedback', icon: Lightbulb, path: '/portal/dev-feedback', advancedOnly: true },

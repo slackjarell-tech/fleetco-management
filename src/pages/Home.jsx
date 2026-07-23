@@ -10,6 +10,7 @@ import AboutSection from '@/components/home/AboutSection';
 import VideoPresentationSection from '@/components/home/VideoPresentationSection';
 import TestimonialsSection from '@/components/home/TestimonialsSection';
 import DriverAppDownload from '@/components/shared/DriverAppDownload';
+import MarketingAiWidget from '@/components/marketing/MarketingAiWidget';
 
 export default function Home() {
   const [paymentStatus, setPaymentStatus] = useState(null);
@@ -61,6 +62,7 @@ export default function Home() {
       <TestimonialsSection />
       <InquiryForm />
       <FooterSection />
+      <MarketingAiWidget />
     </div>
   );
 }
