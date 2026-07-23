@@ -48,6 +48,7 @@ export const PATH_TO_SECTION = {
   '/portal/messages': 'Other',
   '/portal/assistant': 'Other',
   '/portal/slt-marketing': 'Other',
+  '/portal/slt-billing': 'Finance',
 };
 
 export function sectionForPath(pathname) {
@@ -66,6 +67,7 @@ export const INTERNAL_ONLY_PATHS = new Set([
   '/portal/dev-feedback',
   '/portal/revan',
   '/portal/slt-marketing',
+  '/portal/slt-billing',
   '/portal/competitive-analysis',
   '/portal/marketing-gallery',
 ]);

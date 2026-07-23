@@ -216,6 +216,110 @@ export async function createStripePortalSession(user) {
   return { url: portal.url, provider: 'stripe' };
 }
 
+/** SLT support — open Stripe Customer Portal for a FleetCo customer record */
+export async function createStripePortalSessionForCustomerId(fleetCoCustomerId, options = {}) {
+  const stripe = getStripe();
+  if (!stripe) throw new Error('Stripe is not configured on the server (STRIPE_SECRET_KEY)');
+
+  const customer = getEntity('Customer', fleetCoCustomerId);
+  if (!customer) throw new Error('Customer not found');
+
+  const stripeCustomerId = await ensureStripeCustomer(customer);
+  const returnUrl = options.returnUrl || `${appOrigin()}/portal/slt-billing`;
+  const portal = await stripe.billingPortal.sessions.create({
+    customer: stripeCustomerId,
+    return_url: returnUrl,
+  });
+
+  return { url: portal.url, provider: 'stripe' };
+}
+
+export function stripeDashboardPathPrefix() {
+  const key = (process.env.STRIPE_SECRET_KEY || '').trim();
+  return key.startsWith('sk_live') ? '' : '/test';
+}
+
+export function stripeDashboardUrls() {
+  const base = 'https://dashboard.stripe.com';
+  const prefix = stripeDashboardPathPrefix();
+  return {
+    home: `${base}${prefix}`,
+    payments: `${base}${prefix}/payments`,
+    subscriptions: `${base}${prefix}/subscriptions`,
+    customers: `${base}${prefix}/customers`,
+    balance: `${base}${prefix}/balance/overview`,
+    payouts: `${base}${prefix}/payouts`,
+  };
+}
+
+export function stripeResourceUrl(kind, stripeId) {
+  if (!stripeId) return null;
+  const base = 'https://dashboard.stripe.com';
+  const prefix = stripeDashboardPathPrefix();
+  const paths = {
+    customer: `/customers/${stripeId}`,
+    subscription: `/subscriptions/${stripeId}`,
+    payment: `/payments/${stripeId}`,
+  };
+  const path = paths[kind];
+  if (!path) return null;
+  return `${base}${prefix}${path}`;
+}
+
+export async function fetchStripePaymentsForCustomer(customerRecord, { limit = 12 } = {}) {
+  const stripe = getStripe();
+  if (!stripe || !customerRecord?.stripe_customer_id) {
+    return { invoices: [], charges: [], subscription: null };
+  }
+
+  const customerId = customerRecord.stripe_customer_id;
+  const [invoices, charges] = await Promise.all([
+    stripe.invoices.list({ customer: customerId, limit }),
+    stripe.charges.list({ customer: customerId, limit }),
+  ]);
+
+  let subscription = null;
+  if (customerRecord.stripe_subscription_id) {
+    try {
+      subscription = await stripe.subscriptions.retrieve(customerRecord.stripe_subscription_id);
+    } catch {
+      subscription = null;
+    }
+  }
+
+  return {
+    invoices: invoices.data.map((inv) => ({
+      id: inv.id,
+      number: inv.number,
+      status: inv.status,
+      amount_paid: inv.amount_paid,
+      currency: inv.currency,
+      created: inv.created ? new Date(inv.created * 1000).toISOString() : null,
+      hosted_invoice_url: inv.hosted_invoice_url,
+      invoice_pdf: inv.invoice_pdf,
+    })),
+    charges: charges.data.map((ch) => ({
+      id: ch.id,
+      amount: ch.amount,
+      currency: ch.currency,
+      status: ch.status,
+      paid: ch.paid,
+      created: ch.created ? new Date(ch.created * 1000).toISOString() : null,
+      receipt_url: ch.receipt_url,
+    })),
+    subscription: subscription
+      ? {
+          id: subscription.id,
+          status: subscription.status,
+          current_period_end: subscription.current_period_end
+            ? new Date(subscription.current_period_end * 1000).toISOString()
+            : null,
+          cancel_at_period_end: subscription.cancel_at_period_end,
+        }
+      : null,
+  };
+}
+
 export async function getCustomerBillingOverview(user) {
   if (!user?.customer_id) {
     throw new Error('Customer account required');

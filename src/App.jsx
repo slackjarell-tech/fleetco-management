@@ -74,6 +74,7 @@ import Revan from './pages/Revan';
 import SubscriptionBilling from './pages/SubscriptionBilling';
 import FleetCoPayroll from './pages/FleetCoPayroll';
 import SltMarketingHub from './pages/SltMarketingHub';
+import SltBillingHub from './pages/SltBillingHub';
 import EldPortal from './pages/EldPortal';
 import RouteDashboard from './pages/RouteDashboard';
 import DomainEmails from './pages/DomainEmails';
@@ -186,6 +187,7 @@ const AuthenticatedApp = () => {
           <Route path="competitive-analysis" element={<CompetitiveAnalysis />} />
           <Route path="revan" element={<Revan />} />
           <Route path="slt-marketing" element={<SltMarketingHub />} />
+          <Route path="slt-billing" element={<SltBillingHub />} />
           <Route path="eld" element={<EldPortal />} />
           <Route path="domain-emails" element={<DomainEmails />} />
           <Route path="data-backup" element={<DataBackup />} />

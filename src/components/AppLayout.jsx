@@ -112,6 +112,7 @@ const NAV_GROUPS = [
       { label: 'Driver Scans', icon: ScanLine, path: '/portal/driver-scans' },
       { label: 'Driver Media', icon: Video, path: '/portal/driver-media' },
       { label: 'Reports', icon: BarChart2, path: '/portal/reports' },
+      { label: 'Customer Payments', icon: CreditCard, path: '/portal/slt-billing', sltOnly: true },
       { label: 'Subscription', icon: CreditCard, path: '/portal/billing', customerBilling: true },
     ]
   },
@@ -314,7 +315,7 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
             const visibleItems = group.items.filter(item => {
               if (item.internalOnly && !isInternal) return false;
               if (item.sltOnly && !['owner', 'executive', 'fleet_manager'].includes(user?.role)) return false;
-              if (item.path === '/portal/fleetco-payroll' && !['owner', 'executive'].includes(user?.role)) return false;
+              if (item.path === '/portal/fleetco-payroll' && !['owner', 'executive', 'fleet_manager'].includes(user?.role)) return false;
               if (item.ownerOnly && user?.role !== 'owner') return false;
               if (item.customerBilling && !user?.customer_id) return false;
               if (item.advancedOnly && isCustomerPortalUser(user) && !isInternal) return false;

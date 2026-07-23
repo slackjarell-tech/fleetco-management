@@ -317,6 +317,17 @@ const payroll = {
   disburse(body) {
     return apiFetch('/payroll/disburse', { method: 'POST', body: JSON.stringify(body) });
   },
+  getTaxProfile({ user_id, tax_year }) {
+    const params = new URLSearchParams({ user_id, tax_year: String(tax_year || new Date().getFullYear()) });
+    return apiFetch(`/payroll/tax-profile?${params}`);
+  },
+  saveTaxProfile(body) {
+    return apiFetch('/payroll/tax-profile', { method: 'POST', body: JSON.stringify(body) });
+  },
+  listTaxProfiles(tax_year) {
+    const params = new URLSearchParams({ tax_year: String(tax_year || new Date().getFullYear()) });
+    return apiFetch(`/payroll/tax-profiles?${params}`);
+  },
 };
 
 const sltMarketing = {
@@ -331,7 +342,22 @@ const sltMarketing = {
   },
 };
 
-export const api = { auth, entities, functions, integrations, agents, billing, payroll, sltMarketing, reports: {
+const sltBilling = {
+  getDashboard() {
+    return apiFetch('/slt-billing/dashboard');
+  },
+  getCustomerDetail(customerId) {
+    return apiFetch(`/slt-billing/customer/${encodeURIComponent(customerId)}`);
+  },
+  openCustomerPortal(customerId) {
+    return apiFetch(`/slt-billing/customer/${encodeURIComponent(customerId)}/portal-session`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+};
+
+export const api = { auth, entities, functions, integrations, agents, billing, payroll, sltMarketing, sltBilling, reports: {
   listEntity(entityName, sort, limit) {
     const params = new URLSearchParams();
     if (sort) params.set('sort', sort);

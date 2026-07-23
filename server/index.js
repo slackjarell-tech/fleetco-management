@@ -404,6 +404,35 @@ app.post('/api/slt-marketing/daily-report', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/slt-billing/dashboard', requireAuth, async (req, res) => {
+  try {
+    const { getSltBillingDashboard } = await import('./sltBilling.js');
+    res.json(getSltBillingDashboard(req.user));
+  } catch (err) {
+    res.status(err.message?.includes('SLT') ? 403 : 400).json({ error: err.message });
+  }
+});
+
+app.get('/api/slt-billing/customer/:customerId', requireAuth, async (req, res) => {
+  try {
+    const { getSltCustomerBillingDetail } = await import('./sltBilling.js');
+    const data = await getSltCustomerBillingDetail(req.user, req.params.customerId);
+    res.json(data);
+  } catch (err) {
+    res.status(err.message?.includes('SLT') ? 403 : 400).json({ error: err.message });
+  }
+});
+
+app.post('/api/slt-billing/customer/:customerId/portal-session', requireAuth, async (req, res) => {
+  try {
+    const { createSltCustomerPortalSession } = await import('./sltBilling.js');
+    const result = await createSltCustomerPortalSession(req.user, req.params.customerId);
+    res.json(result);
+  } catch (err) {
+    res.status(err.message?.includes('SLT') ? 403 : 400).json({ error: err.message });
+  }
+});
+
 app.get('/api/payroll/banking', requireAuth, async (req, res) => {
   try {
     const { getPayrollBankingSummary } = await import('./payrollBanking.js');
@@ -436,6 +465,38 @@ app.post('/api/payroll/disburse', requireAuth, async (req, res) => {
     const { initiateDirectDeposit } = await import('./payrollDisburse.js');
     const result = initiateDirectDeposit(req.user, req.body);
     res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/payroll/tax-profile', requireAuth, async (req, res) => {
+  try {
+    const { getEmployeeTaxProfile } = await import('./employeeTaxProfiles.js');
+    res.json(getEmployeeTaxProfile(req.user, {
+      user_id: req.query.user_id,
+      tax_year: req.query.tax_year ? Number(req.query.tax_year) : undefined,
+    }));
+  } catch (err) {
+    res.status(err.message?.includes('required') ? 403 : 400).json({ error: err.message });
+  }
+});
+
+app.post('/api/payroll/tax-profile', requireAuth, async (req, res) => {
+  try {
+    const { saveEmployeeTaxProfile } = await import('./employeeTaxProfiles.js');
+    res.json(saveEmployeeTaxProfile(req.user, req.body));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/payroll/tax-profiles', requireAuth, async (req, res) => {
+  try {
+    const { listEmployeeTaxProfiles } = await import('./employeeTaxProfiles.js');
+    res.json(listEmployeeTaxProfiles(req.user, {
+      tax_year: req.query.tax_year ? Number(req.query.tax_year) : undefined,
+    }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -543,6 +604,7 @@ const ENTITY_NAMES = [
   'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
   'MarketingSocialPost', 'MarketingScheduledCall', 'MarketingActivityLog', 'MarketingReportRun',
   'CustomerFundingAccount', 'PayeeBankAccount', 'PayrollDisbursement', 'PayrollDisbursementBatch',
+  'EmployeeTaxProfile',
 ];
 
 function filterUsersForActor(actor, users) {
