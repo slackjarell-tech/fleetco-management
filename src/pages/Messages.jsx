@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/api/apiClient';
 import { MessageCircle, Send, ChevronLeft, User, Building2, UserCheck } from 'lucide-react';
+import PortalPageShell from '@/components/layout/PortalPageShell';
 
 export default function Messages() {
   const [user, setUser] = useState(null);
@@ -149,7 +150,8 @@ export default function Messages() {
   // ── Customer Messaging View ──
   if (isCustomer) {
     return (
-      <div className="flex h-[calc(100vh-4rem)] lg:h-screen bg-white overflow-hidden">
+      <PortalPageShell variant="fullBleed" className="!bg-white">
+      <div className="flex flex-1 min-h-0 w-full bg-white overflow-hidden">
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header with account rep info */}
           <div className="px-5 py-4 border-b border-slate-200 bg-white">
@@ -236,12 +238,14 @@ export default function Messages() {
           </div>
         </div>
       </div>
+      </PortalPageShell>
     );
   }
 
   // ── Driver Messaging View (existing) ──
   return (
-    <div className="flex h-[calc(100vh-4rem)] lg:h-screen bg-white overflow-hidden">
+    <PortalPageShell variant="fullBleed" className="!bg-white">
+      <div className="flex flex-1 min-h-0 w-full bg-white overflow-hidden">
       {/* Sidebar: driver list (hidden for drivers) */}
       {!isDriver && (
         <aside className={`w-64 flex-shrink-0 border-r border-slate-200 flex flex-col bg-slate-50 ${selectedDriver ? 'hidden md:flex' : 'flex'}`}>
@@ -369,5 +373,6 @@ export default function Messages() {
         )}
       </div>
     </div>
+    </PortalPageShell>
   );
 }

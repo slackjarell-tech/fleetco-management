@@ -2,12 +2,14 @@ import React from 'react';
 import { PauseCircle, Mail, Phone } from 'lucide-react';
 import { formatCountdown, formatDueDate } from '@/lib/billing';
 import { SITE } from '@/lib/site';
+import { isCustomerPortalUser } from '@/lib/customerRoles';
 
 export default function CustomerPausedOverlay({ user, billing }) {
+  if (!user?.customer_id && !isCustomerPortalUser(user)) return null;
   if (!user?.system_paused && !billing?.isPaused) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-900/95 flex items-center justify-center p-6">
+    <div className="absolute inset-0 z-[60] bg-slate-900/95 flex items-center justify-center p-6">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center">
         <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <PauseCircle className="w-8 h-8 text-red-600" />

@@ -1,10 +1,11 @@
 import React from 'react';
 import AssistantChat from '@/components/assistant/AssistantChat';
+import PortalPageShell from '@/components/layout/PortalPageShell';
 
 export default function Assistant() {
   return (
-    <div className="h-screen flex flex-col" style={{ height: 'calc(100vh - 0px)' }}>
+    <PortalPageShell variant="fullBleed">
       <AssistantChat />
-    </div>
+    </PortalPageShell>
   );
 }

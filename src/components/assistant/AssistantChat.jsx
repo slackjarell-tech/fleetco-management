@@ -156,7 +156,7 @@ export default function AssistantChat({
   ];
 
   return (
-    <div className="flex flex-col h-full bg-slate-950">
+    <div className="flex flex-col h-full min-h-0 bg-slate-950">
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-900">
         <div className="flex items-center gap-3">
           <div className={`w-9 h-9 rounded-lg flex items-center justify-center border ${
@@ -201,7 +201,7 @@ export default function AssistantChat({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-5 space-y-4">
         {starting ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className={`w-6 h-6 animate-spin ${isRevan ? 'text-violet-500' : isSlt ? 'text-cyan-500' : 'text-amber-500'}`} />

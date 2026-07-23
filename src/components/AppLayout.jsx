@@ -19,6 +19,7 @@ import { getBulkImportConfig } from '@/lib/bulkImportConfigs';
 import { CustomerProvider, useCustomerContext } from '@/lib/CustomerContext';
 import { defaultSidebarModulesForRole } from '@/lib/customerRoles';
 import { sectionForPath, isCustomerFacingPath } from '@/lib/portalSections';
+import { isPortalFullBleedPath } from '@/lib/portalLayout';
 
 const isInternalRole = (role) => {
   return ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(role);
@@ -245,6 +246,8 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
     setExpandedGroups(p => ({ ...p, [label]: !p[label] }));
   };
 
+  const fullBleedMain = isPortalFullBleedPath(location.pathname);
+
   const handleCustomerSwitch = (e) => {
     const value = e.target.value;
     if (!value) {
@@ -256,9 +259,13 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 flex flex-col transform transition-transform duration-200 ${open ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+    <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:h-screen lg:max-h-screen lg:overflow-hidden">
+      {/* Sidebar — drawer on mobile; grid column on desktop (never overlapped by main) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 flex flex-col transform transition-transform duration-200 ${
+          open ? 'translate-x-0' : '-translate-x-full'
+        } lg:static lg:translate-x-0 lg:z-auto lg:h-screen lg:max-h-screen lg:overflow-y-auto lg:overscroll-contain`}
+      >
         {/* Brand */}
         <div className="p-5 border-b border-slate-800 flex items-center gap-3">
           <Link to="/portal" className="flex-shrink-0">
@@ -427,10 +434,14 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
       </aside>
 
       {/* Mobile overlay */}
-      {open && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setOpen(false)} />}
+      {open && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setOpen(false)} />}
 
-      {/* Main */}
-      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
+      {/* Main column — minmax(0,1fr) prevents horizontal bleed into sidebar */}
+      <div
+        className={`flex flex-col min-h-screen min-w-0 w-full lg:min-h-0 ${
+          fullBleedMain ? 'lg:h-screen lg:max-h-screen lg:overflow-hidden' : 'lg:overflow-y-auto'
+        }`}
+      >
         <header className="lg:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
           <Button size="icon" variant="ghost" onClick={() => setOpen(true)}>
             <Menu className="w-5 h-5" />
@@ -456,7 +467,7 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
             </button>
           </div>
         )}
-        {bulkConfig && (
+        {bulkConfig && !fullBleedMain && (
           <div className="hidden lg:flex absolute top-4 right-6 z-20">
             <Button
               size="sm"
@@ -468,10 +479,14 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
             </Button>
           </div>
         )}
-        <main className="flex-1 relative">
+        <main
+          className={`relative flex flex-col flex-1 min-h-0 min-w-0 w-full ${
+            fullBleedMain ? 'overflow-hidden p-0' : 'overflow-x-hidden'
+          }`}
+        >
           <CustomerPausedOverlay user={user} billing={user?.billing} />
-          {bulkConfig && (
-            <div className="lg:hidden px-4 pt-3">
+          {bulkConfig && !fullBleedMain && (
+            <div className="lg:hidden px-4 pt-3 shrink-0">
               <Button
                 size="sm"
                 variant="outline"
@@ -482,7 +497,13 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
               </Button>
             </div>
           )}
-          <Outlet key={viewAsCustomerId || 'all-customers'} />
+          <div
+            className={`flex flex-col flex-1 min-h-0 min-w-0 w-full ${
+              fullBleedMain ? 'h-full overflow-hidden' : ''
+            }`}
+          >
+            <Outlet key={viewAsCustomerId || 'all-customers'} />
+          </div>
         </main>
         {showBulkImport && bulkConfig && (
           <BulkCsvImport

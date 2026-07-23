@@ -11,6 +11,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import PortalPageShell from '@/components/layout/PortalPageShell';
 import { billingStatusColor, formatDueDate } from '@/lib/billing';
 
 const SLT_ROLES = ['owner', 'executive', 'fleet_manager'];
@@ -113,15 +114,15 @@ export default function SltBillingHub() {
 
   if (loadingUser) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
+      <PortalPageShell variant="wide" className="flex items-center justify-center min-h-[50vh]">
         <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
-      </div>
+      </PortalPageShell>
     );
   }
 
   if (!SLT_ROLES.includes(user?.role)) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
+      <PortalPageShell variant="wide" className="flex items-center justify-center min-h-[50vh] px-4">
         <div className="text-center max-w-md">
           <CreditCard className="w-12 h-12 mx-auto mb-4 text-slate-700" />
           <p className="text-slate-300 text-lg font-medium">SLT access required</p>
@@ -129,7 +130,7 @@ export default function SltBillingHub() {
             Customer payments and Stripe are for owner, executive, and fleet manager roles.
           </p>
         </div>
-      </div>
+      </PortalPageShell>
     );
   }
 
@@ -138,7 +139,7 @@ export default function SltBillingHub() {
   const stripeOk = data?.stripe?.configured;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <PortalPageShell variant="wide" className="space-y-6 bg-slate-950 text-slate-100 rounded-2xl border border-slate-800 shadow-sm">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -351,6 +352,6 @@ export default function SltBillingHub() {
           with your FleetCo Stripe account for full banking, payouts, and dispute tools.
         </p>
       )}
-    </div>
+    </PortalPageShell>
   );
 }
