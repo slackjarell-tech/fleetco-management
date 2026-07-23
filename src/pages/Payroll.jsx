@@ -4,7 +4,9 @@ import { DollarSign, Plus, Users, CheckCircle2, Clock, FileText, TrendingUp, Che
 import { Button } from '@/components/ui/button';
 import PayrollRunModal from '@/components/payroll/PayrollRunModal';
 import PayrollRecordRow from '@/components/payroll/PayrollRecordRow';
-import { isPlatformAdmin } from '@/lib/roles';
+import DirectDepositPanel from '@/components/payroll/DirectDepositPanel';
+import { isPlatformAdmin, isFleetCoAdmin } from '@/lib/roles';
+import { canManageCustomerTeam } from '@/lib/customerRoles';
 
 const STATUS_COLORS = {
   draft: 'bg-slate-100 text-slate-600',
@@ -69,7 +71,11 @@ export default function Payroll() {
       const updated = await api.entities.PayrollRecord.update(editRecord.id, data);
       setRecords(prev => prev.map(r => r.id === editRecord.id ? updated : r));
     } else {
-      const created = await api.entities.PayrollRecord.create(data);
+      const created = await api.entities.PayrollRecord.create({
+        ...data,
+        customer_id: user?.customer_id || data.customer_id,
+        payee_type: 'driver',
+      });
       setRecords(prev => [created, ...prev]);
     }
     setShowModal(false);
@@ -114,7 +120,12 @@ export default function Payroll() {
           <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
             <DollarSign className="w-6 h-6 text-amber-500" /> Payroll
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">Manage driver compensation — W2, 1099, per mile, per stop, salary & hourly</p>
+          <p className="text-slate-500 text-sm mt-0.5">
+            Manage driver compensation — use sidebar <strong>Bulk Upload</strong> for CSV imports
+            {isFleetCoAdmin(user?.role) && (
+              <span className="block text-xs mt-1 text-amber-700">FleetCo staff: include <code className="bg-amber-50 px-1 rounded">customer_company</code> in CSV to import payroll for any customer.</span>
+            )}
+          </p>
         </div>
         <Button onClick={() => { setEditRecord(null); setShowModal(true); }} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold">
           <Plus className="w-4 h-4 mr-1" /> Run Payroll
@@ -208,6 +219,14 @@ export default function Payroll() {
             </table>
           </div>
         </div>
+      )}
+
+      {(canManageCustomerTeam(user?.role) || isPlatformAdmin(user?.role)) && (
+        <DirectDepositPanel
+          user={user}
+          payrollRecords={records}
+          onDisbursed={() => load()}
+        />
       )}
 
       {showModal && (

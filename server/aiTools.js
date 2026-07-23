@@ -18,6 +18,7 @@ const ENTITY_TYPES = [
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
   'UsageFeedback', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder',
+  'MarketingSocialPost', 'MarketingScheduledCall', 'MarketingActivityLog', 'MarketingReportRun',
 ];
 
 const WRITE_ROLES = new Set(['owner', 'executive', 'fleet_manager', 'fleet_coordinator', 'employee']);

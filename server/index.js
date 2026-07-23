@@ -100,6 +100,19 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.use(cors({ origin: true, credentials: true }));
+
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    const { handleStripeWebhook } = await import('./stripeBilling.js');
+    const signature = req.headers['stripe-signature'];
+    const result = await handleStripeWebhook(req.body, signature);
+    res.json(result);
+  } catch (err) {
+    console.error('[stripe webhook]', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use('/uploads', express.static(uploadsDir));
 
@@ -309,11 +322,16 @@ app.get('/api/agents/status', requireAuth, async (_req, res) => {
 
 app.post('/api/agents/conversations', requireAuth, (req, res) => {
   const { agent_name = 'site_commander', metadata = {} } = req.body || {};
+  if (agent_name === 'slt_marketing' && !['owner', 'executive', 'fleet_manager'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'SLT access required for Marketing Commander' });
+  }
   const id = randomUUID();
   const welcome =
     agent_name === 'revan'
       ? 'Revan online — executive commander with Cursor-style control. I can change fleetcomanagement.org content, manage fleet records, run audits, and update users. Try: "Run a system health audit" or "Change the homepage headline to …"'
-      : 'Site Commander online. I can read your fleet data and make real changes — like Cursor for your portal. Try: "Show open work orders" or "Change the homepage headline to …"';
+      : agent_name === 'slt_marketing'
+        ? 'SLT Marketing Commander online. I can manage leads, queue social posts, send follow-up emails, and schedule sales calls. Daily interested-lead reports go to SLT at 3:00 PM CST. Try: "Show interested leads" or "Queue a Facebook post about our fleet platform."'
+        : 'Site Commander online. I can read your fleet data and make real changes — like Cursor for your portal. Try: "Show open work orders" or "Change the homepage headline to …"';
   const conversation = {
     id,
     agent_name,
@@ -360,6 +378,107 @@ app.post('/api/agents/conversations/:id/messages', requireAuth, async (req, res)
   } catch (err) {
     console.error('[agent error]', err);
     res.status(500).json({ error: err.message || 'Agent failed' });
+  }
+});
+
+app.get('/api/slt-marketing/dashboard', requireAuth, async (req, res) => {
+  try {
+    const { getMarketingDashboard } = await import('./sltMarketing.js');
+    res.json(getMarketingDashboard(req.user));
+  } catch (err) {
+    res.status(err.message?.includes('SLT') ? 403 : 400).json({ error: err.message });
+  }
+});
+
+app.post('/api/slt-marketing/daily-report', requireAuth, async (req, res) => {
+  if (!['owner', 'executive', 'fleet_manager'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'SLT access required' });
+  }
+  try {
+    const { runDailyLeadReport } = await import('./sltMarketing.js');
+    const force = req.body?.force === true;
+    const result = await runDailyLeadReport({ force });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/payroll/banking', requireAuth, async (req, res) => {
+  try {
+    const { getPayrollBankingSummary } = await import('./payrollBanking.js');
+    res.json(getPayrollBankingSummary(req.user));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/payroll/funding-account', requireAuth, async (req, res) => {
+  try {
+    const { saveCustomerFundingAccount } = await import('./payrollBanking.js');
+    res.json({ success: true, account: saveCustomerFundingAccount(req.user, req.body) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/payroll/payee-bank', requireAuth, async (req, res) => {
+  try {
+    const { savePayeeBankAccount } = await import('./payrollBanking.js');
+    res.json({ success: true, account: savePayeeBankAccount(req.user, req.body) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/payroll/disburse', requireAuth, async (req, res) => {
+  try {
+    const { initiateDirectDeposit } = await import('./payrollDisburse.js');
+    const result = initiateDirectDeposit(req.user, req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/billing/status', requireAuth, async (req, res) => {
+  try {
+    const { getCustomerBillingOverview, getStripeConfigStatus } = await import('./stripeBilling.js');
+    if (req.user?.customer_id) {
+      return res.json(await getCustomerBillingOverview(req.user));
+    }
+    res.json({ success: true, stripe: getStripeConfigStatus() });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/billing/checkout-session', authMiddleware, async (req, res) => {
+  try {
+    const { createCheckoutWithFallback } = await import('./stripeBilling.js');
+    const result = await createCheckoutWithFallback(req.body, req.user);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/billing/portal-session', requireAuth, async (req, res) => {
+  try {
+    const { createStripePortalSession } = await import('./stripeBilling.js');
+    res.json(await createStripePortalSession(req.user));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/billing/sync-session', requireAuth, async (req, res) => {
+  try {
+    const { syncCheckoutSession } = await import('./stripeBilling.js');
+    const result = await syncCheckoutSession(req.body?.sessionId, req.user);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -422,6 +541,8 @@ const ENTITY_NAMES = [
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
   'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
+  'MarketingSocialPost', 'MarketingScheduledCall', 'MarketingActivityLog', 'MarketingReportRun',
+  'CustomerFundingAccount', 'PayeeBankAccount', 'PayrollDisbursement', 'PayrollDisbursementBatch',
 ];
 
 function filterUsersForActor(actor, users) {
@@ -790,6 +911,9 @@ async function startServer() {
 
   app.listen(PORT, () => {
     console.log(`Fleetco Management API running on ${siteUrl}`);
+    import('./sltMarketing.js').then(({ startSltMarketingScheduler }) => {
+      startSltMarketingScheduler();
+    }).catch((err) => console.warn('[slt-marketing] scheduler not started', err.message));
   });
 }
 

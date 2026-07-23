@@ -13,6 +13,10 @@ export const GLOBAL_ENTITY_TYPES = new Set([
   'PartInventory',
   'ServiceTemplate',
   'Inquiry',
+  'MarketingSocialPost',
+  'MarketingScheduledCall',
+  'MarketingActivityLog',
+  'MarketingReportRun',
   'DomainEmail',
   'UsageFeedback',
   'FuelStation',
@@ -131,6 +135,11 @@ export function entityBelongsToCustomer(type, item, customerId, scopeIndex) {
     return true;
   }
 
+  if (type === 'PayrollRecord') {
+    if (item.driver_id && userIds?.has(item.driver_id)) return true;
+    if (item.employee_user_id && userIds?.has(item.employee_user_id)) return true;
+  }
+
   if (type === 'VehicleAccessory') {
     if (matchesCustomerField(item, customerId)) return true;
     if (item.vehicle_id && vehicleIds?.has(item.vehicle_id)) return true;
@@ -171,6 +180,7 @@ export function stampEntityForCreate(type, data, ctx) {
     'Invoice',
     'PurchaseOrder',
     'PayrollRun',
+    'PayrollRecord',
     'ChartOfAccount',
     'JournalEntry',
     'Yard',

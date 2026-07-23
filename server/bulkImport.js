@@ -1,5 +1,30 @@
-import { createEntity, createUser, findUserByEmail, listEntities } from './db.js';
+import { createEntity, createUser, findUserByEmail, listEntities, listUsers } from './db.js';
 import bcrypt from 'bcryptjs';
+
+const INTERNAL_EMPLOYEE_ROLES = new Set(['owner', 'executive', 'fleet_manager', 'fleet_coordinator']);
+
+function resolveDriverByEmail(email, customerId) {
+  if (!email) return null;
+  const normalized = String(email).trim().toLowerCase();
+  const users = listUsers();
+  return users.find(
+    (u) => u.email?.toLowerCase() === normalized && u.role === 'driver' && (!customerId || u.customer_id === customerId),
+  );
+}
+
+function resolveInternalEmployeeByEmail(email) {
+  if (!email) return null;
+  const normalized = String(email).trim().toLowerCase();
+  return listUsers().find(
+    (u) => u.email?.toLowerCase() === normalized && INTERNAL_EMPLOYEE_ROLES.has(u.role) && !u.customer_id,
+  );
+}
+
+function resolveCustomerByCompany(name) {
+  if (!name) return null;
+  const needle = String(name).trim().toLowerCase();
+  return listEntities('Customer').find((c) => (c.company_name || '').toLowerCase() === needle);
+}
 
 function resolveVehicleId(unitRef) {
   if (!unitRef) return undefined;
@@ -33,7 +58,45 @@ function enrichRecord(type, record, user, ctx) {
     data.total_cost = data.labor_cost + data.parts_total;
   }
 
+  if (type === 'PayrollRecord') {
+    if (data.payee_type === 'fleetco_employee' || data.employee_email) {
+      const employee = resolveInternalEmployeeByEmail(data.employee_email);
+      if (!employee) throw new Error(`FleetCo employee not found: ${data.employee_email}`);
+      data.payee_type = 'fleetco_employee';
+      data.employee_user_id = employee.id;
+      data.driver_name = data.driver_name || employee.full_name || employee.email;
+      data.customer_id = '';
+      delete data.employee_email;
+      delete data.driver_email;
+    } else {
+      let customerId = data.customer_id || ctx?.customerId || user?.customer_id || null;
+      if (!customerId && data.customer_company && isInternalImport(user)) {
+        const cust = resolveCustomerByCompany(data.customer_company);
+        if (!cust) throw new Error(`Customer not found: ${data.customer_company}`);
+        customerId = cust.id;
+      }
+      const driver = resolveDriverByEmail(data.driver_email, customerId);
+      if (!driver) throw new Error(`Driver not found for email: ${data.driver_email}`);
+      data.payee_type = 'driver';
+      data.driver_id = driver.id;
+      data.driver_name = data.driver_name || driver.full_name || driver.email;
+      data.customer_id = driver.customer_id || customerId || '';
+      delete data.driver_email;
+      delete data.customer_company;
+    }
+    if (data.gross_pay != null && data.net_pay == null) {
+      const gross = Number(data.gross_pay) || 0;
+      const ded = Number(data.deductions) || 0;
+      data.net_pay = gross - ded;
+    }
+    if (!data.status) data.status = 'draft';
+  }
+
   return data;
+}
+
+function isInternalImport(user) {
+  return ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(user?.role);
 }
 
 function createBulkRecord(type, record, user, ctx) {

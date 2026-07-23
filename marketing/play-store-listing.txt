@@ -1,0 +1,94 @@
+# FleetCo Driver — Google Play Store Listing
+# Package: org.fleetcomanagement.driver
+# Backend: https://fleetcomanagement.org
+# Last updated: 2026-07-20
+
+See also: scripts/play-store-listing.txt (canonical copy for Play Console paste)
+
+================================================================================
+SHORT DESCRIPTION (max 80 characters)
+================================================================================
+
+Clock in, share live GPS, complete routes & scans. Syncs to FleetCo portal.
+
+(74 / 80 characters)
+
+================================================================================
+FULL DESCRIPTION
+================================================================================
+
+FleetCo Driver is the mobile companion for professional drivers on the FleetCo Management platform. Clock in from the cab, share your live location with dispatch, complete delivery routes with proof of delivery, and keep compliance records—all from one app that syncs instantly to your fleet's web portal at fleetcomanagement.org.
+
+Built for drivers. Trusted by fleet managers.
+
+Whether you run regional lanes, dedicated routes, or local deliveries, FleetCo Driver keeps your day organized and your office in the loop—without phone calls, paper logs, or guesswork.
+
+⏱ TIME CLOCK & LIVE GPS
+• Clock in and out with optional photo verification
+• Share live GPS location while on shift so dispatch sees you on the Fleet Map
+• Shift history available to you and your fleet manager
+
+🗺 ROUTES & PROOF OF DELIVERY
+• View assigned delivery routes and stop details
+• Capture photos and notes at each stop for POD
+• Progress updates flow to the Route Dashboard in real time
+
+📷 BARCODE & QR SCANNING
+• Scan barcodes and QR codes in the field
+• Each scan is tagged with GPS and timestamp
+• Finance and operations teams review scans in the portal
+
+📋 HOURS OF SERVICE (HOS)
+• Log HOS entries from your phone
+• Stay aligned with fleet compliance requirements
+• Records sync to the same system your safety team uses
+
+⛽ FUEL LOGS
+• Record fuel purchases on the road
+• Attach receipts and location data
+• Support accurate IFTA and expense reporting
+
+🔍 VEHICLE INSPECTIONS
+• Complete pre-trip and post-trip inspections
+• Capture photos of defects or damage
+• Inspection records appear in the customer portal
+
+📦 LOADS & DISPATCH
+• View loads assigned to you
+• Check pickup and delivery details
+• Stay connected to dispatch without radio chatter
+
+💬 MESSAGES
+• Two-way messaging with dispatch and fleet staff
+• Route updates and questions in one thread
+• Faster coordination, fewer missed calls
+
+🎥 DASHCAM & DRIVER MEDIA
+• Record dashcam-style time-lapse or cabin clips
+• Capture B-roll at stops for documentation
+• Media uploads to Driver Media in the FleetCo portal
+
+🚨 INCIDENT REPORTING
+• Report incidents from the field with photos and location
+• Alert your fleet team immediately
+• Maintain a clear audit trail
+
+🔗 ONE PLATFORM, INSTANT SYNC
+Everything you capture in FleetCo Driver—GPS pings, scans, photos, HOS, fuel, inspections, and messages—appears in the FleetCo Management customer portal. Fleet managers see live positions on the Fleet Map, track route progress, review driver scans, and manage compliance from one dashboard.
+
+No duplicate entry. No delayed updates. One source of truth for your entire operation.
+
+WHO IS THIS APP FOR?
+• CDL and commercial drivers whose fleet uses FleetCo Management
+• Owner-operators and company drivers on assigned routes
+• Fleet managers inviting drivers to download and sign in
+
+REQUIREMENTS
+• A FleetCo Management account provided by your fleet or carrier
+• Internet connection (cellular or Wi‑Fi) while on the road
+• Location permission while clocked in (for live fleet tracking)
+• Camera permission (for POD photos, inspections, and clock-in verification)
+
+FleetCo Management LLC — Move freight. We handle the rest.
+
+Questions or need a fleet account? Visit fleetcomanagement.org or contact support@fleetcomanagement.org

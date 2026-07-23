@@ -289,7 +289,49 @@ const agents = {
   },
 };
 
-export const api = { auth, entities, functions, integrations, agents, reports: {
+const billing = {
+  getStatus() {
+    return apiFetch('/billing/status');
+  },
+  createCheckoutSession(body) {
+    return apiFetch('/billing/checkout-session', { method: 'POST', body: JSON.stringify(body) });
+  },
+  createPortalSession() {
+    return apiFetch('/billing/portal-session', { method: 'POST', body: JSON.stringify({}) });
+  },
+  syncSession(sessionId) {
+    return apiFetch('/billing/sync-session', { method: 'POST', body: JSON.stringify({ sessionId }) });
+  },
+};
+
+const payroll = {
+  getBanking() {
+    return apiFetch('/payroll/banking');
+  },
+  saveFunding(body) {
+    return apiFetch('/payroll/funding-account', { method: 'POST', body: JSON.stringify(body) });
+  },
+  savePayeeBank(body) {
+    return apiFetch('/payroll/payee-bank', { method: 'POST', body: JSON.stringify(body) });
+  },
+  disburse(body) {
+    return apiFetch('/payroll/disburse', { method: 'POST', body: JSON.stringify(body) });
+  },
+};
+
+const sltMarketing = {
+  async getDashboard() {
+    return apiFetch('/slt-marketing/dashboard');
+  },
+  async sendDailyReport(force = true) {
+    return apiFetch('/slt-marketing/daily-report', {
+      method: 'POST',
+      body: JSON.stringify({ force }),
+    });
+  },
+};
+
+export const api = { auth, entities, functions, integrations, agents, billing, payroll, sltMarketing, reports: {
   listEntity(entityName, sort, limit) {
     const params = new URLSearchParams();
     if (sort) params.set('sort', sort);

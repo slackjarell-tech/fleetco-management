@@ -1,11 +1,37 @@
 import { chatCompletion, getAiStatus } from './aiProvider.js';
 import { executeTool, getToolsForUser } from './aiTools.js';
+import { executeMarketingTool, getMarketingToolsForUser } from './marketingAiTools.js';
+import { SLT_MARKETING_ROLES } from './sltMarketing.js';
 
 const MAX_TOOL_ROUNDS = 6;
 
 function buildSystemPrompt(user, agentName) {
   const role = user?.role || 'user';
   const isRevan = agentName === 'revan';
+  const isSltMarketing = agentName === 'slt_marketing';
+
+  if (isSltMarketing) {
+    return `You are FleetCo SLT Marketing Commander — an AI for the Senior Leadership Team at fleetcomanagement.org.
+You help grow the business: manage leads, draft and queue social posts, send follow-up emails, and schedule sales calls.
+
+Current user: ${user?.email} (role: ${role})
+
+Tools (real actions — never pretend):
+- get_marketing_dashboard / list_marketing_leads
+- update_marketing_lead (status: new, interested, contacted, call_scheduled, qualified, won, lost)
+- send_lead_email (Resend — requires RESEND_API_KEY on server)
+- schedule_sales_call
+- queue_social_post / approve_social_post / list_social_queue
+
+Social: Facebook auto-post works when FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN are set. Other platforms queue as draft/manual until tokens are configured.
+
+Behavior:
+1. When asked to market or follow up, use tools immediately.
+2. Draft professional, fleet-industry copy for owner-operators and small fleets.
+3. Always suggest scheduling a call via the team calendar when a lead is interested.
+4. For social posts, queue first; remind SLT to approve unless they explicitly ask to approve and publish.
+5. A daily email at 3:00 PM CST summarizes interested leads to the SLT inbox automatically.`;
+  }
 
   if (isRevan) {
     return `You are Revan, the Executive Commander AI for FleetCo Management at fleetcomanagement.org.
@@ -65,7 +91,8 @@ function parseToolCalls(message) {
 }
 
 function offlineReply(agentName, userMessage) {
-  const label = agentName === 'revan' ? 'Revan' : 'Site Commander';
+  const label =
+    agentName === 'revan' ? 'Revan' : agentName === 'slt_marketing' ? 'SLT Marketing Commander' : 'Site Commander';
   const setup = `**Free AI not configured yet.** Add a free API key to enable ${label}:
 
 1. Get a free key at [console.groq.com](https://console.groq.com) (recommended) or [aistudio.google.com](https://aistudio.google.com)
@@ -76,9 +103,12 @@ Until then I can only show this setup guide.`;
 
   const lower = userMessage.toLowerCase();
   if (lower.includes('help') || lower.includes('what can')) {
-    const examples = agentName === 'revan'
-      ? '\n- "Run a full system health audit"\n- "Change the homepage headline to Welcome to FleetCo"\n- "List all customers and their fleet size"\n- "Update the contact email on the website"'
-      : '\n- "Change the homepage headline to Welcome to FleetCo"\n- "List all open work orders"\n- "Add a work order for unit 104 brake inspection"';
+    const examples =
+      agentName === 'revan'
+        ? '\n- "Run a full system health audit"\n- "Change the homepage headline to Welcome to FleetCo"\n- "List all customers and their fleet size"\n- "Update the contact email on the website"'
+        : agentName === 'slt_marketing'
+          ? '\n- "List all interested leads and draft follow-up emails"\n- "Queue a LinkedIn post about our driver app"\n- "Schedule a call tomorrow at 2pm with Robert Kim"\n- "Send a demo invite to every new lead this week"'
+          : '\n- "Change the homepage headline to Welcome to FleetCo"\n- "List all open work orders"\n- "Add a work order for unit 104 brake inspection"';
     return `${setup}\n\nOnce enabled, ask things like:${examples}`;
   }
   return setup;
@@ -97,7 +127,19 @@ export async function runAgent({ user, messages, agentName = 'site_commander' })
     };
   }
 
-  const tools = getToolsForUser(user, agentName);
+  const isSltMarketing = agentName === 'slt_marketing';
+  if (isSltMarketing && !SLT_MARKETING_ROLES.has(user?.role)) {
+    return {
+      message: {
+        role: 'assistant',
+        content: 'SLT Marketing Commander is for owner, executive, and fleet manager roles only.',
+      },
+      actions: [],
+      ai_status: status,
+    };
+  }
+
+  const tools = isSltMarketing ? getMarketingToolsForUser(user) : getToolsForUser(user, agentName);
   const chatMessages = [
     { role: 'system', content: buildSystemPrompt(user, agentName) },
     ...messages.filter((m) => m.role === 'user' || m.role === 'assistant'),
@@ -136,7 +178,9 @@ export async function runAgent({ user, messages, agentName = 'site_commander' })
     });
 
     for (const call of toolCalls) {
-      const result = executeTool(user, call.name, call.args);
+      const result = isSltMarketing
+        ? await executeMarketingTool(user, call.name, call.args)
+        : executeTool(user, call.name, call.args);
       actions.push({ tool: call.name, args: call.args, result });
       chatMessages.push({
         role: 'tool',

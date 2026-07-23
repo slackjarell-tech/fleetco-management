@@ -71,6 +71,9 @@ import Advertisement from './pages/Advertisement';
 import MarketingGallery from './pages/MarketingGallery';
 import CompetitiveAnalysis from './pages/CompetitiveAnalysis';
 import Revan from './pages/Revan';
+import SubscriptionBilling from './pages/SubscriptionBilling';
+import FleetCoPayroll from './pages/FleetCoPayroll';
+import SltMarketingHub from './pages/SltMarketingHub';
 import EldPortal from './pages/EldPortal';
 import RouteDashboard from './pages/RouteDashboard';
 import DomainEmails from './pages/DomainEmails';
@@ -153,6 +156,8 @@ const AuthenticatedApp = () => {
           <Route path="vendors" element={<Vendors />} />
           <Route path="assistant" element={<Assistant />} />
           <Route path="executive" element={<ExecutiveDashboard />} />
+          <Route path="billing" element={<SubscriptionBilling />} />
+          <Route path="fleetco-payroll" element={<FleetCoPayroll />} />
           <Route path="customer-insights" element={<CustomerInsights />} />
           <Route path="messages" element={<Messages />} />
           <Route path="navigation" element={<Navigation />} />
@@ -180,6 +185,7 @@ const AuthenticatedApp = () => {
           <Route path="marketing-gallery" element={<MarketingGallery />} />
           <Route path="competitive-analysis" element={<CompetitiveAnalysis />} />
           <Route path="revan" element={<Revan />} />
+          <Route path="slt-marketing" element={<SltMarketingHub />} />
           <Route path="eld" element={<EldPortal />} />
           <Route path="domain-emails" element={<DomainEmails />} />
           <Route path="data-backup" element={<DataBackup />} />

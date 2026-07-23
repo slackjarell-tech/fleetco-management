@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/api/apiClient';
-import { Send, Bot, Loader2, Plus, MessageSquare, Wrench, Sparkles, AlertCircle, Zap, Crown } from 'lucide-react';
+import { Send, Bot, Loader2, Plus, MessageSquare, Wrench, Sparkles, AlertCircle, Zap, Crown, Megaphone } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 function ActionChip({ action }) {
@@ -16,16 +16,21 @@ function ActionChip({ action }) {
 function MessageBubble({ message, variant = 'default' }) {
   const isUser = message.role === 'user';
   const isRevan = variant === 'revan';
+  const isSlt = variant === 'slt_marketing';
 
   if (!message.content && !message.actions?.length) return null;
 
   const botIconWrap = isRevan
     ? 'bg-violet-500/20 border-violet-500/40'
-    : 'bg-amber-500/20 border-amber-500/40';
-  const botIconColor = isRevan ? 'text-violet-400' : 'text-amber-500';
+    : isSlt
+      ? 'bg-cyan-500/20 border-cyan-500/40'
+      : 'bg-amber-500/20 border-amber-500/40';
+  const botIconColor = isRevan ? 'text-violet-400' : isSlt ? 'text-cyan-400' : 'text-amber-500';
   const userBubble = isRevan
     ? 'bg-violet-500 text-white font-medium'
-    : 'bg-amber-500 text-slate-900 font-medium';
+    : isSlt
+      ? 'bg-cyan-500 text-slate-900 font-medium'
+      : 'bg-amber-500 text-slate-900 font-medium';
 
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -73,8 +78,9 @@ export default function AssistantChat({
   emptySubtitle = 'I can query fleet records and make real updates — website text, work orders, vehicles, and more.',
 }) {
   const isRevan = variant === 'revan';
-  const HeaderIcon = isRevan ? Crown : Sparkles;
-  const EmptyIcon = isRevan ? Zap : Wrench;
+  const isSlt = variant === 'slt_marketing';
+  const HeaderIcon = isRevan ? Crown : isSlt ? Megaphone : Sparkles;
+  const EmptyIcon = isRevan ? Zap : isSlt ? Megaphone : Wrench;
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -154,9 +160,9 @@ export default function AssistantChat({
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-900">
         <div className="flex items-center gap-3">
           <div className={`w-9 h-9 rounded-lg flex items-center justify-center border ${
-            isRevan ? 'bg-violet-500/20 border-violet-500/40' : 'bg-amber-500/20 border-amber-500/40'
+            isRevan ? 'bg-violet-500/20 border-violet-500/40' : isSlt ? 'bg-cyan-500/20 border-cyan-500/40' : 'bg-amber-500/20 border-amber-500/40'
           }`}>
-            <HeaderIcon className={`w-5 h-5 ${isRevan ? 'text-violet-400' : 'text-amber-500'}`} />
+            <HeaderIcon className={`w-5 h-5 ${isRevan ? 'text-violet-400' : isSlt ? 'text-cyan-400' : 'text-amber-500'}`} />
           </div>
           <div>
             <div className="text-white font-bold text-sm flex items-center gap-2">
@@ -183,9 +189,11 @@ export default function AssistantChat({
         <div className={`mx-4 mt-3 flex items-start gap-2 text-xs rounded-lg px-3 py-2 border ${
           isRevan
             ? 'text-violet-200/90 bg-violet-950/30 border-violet-800/40'
-            : 'text-amber-200/90 bg-amber-950/30 border-amber-800/40'
+            : isSlt
+              ? 'text-cyan-200/90 bg-cyan-950/30 border-cyan-800/40'
+              : 'text-amber-200/90 bg-amber-950/30 border-amber-800/40'
         }`}>
-          <AlertCircle className={`w-4 h-4 flex-shrink-0 mt-0.5 ${isRevan ? 'text-violet-400' : 'text-amber-400'}`} />
+          <AlertCircle className={`w-4 h-4 flex-shrink-0 mt-0.5 ${isRevan ? 'text-violet-400' : isSlt ? 'text-cyan-400' : 'text-amber-400'}`} />
           <span>
             Add a free <strong>GROQ_API_KEY</strong> in Render environment variables to enable AI changes.
             Get one at console.groq.com — no credit card required.
@@ -196,14 +204,14 @@ export default function AssistantChat({
       <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
         {starting ? (
           <div className="flex items-center justify-center h-full">
-            <Loader2 className={`w-6 h-6 animate-spin ${isRevan ? 'text-violet-500' : 'text-amber-500'}`} />
+            <Loader2 className={`w-6 h-6 animate-spin ${isRevan ? 'text-violet-500' : isSlt ? 'text-cyan-500' : 'text-amber-500'}`} />
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-6 text-center px-4">
             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center border ${
-              isRevan ? 'bg-violet-500/10 border-violet-500/30' : 'bg-amber-500/10 border-amber-500/30'
+              isRevan ? 'bg-violet-500/10 border-violet-500/30' : isSlt ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-amber-500/10 border-amber-500/30'
             }`}>
-              <EmptyIcon className={`w-8 h-8 ${isRevan ? 'text-violet-400' : 'text-amber-500'}`} />
+              <EmptyIcon className={`w-8 h-8 ${isRevan ? 'text-violet-400' : isSlt ? 'text-cyan-400' : 'text-amber-500'}`} />
             </div>
             <div>
               <h3 className="text-white font-bold text-lg mb-1">{emptyTitle}</h3>
@@ -216,7 +224,7 @@ export default function AssistantChat({
                   onClick={() => { setInput(q); setTimeout(() => inputRef.current?.focus(), 50); }}
                   className="text-left text-xs text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl px-4 py-3 transition-colors"
                 >
-                  <MessageSquare className={`w-3.5 h-3.5 mb-1 ${isRevan ? 'text-violet-400' : 'text-amber-500'}`} />
+                  <MessageSquare className={`w-3.5 h-3.5 mb-1 ${isRevan ? 'text-violet-400' : isSlt ? 'text-cyan-400' : 'text-amber-500'}`} />
                   {q}
                 </button>
               ))}
@@ -238,7 +246,7 @@ export default function AssistantChat({
             placeholder={placeholder}
             rows={1}
             className={`flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none resize-none ${
-              isRevan ? 'focus:border-violet-500' : 'focus:border-amber-500'
+              isRevan ? 'focus:border-violet-500' : isSlt ? 'focus:border-cyan-500' : 'focus:border-amber-500'
             }`}
             style={{ maxHeight: '120px', overflowY: 'auto' }}
             disabled={starting}
@@ -249,14 +257,16 @@ export default function AssistantChat({
             className={`w-10 h-10 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
               isRevan
                 ? 'bg-violet-500 hover:bg-violet-400 text-white'
-                : 'bg-amber-500 hover:bg-amber-400 text-slate-900'
+                : isSlt
+                  ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-900'
+                  : 'bg-amber-500 hover:bg-amber-400 text-slate-900'
             }`}
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
         <p className="text-slate-600 text-xs mt-2 text-center">
-          Enter to send · AI can modify your site & fleet data when configured
+          Enter to send · {isSlt ? 'AI can email leads, queue social posts, and schedule calls' : 'AI can modify your site & fleet data when configured'}
         </p>
       </div>
     </div>

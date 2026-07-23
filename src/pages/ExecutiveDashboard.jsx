@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { Users, DollarSign, TrendingUp, FileText, Fuel, Wrench, BarChart2, Crown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
@@ -30,7 +31,7 @@ export default function ExecutiveDashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
-    users: [], invoices: [], fuelLogs: [], workOrders: [], loads: [], customers: []
+    users: [], invoices: [], fuelLogs: [], workOrders: [], loads: [], customers: [], payrollRecords: [],
   });
 
   useEffect(() => {
@@ -38,15 +39,16 @@ export default function ExecutiveDashboard() {
       const u = await api.auth.me();
       setUser(u);
       if (!isExecutiveView(u?.role)) { setLoading(false); return; }
-      const [users, invoices, fuelLogs, workOrders, loads, customers] = await Promise.all([
+      const [users, invoices, fuelLogs, workOrders, loads, customers, payrollRecords] = await Promise.all([
         api.entities.User.list(),
         api.entities.Invoice.list(),
         api.entities.FuelLog.list(),
         api.entities.WorkOrder.list(),
         api.entities.Load.list(),
         api.entities.Customer.list(),
+        api.entities.PayrollRecord.list('-created_date', 300),
       ]);
-      setData({ users, invoices, fuelLogs, workOrders, loads, customers });
+      setData({ users, invoices, fuelLogs, workOrders, loads, customers, payrollRecords });
       setLoading(false);
     };
     load();
@@ -67,7 +69,13 @@ export default function ExecutiveDashboard() {
     </div>
   );
 
-  const { users, invoices, fuelLogs, workOrders, loads, customers } = data;
+  const { users, invoices, fuelLogs, workOrders, loads, customers, payrollRecords } = data;
+
+  const fleetcoPayroll = payrollRecords.filter((r) => r.payee_type === 'fleetco_employee' || r.employee_user_id);
+  const fleetcoPayrollNet = fleetcoPayroll.reduce((s, r) => s + (r.net_pay || 0), 0);
+  const customerPayrollNet = payrollRecords
+    .filter((r) => r.payee_type !== 'fleetco_employee' && !r.employee_user_id)
+    .reduce((s, r) => s + (r.net_pay || 0), 0);
 
   // Subscriber / customer counts
   const totalSubscribers = customers.filter(c => c.status === 'active').length;
@@ -145,6 +153,37 @@ export default function ExecutiveDashboard() {
         <StatCard icon={DollarSign} label="Total Revenue (Paid)" value={fmt(totalRevenue)} sub={`${fmt(pendingRevenue)} pending`} color="green" />
         <StatCard icon={TrendingUp} label="Load Revenue" value={fmt(loadRevenue)} sub={`${loads.filter(l => l.status === 'delivered').length} loads delivered`} color="amber" />
         <StatCard icon={Wrench} label="Maintenance Cost" value={fmt(totalMaintCost)} sub={`${fmt(totalFuelSpend)} fuel spend`} color="red" />
+      </div>
+
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 className="text-white font-bold text-sm flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-emerald-400" /> Payroll overview
+          </h2>
+          <Link
+            to="/portal/fleetco-payroll"
+            className="text-xs font-bold text-amber-400 hover:text-amber-300"
+          >
+            Manage FleetCo employee payroll →
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+          <div>
+            <div className="text-slate-500 text-xs uppercase">FleetCo staff records</div>
+            <div className="text-xl font-black text-white">{fleetcoPayroll.length}</div>
+            <div className="text-emerald-400 text-xs mt-1">${fleetcoPayrollNet.toLocaleString()} net</div>
+          </div>
+          <div>
+            <div className="text-slate-500 text-xs uppercase">Customer driver payroll</div>
+            <div className="text-xl font-black text-white">{payrollRecords.length - fleetcoPayroll.length}</div>
+            <div className="text-blue-400 text-xs mt-1">${customerPayrollNet.toLocaleString()} net</div>
+          </div>
+          <div className="col-span-2 text-slate-400 text-xs leading-relaxed">
+            Customer portals bulk-upload driver payroll on <span className="text-slate-200">Payroll</span> (CSV).
+            FleetCo staff payroll uses <span className="text-slate-200">employee_email</span> in bulk upload.
+            Direct deposit: company + employee bank profiles, then ACH CSV export from customer Payroll page.
+          </div>
+        </div>
       </div>
 
       {/* Valuation & Profit Tracker */}

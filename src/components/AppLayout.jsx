@@ -7,7 +7,7 @@ import {
   Archive, Calendar, Cpu, Store, Bot, Crown, MessageCircle, Navigation, TrendingUp,
   Map, Route, DollarSign, Globe, Clock, ShieldCheck, AlertTriangle, Award, Lightbulb,
   MapPin, Megaphone, Zap, Mail, ScanLine, Video, Upload, Warehouse, Search,
-  ChevronDown, KeyRound, Bell, Database, Calculator, Smartphone,
+  ChevronDown, KeyRound, Bell, Database, Calculator, Smartphone, CreditCard,
 } from 'lucide-react';
 import { DRIVER_APP } from '@/lib/platform';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,7 @@ const NAV_GROUPS = [
     items: [
       { label: 'Admin Dashboard', icon: LayoutDashboard, path: '/portal' },
       { label: 'Executive View', icon: Crown, path: '/portal/executive' },
+      { label: 'FleetCo Payroll', icon: DollarSign, path: '/portal/fleetco-payroll' },
       { label: 'Customer Insights', icon: BarChart2, path: '/portal/customer-insights', internalOnly: true },
     ]
   },
@@ -111,6 +112,7 @@ const NAV_GROUPS = [
       { label: 'Driver Scans', icon: ScanLine, path: '/portal/driver-scans' },
       { label: 'Driver Media', icon: Video, path: '/portal/driver-media' },
       { label: 'Reports', icon: BarChart2, path: '/portal/reports' },
+      { label: 'Subscription', icon: CreditCard, path: '/portal/billing', customerBilling: true },
     ]
   },
   {
@@ -123,6 +125,7 @@ const NAV_GROUPS = [
       { label: 'Messages', icon: MessageCircle, path: '/portal/messages' },
       { label: 'Site Commander AI', icon: Bot, path: '/portal/assistant' },
       { label: 'Revan', icon: Zap, path: '/portal/revan', advancedOnly: true },
+      { label: 'SLT Marketing AI', icon: Megaphone, path: '/portal/slt-marketing', sltOnly: true },
       { label: 'Advertisement', icon: Megaphone, path: '/portal/advertisement', advancedOnly: true },
       { label: 'Marketing Gallery', icon: Megaphone, path: '/portal/marketing-gallery', advancedOnly: true },
       { label: 'AI Dev Feedback', icon: Lightbulb, path: '/portal/dev-feedback', advancedOnly: true },
@@ -311,7 +314,9 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
             const visibleItems = group.items.filter(item => {
               if (item.internalOnly && !isInternal) return false;
               if (item.sltOnly && !['owner', 'executive', 'fleet_manager'].includes(user?.role)) return false;
+              if (item.path === '/portal/fleetco-payroll' && !['owner', 'executive'].includes(user?.role)) return false;
               if (item.ownerOnly && user?.role !== 'owner') return false;
+              if (item.customerBilling && !user?.customer_id) return false;
               if (item.advancedOnly && isCustomerPortalUser(user) && !isInternal) return false;
 
               if (isViewingAsCustomer) {

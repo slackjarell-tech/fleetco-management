@@ -122,7 +122,7 @@ export async function invokeFunction(name, body, user) {
     case 'predictFuelPrices':
       return predictFuelPrices();
     case 'createCheckout':
-      return createCheckout(body);
+      return createCheckout(body, user);
     case 'sendNotification':
       return sendNotification(body);
     case 'getEmailConfig':
@@ -172,6 +172,44 @@ export async function invokeFunction(name, body, user) {
         summary: getDemoSeedSummary(),
         ...result,
       };
+    }
+    case 'getSltMarketingDashboard': {
+      const { getMarketingDashboard } = await import('./sltMarketing.js');
+      return getMarketingDashboard(user);
+    }
+    case 'runSltMarketingDailyReport': {
+      const { runDailyLeadReport } = await import('./sltMarketing.js');
+      const { assertSltMarketingAccess } = await import('./sltMarketing.js');
+      assertSltMarketingAccess(user);
+      return runDailyLeadReport({ force: body?.force === true });
+    }
+    case 'updateSltMarketingLead': {
+      const { updateMarketingLead } = await import('./sltMarketing.js');
+      return {
+        success: true,
+        item: updateMarketingLead(user, {
+          inquiryId: body.inquiryId,
+          lead_status: body.lead_status,
+          notes: body.notes,
+          assigned_to: body.assigned_to,
+        }),
+      };
+    }
+    case 'approveSltSocialPost': {
+      const { approveSocialPost } = await import('./sltMarketing.js');
+      return approveSocialPost(user, { postId: body.postId, publishNow: body.publishNow !== false });
+    }
+    case 'createBillingPortalSession': {
+      const { createStripePortalSession } = await import('./stripeBilling.js');
+      return createStripePortalSession(user);
+    }
+    case 'getSubscriptionBilling': {
+      const { getCustomerBillingOverview } = await import('./stripeBilling.js');
+      return getCustomerBillingOverview(user);
+    }
+    case 'syncStripeCheckoutSession': {
+      const { syncCheckoutSession } = await import('./stripeBilling.js');
+      return syncCheckoutSession(body.sessionId, user);
     }
     default:
       throw new Error(`Unknown function: ${name}`);
@@ -1406,13 +1444,9 @@ function predictFuelPrices() {
   };
 }
 
-function createCheckout({ planName, billingTerm = 'monthly' }) {
-  const origin = process.env.APP_ORIGIN || 'http://localhost:5173';
-  const term = billingTerm === 'yearly' ? 'yearly' : 'monthly';
-  return {
-    url: `${origin}/register?plan=${encodeURIComponent(planName || 'Starter')}&term=${term}`,
-    message: 'Complete registration after selecting your plan',
-  };
+async function createCheckout(body, user) {
+  const { createCheckoutWithFallback } = await import('./stripeBilling.js');
+  return createCheckoutWithFallback(body, user);
 }
 
 export function invokeLLM({ prompt }) {

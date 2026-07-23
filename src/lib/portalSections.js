@@ -2,6 +2,7 @@
 export const PATH_TO_SECTION = {
   '/portal': 'Dashboard',
   '/portal/executive': 'Dashboard',
+  '/portal/fleetco-payroll': 'Dashboard',
   '/portal/customer-insights': 'Dashboard',
   '/portal/loads': 'Operations',
   '/portal/pd-command': 'Operations',
@@ -36,6 +37,7 @@ export const PATH_TO_SECTION = {
   '/portal/ifta': 'Compliance',
   '/portal/incidents': 'Compliance',
   '/portal/invoices': 'Finance',
+  '/portal/billing': 'Finance',
   '/portal/fuel-stations': 'Finance',
   '/portal/fuel': 'Finance',
   '/portal/driver-scans': 'Finance',
@@ -45,6 +47,7 @@ export const PATH_TO_SECTION = {
   '/portal/customers': 'Other',
   '/portal/messages': 'Other',
   '/portal/assistant': 'Other',
+  '/portal/slt-marketing': 'Other',
 };
 
 export function sectionForPath(pathname) {
@@ -55,12 +58,14 @@ export function sectionForPath(pathname) {
 
 export const INTERNAL_ONLY_PATHS = new Set([
   '/portal/executive',
+  '/portal/fleetco-payroll',
   '/portal/customer-insights',
   '/portal/domain-emails',
   '/portal/data-backup',
   '/portal/advertisement',
   '/portal/dev-feedback',
   '/portal/revan',
+  '/portal/slt-marketing',
   '/portal/competitive-analysis',
   '/portal/marketing-gallery',
 ]);

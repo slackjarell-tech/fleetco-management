@@ -73,6 +73,16 @@ export default function PaymentDueBanner({ user }) {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {hasCustomerAlert && (
+            <Link
+              to="/portal/billing"
+              className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg ${
+                isPaused ? 'bg-slate-700 text-white hover:bg-slate-600' : isOverdue ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-amber-500 text-slate-900 hover:bg-amber-400'
+              }`}
+            >
+              <DollarSign className="w-3.5 h-3.5" /> Pay now
+            </Link>
+          )}
           {hasInternalAlerts && (
             <Link
               to="/portal/customers"
