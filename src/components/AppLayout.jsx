@@ -262,9 +262,9 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
     <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:h-screen lg:max-h-screen lg:overflow-hidden">
       {/* Sidebar — drawer on mobile; grid column on desktop (never overlapped by main) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 flex flex-col transform transition-transform duration-200 ${
-          open ? 'translate-x-0' : '-translate-x-full'
-        } lg:static lg:translate-x-0 lg:z-auto lg:h-screen lg:max-h-screen lg:overflow-y-auto lg:overscroll-contain`}
+        className={`max-lg:fixed max-lg:inset-y-0 max-lg:left-0 z-50 w-64 bg-slate-900 flex flex-col max-lg:transform max-lg:transition-transform max-lg:duration-200 ${
+          open ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full'
+        } lg:relative lg:translate-x-0 lg:z-auto lg:col-start-1 lg:row-start-1 lg:h-screen lg:max-h-screen lg:overflow-y-auto lg:overscroll-contain`}
       >
         {/* Brand */}
         <div className="p-5 border-b border-slate-800 flex items-center gap-3">
@@ -438,7 +438,7 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
 
       {/* Main column — minmax(0,1fr) prevents horizontal bleed into sidebar */}
       <div
-        className={`flex flex-col min-h-screen min-w-0 w-full lg:min-h-0 ${
+        className={`flex flex-col min-h-screen min-w-0 w-full lg:col-start-2 lg:row-start-1 lg:min-h-0 ${
           fullBleedMain ? 'lg:h-screen lg:max-h-screen lg:overflow-hidden' : 'lg:overflow-y-auto'
         }`}
       >
