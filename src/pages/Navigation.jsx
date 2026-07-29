@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/api/apiClient';
 import { MapPin, Navigation as NavIcon, ExternalLink, Package, Calendar, Truck, AlertCircle, User } from 'lucide-react';
+import { isPureDriverUser } from '@/lib/driverAccess';
 
 const STATUS_COLORS = {
   available: 'bg-green-100 text-green-700',
@@ -41,7 +42,7 @@ export default function Navigation() {
         api.entities.Load.list('-created_date', 100),
         api.entities.DriverLocation.list('-timestamp', 500),
       ]);
-      const myLoads = u?.role === 'driver'
+      const myLoads = isPureDriverUser(u)
         ? allLoads.filter(l => l.assigned_driver_id === u.id && ['assigned', 'in_transit'].includes(l.status))
         : allLoads.filter(l => ['assigned', 'in_transit'].includes(l.status));
       setLoads(myLoads);
@@ -68,7 +69,7 @@ export default function Navigation() {
     </div>
   );
 
-  const isDriver = user?.role === 'driver';
+  const isDriver = isPureDriverUser(user);
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">

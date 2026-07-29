@@ -6,11 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import { isDriverAppContext, isNativeApp } from '@/lib/platform';
+import { canAccessDriverApp } from '@/lib/driverAccess';
 
 export function resolveLoginDestination(result) {
-  const isDriver = result?.user?.role === 'driver';
-  if (isDriver && (isNativeApp() || isDriverAppContext())) return '/driver';
-  if (isDriver && new URLSearchParams(window.location.search).get('app') === 'driver') return '/driver';
+  const canDrive = canAccessDriverApp(result?.user);
+  if (canDrive && (isNativeApp() || isDriverAppContext())) return '/driver';
+  if (canDrive && new URLSearchParams(window.location.search).get('app') === 'driver') return '/driver';
   return '/portal';
 }
 

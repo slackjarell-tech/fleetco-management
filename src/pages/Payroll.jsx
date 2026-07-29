@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/api/apiClient';
-import { DollarSign, Plus, Users, CheckCircle2, Clock, FileText, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, Plus, CheckCircle2, Clock, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PayrollRunModal from '@/components/payroll/PayrollRunModal';
 import PayrollRecordRow from '@/components/payroll/PayrollRecordRow';
 import DirectDepositPanel from '@/components/payroll/DirectDepositPanel';
+import HrPayrollPanel from '@/components/payroll/HrPayrollPanel';
 import { isPlatformAdmin, isFleetCoAdmin } from '@/lib/roles';
 import { canManageCustomerTeam } from '@/lib/customerRoles';
+import { filterDriverRoster } from '@/lib/driverAccess';
+import { canRunPayroll } from '@/lib/accounting/accountingRoles';
 
 const STATUS_COLORS = {
   draft: 'bg-slate-100 text-slate-600',
@@ -35,6 +38,14 @@ export default function Payroll() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPeriod, setFilterPeriod] = useState('');
   const [customerState, setCustomerState] = useState('TX');
+  const [tab, setTab] = useState('payroll');
+
+  const reloadDrivers = async (us, u) => {
+    let driverList = filterDriverRoster(us, u?.customer_id || null);
+    if (u?.customer_id) driverList = driverList.filter(d => d.customer_id === u.customer_id);
+    setDrivers(driverList);
+    return driverList;
+  };
 
   const load = async () => {
     const u = await api.auth.me().catch(() => null);
@@ -50,9 +61,7 @@ export default function Payroll() {
       const c = cust.find(x => x.id === u.customer_id);
       if (c?.state) setCustomerState(c.state);
     }
-    let driverList = us.filter(u => u.role === 'driver');
-    if (u?.customer_id) driverList = driverList.filter(d => d.customer_id === u.customer_id);
-    setDrivers(driverList);
+    const driverList = await reloadDrivers(us, u);
     let filteredRecords = rs;
     if (u?.customer_id) {
       const customerDriverIds = driverList.map(d => d.id);
@@ -112,27 +121,57 @@ export default function Payroll() {
     </div>
   );
 
+  const hrPayroll = canRunPayroll(user);
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
             <DollarSign className="w-6 h-6 text-amber-500" /> Payroll
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            Manage driver compensation — use sidebar <strong>Bulk Upload</strong> for CSV imports
-            {isFleetCoAdmin(user?.role) && (
-              <span className="block text-xs mt-1 text-amber-700">FleetCo staff: include <code className="bg-amber-50 px-1 rounded">customer_company</code> in CSV to import payroll for any customer.</span>
-            )}
+            Customer HR can run payroll, assign employee numbers, and file state tax forms. Use sidebar <strong>Bulk Upload</strong> for CSV.
           </p>
         </div>
-        <Button onClick={() => { setEditRecord(null); setShowModal(true); }} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold">
-          <Plus className="w-4 h-4 mr-1" /> Run Payroll
-        </Button>
+        {hrPayroll && tab === 'payroll' && (
+          <Button onClick={() => { setEditRecord(null); setShowModal(true); }} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold">
+            <Plus className="w-4 h-4 mr-1" /> Run Payroll
+          </Button>
+        )}
       </div>
 
-      {/* Summary Cards */}
+      <div className="flex gap-2 border-b border-slate-200">
+        {[
+          { id: 'payroll', label: 'Payroll runs' },
+          { id: 'hr', label: 'HR & tax forms' },
+        ].map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`px-4 py-2 text-sm font-bold border-b-2 -mb-px ${
+              tab === t.id ? 'border-amber-500 text-amber-700' : 'border-transparent text-slate-500'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'hr' && (
+        <HrPayrollPanel
+          user={user}
+          drivers={drivers}
+          onEmployeeUpdated={async () => {
+            const us = await api.entities.User.list();
+            await reloadDrivers(us, user);
+          }}
+        />
+      )}
+
+      {tab === 'payroll' && (
+        <>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: 'Total Gross', value: `$${totalGross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: TrendingUp, color: 'text-slate-700' },
@@ -228,8 +267,10 @@ export default function Payroll() {
           onDisbursed={() => load()}
         />
       )}
+        </>
+      )}
 
-      {showModal && (
+      {showModal && hrPayroll && (
         <PayrollRunModal
           record={editRecord}
           drivers={drivers}

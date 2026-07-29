@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/api/apiClient';
 import { MessageCircle, Send, ChevronLeft, User, Building2, UserCheck } from 'lucide-react';
 import PortalPageShell from '@/components/layout/PortalPageShell';
+import { filterDriverRoster, isPureDriverUser, isDriverCapableUser } from '@/lib/driverAccess';
+import { isCustomerPortalUser } from '@/lib/customerRoles';
 
 export default function Messages() {
   const [user, setUser] = useState(null);
@@ -22,11 +24,9 @@ export default function Messages() {
       const u = await api.auth.me();
       setUser(u);
       const allUsers = await api.entities.User.list();
-      const driverList = allUsers.filter(u => u.role === 'driver');
-      setDrivers(driverList);
+      setDrivers(filterDriverRoster(allUsers, u?.customer_id || null));
 
-      // If current user is a driver, auto-select themselves as the "inbox" view
-      if (u?.role === 'driver') {
+      if (isPureDriverUser(u)) {
         setSelectedDriver(u);
       }
 
@@ -90,7 +90,7 @@ export default function Messages() {
     const msgs = await api.entities.Message.filter({ conversation_id: convId }, 'created_date', 100);
     setMessages(msgs);
     // Mark unread messages as read for the receiving user
-    if (user?.role === 'driver' || user?.role === 'user') {
+    if (isPureDriverUser(user) || user?.role === 'user') {
       msgs.filter(m => !m.read && m.sender_id !== user.id).forEach(m => {
         api.entities.Message.update(m.id, { read: true });
       });
@@ -144,8 +144,8 @@ export default function Messages() {
     </div>
   );
 
-  const isDriver = user?.role === 'driver';
-  const isCustomer = user?.role === 'user' && customerRecord;
+  const isDriver = isPureDriverUser(user);
+  const isCustomer = isCustomerPortalUser(user) && user?.role === 'user' && customerRecord;
 
   // ── Customer Messaging View ──
   if (isCustomer) {

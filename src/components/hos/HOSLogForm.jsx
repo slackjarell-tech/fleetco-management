@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2, X, Save } from 'lucide-react';
 import HOSGrid from './HOSGrid';
 import HOSViolations, { detectViolations } from './HOSViolations';
+import { filterDriverRoster } from '@/lib/driverAccess';
 
 const STATUS_OPTIONS = [
   { value: 'off_duty', label: 'Off Duty' },
@@ -72,7 +73,7 @@ export default function HOSLogForm({ vehicles, users, onSave, onClose, initialDa
     });
   };
 
-  const drivers = users.filter(u => u.role === 'driver');
+  const drivers = filterDriverRoster(users);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 overflow-y-auto">

@@ -5,9 +5,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { X } from 'lucide-react';
+import { filterDriverRoster } from '@/lib/driverAccess';
 
 export default function LoadModal({ load, vehicles, users, customers = [], onSave, onClose }) {
-  const drivers = users.filter(u => u.role === 'driver');
+  const drivers = filterDriverRoster(users);
   const customerOptions = customers.length > 0
     ? customers.map((c) => ({ id: c.id, label: c.company_name || c.contact_name }))
     : users.filter((u) => u.customer_id).map((u) => ({ id: u.customer_id || u.id, label: u.full_name }));

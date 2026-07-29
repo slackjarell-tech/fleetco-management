@@ -5,6 +5,12 @@ import { executePublicMarketingTool, getPublicMarketingTools, PUBLIC_MARKETING_A
 import { SLT_MARKETING_ROLES } from './sltMarketing.js';
 
 const MAX_TOOL_ROUNDS = 6;
+const MAX_HISTORY_MESSAGES = 14;
+
+function trimHistory(messages, max = MAX_HISTORY_MESSAGES) {
+  const filtered = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
+  return filtered.length > max ? filtered.slice(-max) : filtered;
+}
 
 function buildSystemPrompt(user, agentName) {
   const role = user?.role || 'user';
@@ -177,10 +183,12 @@ export async function runAgent({ user, messages, agentName = 'site_commander', g
   else tools = getToolsForUser(user, agentName);
   const chatMessages = [
     { role: 'system', content: buildSystemPrompt(user, agentName) },
-    ...messages.filter((m) => m.role === 'user' || m.role === 'assistant'),
+    ...trimHistory(messages),
   ];
 
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+  const maxRounds = isPublicGuide || isSltMarketing ? 3 : MAX_TOOL_ROUNDS;
+
+  for (let round = 0; round < maxRounds; round++) {
     const response = await chatCompletion({ messages: chatMessages, tools });
 
     if (response.error === 'not_configured') {

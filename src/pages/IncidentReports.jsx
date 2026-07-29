@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/api/apiClient';
 import { AlertTriangle, Plus, Search, X, Car, User, MapPin, ShieldAlert, DollarSign, FileText } from 'lucide-react';
 import { isPlatformAdmin } from '@/lib/roles';
+import { filterDriverRoster } from '@/lib/driverAccess';
 
 const SEVERITY_COLORS = {
   minor: 'bg-yellow-100 text-yellow-700',
@@ -60,7 +61,7 @@ export default function IncidentReports() {
   }, []);
 
   const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map(v => [v.id, v])), [vehicles]);
-  const drivers = useMemo(() => users.filter(u => u.role === 'driver'), [users]);
+  const drivers = useMemo(() => filterDriverRoster(users, user?.customer_id || null), [users, user?.customer_id]);
 
   const filtered = useMemo(() => incidents.filter(i => {
     const matchSearch = !search ||

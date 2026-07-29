@@ -9,6 +9,7 @@ import {
 } from './db.js';
 import { isInternalRole } from './entityScope.js';
 import { encryptSensitive, maskAccountLast4 } from './payrollVault.js';
+import { isDriverCapableUser, filterDriverRoster } from './driverAccess.js';
 
 const FLEETCO_EMPLOYEE_ROLES = new Set(['owner', 'executive', 'fleet_manager', 'fleet_coordinator']);
 
@@ -19,7 +20,7 @@ export function canManageCustomerFunding(user) {
 
 export function canManagePayeeBank(user, targetUserId) {
   if (!user) return false;
-  if (user.id === targetUserId && user.role === 'driver') return true;
+  if (user.id === targetUserId && isDriverCapableUser(user)) return true;
   if (canManageCustomerFunding(user)) {
     const target = findUserById(targetUserId);
     return target?.customer_id === user.customer_id;
@@ -156,7 +157,7 @@ export function getPayrollBankingSummary(user) {
     payees = payees.filter((p) => p.customer_id === customerId);
   }
 
-  const drivers = listUsers().filter((u) => u.role === 'driver' && (!customerId || u.customer_id === customerId));
+  const drivers = filterDriverRoster(listUsers(), customerId || null);
 
   return {
     mode: customerId ? 'customer' : 'internal',

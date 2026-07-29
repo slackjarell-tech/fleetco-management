@@ -52,6 +52,7 @@ import { sendWelcomeSignupEmail } from './customerEmails.js';
 import { sendInquiryNotificationEmail } from './inquiryEmails.js';
 import { getEmailConfigStatus, sendEmail as sendEmailDirect } from './email.js';
 import { vehiclePartsLookup, accessorySerialLookup } from './vehiclePartsLookup.js';
+import { isDriverCapableUser, ensureDriverNumber } from './driverAccess.js';
 
 const SIM_ROUTES = [
   { name: 'I-80 Westbound', id: 'sim_driver_01', userName: '👤 Mike R. (Sim)', steps: [
@@ -364,17 +365,17 @@ async function createUserAccount(body, user) {
     throw new Error('Email, tempPassword, and role are required');
   }
 
+  const internalRoles = ['executive', 'fleet_manager', 'fleet_coordinator'];
+  const customerRoles = [...CUSTOMER_TEAM_ROLES, CUSTOMER_LEGACY_ROLE];
+
   let employeeNumber = bodyEmployeeNumber?.trim() || null;
-  if (role === 'driver' && !employeeNumber) {
+  if (customerRoles.includes(role) && !employeeNumber) {
     employeeNumber = generateNextDriverNumber();
   } else if (employeeNumber && isDriverNumberTaken(employeeNumber)) {
     throw new Error(`Driver number ${employeeNumber} is already assigned`);
   }
 
   const customerId = bodyCustomerId;
-
-  const internalRoles = ['executive', 'fleet_manager', 'fleet_coordinator'];
-  const customerRoles = [...CUSTOMER_TEAM_ROLES, CUSTOMER_LEGACY_ROLE];
 
   let normalizedEmail = email.trim().toLowerCase();
 
@@ -445,6 +446,9 @@ async function createUserAccount(body, user) {
   }
 
   const portalUser = findUserByEmail(normalizedEmail);
+  if (portalUser && customerRoles.includes(role) && effectiveCustomerId) {
+    ensureDriverNumber(portalUser.id);
+  }
 
   // Replace any prior pending row so temp password stays current
   for (const old of filterEntities('PendingAccount', { email: normalizedEmail })) {
@@ -1231,7 +1235,7 @@ const DASHCAM_INTERVALS = [3, 5, 10, 15];
 
 function assertDriver(user) {
   if (!user) throw new Error('Unauthorized');
-  if (user.role !== 'driver') throw new Error('Dashcam recording is for driver accounts only');
+  if (!isDriverCapableUser(user)) throw new Error('Dashcam recording is for driver accounts only');
 }
 
 function startDashcamSession(body, user) {

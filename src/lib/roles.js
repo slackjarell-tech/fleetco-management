@@ -5,7 +5,8 @@ export {
   customerRoleLabel,
   isCustomerTeamRole,
 } from './customerRoles.js';
-import { isCustomerPortalUser as isCustomerPortalAccount } from './customerRoles.js';
+import { isCustomerPortalUser as isCustomerPortalAccount, canManageCustomerTeam } from './customerRoles.js';
+import { isPureDriverUser } from './driverAccess.js';
 export const PLATFORM_ADMIN_ROLES = ['owner', 'executive', 'admin'];
 export const FLEETCO_ADMIN_ROLES = ['owner', 'executive', 'fleet_manager', 'admin'];
 export const EXECUTIVE_VIEW_ROLES = ['owner', 'executive'];
@@ -40,6 +41,14 @@ export function isExecutiveView(role) {
 
 export function isInternalRole(role) {
   return INTERNAL_ROLES.includes(role);
+}
+
+/** SLT or customer managers can delete dedicated driver accounts (not owner-operators). */
+export function canDeleteDriver(actor, driver) {
+  if (!actor || !driver || !isPureDriverUser(driver)) return false;
+  if (SLT_ROLES.includes(actor.role)) return true;
+  if (canManageCustomerTeam(actor.role) && driver.customer_id === actor.customer_id) return true;
+  return false;
 }
 
 function _isCustomerPortal(user) {

@@ -4,11 +4,12 @@ import { api } from '@/api/apiClient';
 import {
   LayoutDashboard, Clock, Route, ScanLine, Menu, LogOut, Package,
   MessageCircle, Navigation, ClipboardCheck, Fuel, AlertTriangle, MapPin,
-  X, ChevronRight, Video,
+  X, ChevronRight, Video, Building2,
 } from 'lucide-react';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
 import CustomerPausedOverlay from '@/components/billing/CustomerPausedOverlay';
 import { isNativeApp } from '@/lib/platform';
+import { canAccessDriverApp, isDriverCapableUser } from '@/lib/driverAccess';
 
 const TABS = [
   { path: '/driver', label: 'Home', icon: LayoutDashboard, end: true },
@@ -53,7 +54,7 @@ export default function DriverMobileLayout() {
   }
 
   if (!user) return <Navigate to="/login?app=driver" replace />;
-  if (user.role !== 'driver') return <Navigate to="/portal" replace />;
+  if (!canAccessDriverApp(user)) return <Navigate to="/portal" replace />;
 
   const tabActive = (tab) => (tab.end ? location.pathname === tab.path : location.pathname.startsWith(tab.path));
 
@@ -114,6 +115,17 @@ export default function DriverMobileLayout() {
                   <ChevronRight className="w-4 h-4 text-slate-300" />
                 </Link>
               ))}
+              {isDriverCapableUser(user) && user.role !== 'driver' && (
+                <Link
+                  to="/portal"
+                  onClick={() => setMoreOpen(false)}
+                  className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-50 border-t border-slate-100 mt-2 pt-3"
+                >
+                  <Building2 className="w-5 h-5 text-amber-600" />
+                  <span className="flex-1 font-semibold text-slate-800 text-sm">Fleet Portal</span>
+                  <ChevronRight className="w-4 h-4 text-slate-300" />
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={() => api.auth.logout()}

@@ -2,9 +2,35 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GEMINI_URL = (model) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
+// Free tier: 70B hits 12k TPM quickly; 8B instant has much higher limits and is fine for chat.
+const DEFAULT_GROQ_MODEL = 'llama-3.1-8b-instant';
+const DEFAULT_GROQ_MAX_TOKENS = 1024;
+
+function groqModel() {
+  return process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL;
+}
+
+function groqMaxTokens() {
+  const n = Number(process.env.GROQ_MAX_TOKENS);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_GROQ_MAX_TOKENS;
+}
+
+function parseRetryAfterSeconds(message) {
+  const match = String(message || '').match(/try again in ([\d.]+)s/i);
+  return match ? Math.ceil(parseFloat(match[1])) + 1 : 8;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isGroqRateLimit(status, message) {
+  return status === 429 || /rate limit reached/i.test(String(message || ''));
+}
+
 export function getAiStatus() {
   if (process.env.GROQ_API_KEY) {
-    return { configured: true, provider: 'groq', model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile' };
+    return { configured: true, provider: 'groq', model: groqModel() };
   }
   if (process.env.GEMINI_API_KEY) {
     return { configured: true, provider: 'gemini', model: process.env.GEMINI_MODEL || 'gemini-2.0-flash' };
@@ -14,30 +40,46 @@ export function getAiStatus() {
 
 async function chatGroq({ messages, tools, model }) {
   const body = {
-    model: model || process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+    model: model || groqModel(),
     messages,
     temperature: 0.4,
-    max_tokens: 4096,
+    max_tokens: groqMaxTokens(),
   };
   if (tools?.length) {
     body.tools = tools;
     body.tool_choice = 'auto';
   }
 
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  let lastMessage = 'Groq API error';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
 
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.error?.message || `Groq API error (${res.status})`);
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      return data.choices?.[0]?.message || { role: 'assistant', content: 'No response from AI.' };
+    }
+
+    lastMessage = data?.error?.message || `Groq API error (${res.status})`;
+    if (isGroqRateLimit(res.status, lastMessage) && attempt < 2) {
+      await sleep(parseRetryAfterSeconds(lastMessage) * 1000);
+      continue;
+    }
+    if (isGroqRateLimit(res.status, lastMessage)) {
+      throw new Error(
+        'FleetCo AI is briefly busy (free Groq limit). Please wait 30 seconds and send your message again.',
+      );
+    }
+    throw new Error(lastMessage);
   }
-  return data.choices?.[0]?.message || { role: 'assistant', content: 'No response from AI.' };
+
+  throw new Error(lastMessage);
 }
 
 function toGeminiContents(messages) {

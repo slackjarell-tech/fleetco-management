@@ -16,6 +16,7 @@ import { seedDemoData } from './seedDemo.js';
 import { repairCustomerPortalLogins } from './repairCustomerLogins.js';
 import { getStoreStats } from './db.js';
 import { defaultSidebarModulesForRole } from './customerRoles.js';
+import { ensureAllCustomerDriverNumbers } from './driverAccess.js';
 
 function migrateCustomerRoles() {
   let migrated = 0;
@@ -101,6 +102,10 @@ function ensureOwnerLogin() {
 
 export function seedDatabase() {
   migrateCustomerRoles();
+  const driverNums = ensureAllCustomerDriverNumbers();
+  if (driverNums) {
+    console.log(`[seed] Assigned driver numbers to ${driverNums} customer portal user(s)`);
+  }
   const ownerUser = ensureOwnerLogin();
   const ownerMailbox = filterEntities('DomainEmail', { email: OWNER_EMAIL }, null, 1)[0];
   if (!ownerMailbox && ownerUser) {

@@ -5,10 +5,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { X } from 'lucide-react';
+import { filterDriverRoster, isDriverCapableUser } from '@/lib/driverAccess';
 
 export default function FuelLogModal({ log, vehicles, users, currentUser, onSave, onClose }) {
   const isAdmin = currentUser?.role === 'admin';
-  const drivers = users.filter(u => u.role === 'driver');
+  const drivers = filterDriverRoster(users);
 
   const [form, setForm] = useState({
     vehicle_id: log?.vehicle_id || '',

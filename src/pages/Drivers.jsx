@@ -7,6 +7,8 @@ import DriverDocuments from '@/components/drivers/DriverDocuments';
 import CreateDriverModal from '@/components/team/CreateDriverModal';
 import ScreeningTab from '@/components/drivers/ScreeningTab';
 import { canManageCustomerTeam } from '@/lib/customerRoles';
+import { canDeleteDriver, isInternalRole } from '@/lib/roles';
+import { filterDriverRoster } from '@/lib/driverAccess';
 import DriverAppDownload from '@/components/shared/DriverAppDownload';
 
 export default function Drivers() {
@@ -23,14 +25,14 @@ export default function Drivers() {
   const [docsDriver, setDocsDriver] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeTab, setActiveTab] = useState('drivers');
+  const [deletingDriverId, setDeletingDriverId] = useState(null);
 
   const reloadDrivers = useCallback(async () => {
     const [u, users] = await Promise.all([
       api.auth.me().catch(() => null),
       api.entities.User.list(),
     ]);
-    let driverList = users.filter(x => x.role === 'driver');
-    if (u?.customer_id) driverList = driverList.filter(d => d.customer_id === u.customer_id);
+    let driverList = filterDriverRoster(users, u?.customer_id || null);
     setDrivers(driverList);
     return driverList;
   }, []);
@@ -46,8 +48,7 @@ export default function Drivers() {
       api.entities.Inspection.list('-inspection_date', 500),
     ]).then(([u, users, vehs, fuel, lds, wos, insp]) => {
       setUser(u);
-      let driverList = users.filter(u => u.role === 'driver');
-      if (u?.customer_id) driverList = driverList.filter(d => d.customer_id === u.customer_id);
+      let driverList = filterDriverRoster(users, u?.customer_id || null);
       setDrivers(driverList);
       setVehicles(vehs);
       setFuelLogs(fuel);
@@ -114,12 +115,52 @@ export default function Drivers() {
   const assigned = Object.keys(vehiclesByDriver).length;
   const canAddDriver = user && (canManageCustomerTeam(user.role) || ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(user.role));
 
+  const handleDeleteDriver = async (driver) => {
+    const name = driver.full_name || driver.email || 'this driver';
+    const assigned = vehiclesByDriver[driver.id] || [];
+    const activeLoads = loads.filter(
+      (l) => l.assigned_driver_id === driver.id && ['assigned', 'in_transit'].includes(l.status),
+    );
+    let msg = `Permanently delete "${name}"? This cannot be undone.`;
+    if (assigned.length) {
+      msg += `\n\n${assigned.length} assigned vehicle(s) will be unassigned first.`;
+    }
+    if (activeLoads.length) {
+      msg += `\n\nWarning: ${activeLoads.length} active load(s) are still assigned to this driver.`;
+    }
+    if (!confirm(msg)) return;
+
+    setDeletingDriverId(driver.id);
+    try {
+      for (const v of assigned) {
+        await api.entities.Vehicle.update(v.id, { assigned_driver_id: null });
+      }
+      try {
+        const pending = await api.entities.PendingAccount.filter({ user_id: driver.id });
+        for (const p of pending) {
+          await api.entities.PendingAccount.delete(p.id);
+        }
+      } catch { /* ignore */ }
+      const deleteOpts = isInternalRole(user?.role) ? { skipCustomerContext: true } : {};
+      await api.entities.User.delete(driver.id, deleteOpts);
+      setDrivers((prev) => prev.filter((d) => d.id !== driver.id));
+      setVehicles((prev) =>
+        prev.map((v) => (v.assigned_driver_id === driver.id ? { ...v, assigned_driver_id: null } : v)),
+      );
+      if (selectedDriver?.id === driver.id) setSelectedDriver(null);
+    } catch (err) {
+      alert(err.message || 'Could not delete driver.');
+    } finally {
+      setDeletingDriverId(null);
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black text-slate-900">Driver Management</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Contact details, documents, assignments, performance & screening</p>
+          <p className="text-slate-500 text-sm mt-0.5">Contact details, documents, assignments, performance & screening — every team member can also drive</p>
         </div>
         {canAddDriver && activeTab === 'drivers' && (
           <button
@@ -208,6 +249,9 @@ export default function Drivers() {
             inspections={s._inspections || []}
             onClose={() => setSelectedDriver(null)}
             onOpenDocuments={() => setDocsDriver(selectedDriver)}
+            canDelete={canDeleteDriver(user, selectedDriver)}
+            onDelete={() => handleDeleteDriver(selectedDriver)}
+            deleting={deletingDriverId === selectedDriver.id}
           />
         );
       })()}

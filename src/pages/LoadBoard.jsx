@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import LoadModal from '@/components/fleet/LoadModal';
 import WeightScaleModal from '@/components/loadboard/WeightScaleModal';
 import { isFleetCoAdmin, filterByCustomerId } from '@/lib/roles';
+import { isPureDriverUser, isDriverCapableUser } from '@/lib/driverAccess';
 
 const STATUS_COLORS = {
   available: 'bg-green-100 text-green-700',
@@ -46,7 +47,7 @@ export default function LoadBoard() {
       api.entities.Customer.list(),
     ]);
     let filtered = ls;
-    if (u?.role === 'driver') {
+    if (isPureDriverUser(u)) {
       filtered = ls.filter((l) => l.assigned_driver_id === u.id);
     } else {
       filtered = filterByCustomerId(ls, u);
@@ -82,7 +83,7 @@ export default function LoadBoard() {
   };
 
   const isAdmin = isFleetCoAdmin(user?.role) || user?.role === 'admin';
-  const canWeigh = isAdmin || user?.role === 'driver';
+  const canWeigh = isAdmin || isDriverCapableUser(user);
 
   const SCALE_STATUS_STYLE = {
     pass: 'bg-green-100 text-green-700',

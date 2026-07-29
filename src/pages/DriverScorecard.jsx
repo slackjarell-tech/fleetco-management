@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/api/apiClient';
 import { Star, TrendingUp, TrendingDown, Users, CheckCircle2, AlertTriangle, Truck, MapPin, ShieldCheck, ChevronDown, ChevronUp, Search, Award } from 'lucide-react';
+import { filterDriverRoster } from '@/lib/driverAccess';
 
 function calcScore(stats) {
   // Weighted scoring: delivery completion 40%, HOS violations 25%, DVIR defects 20%, load completion 15%
@@ -49,9 +50,7 @@ export default function DriverScorecard() {
         api.entities.Inspection.list('-inspection_date', 1000),
         api.entities.FuelLog.list('-date', 1000),
       ]);
-      let driverList = us.filter(u => u.role === 'driver');
-      if (u?.customer_id) driverList = driverList.filter(d => d.customer_id === u.customer_id);
-      setDrivers(driverList);
+      setDrivers(filterDriverRoster(us, u?.customer_id || null));
       setLoads(ls);
       setHosLogs(hs);
       setInspections(ins);

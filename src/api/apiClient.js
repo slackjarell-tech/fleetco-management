@@ -110,8 +110,8 @@ function createEntityApi(entityName) {
       return result;
     },
 
-    async delete(id) {
-      await apiFetch(`/entities/${entityName}/${id}`, { method: 'DELETE' });
+    async delete(id, options = {}) {
+      await apiFetch(`/entities/${entityName}/${id}`, { method: 'DELETE', ...options });
       notify({ type: 'delete', data: { id } });
     },
 

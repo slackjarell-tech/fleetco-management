@@ -4,6 +4,7 @@ import { CheckCircle2, Circle, Truck, Users, Fuel, Package, X } from 'lucide-rea
 import { api } from '@/api/apiClient';
 import { canManageCustomerTeam } from '@/lib/customerRoles';
 import DriverAppDownload from '@/components/shared/DriverAppDownload';
+import { filterDriverRoster } from '@/lib/driverAccess';
 
 const STORAGE_KEY = 'fleetco_getting_started_dismissed';
 
@@ -22,14 +23,14 @@ export default function GettingStartedChecklist({ user }) {
       api.entities.Load.list('-created_date', 50),
     ]).then(([vehicles, users, fuel, loads]) => {
       const fleet = vehicles.filter(v => v.customer_id === cid || v.assigned_customer_id === cid);
-      const drivers = users.filter(u => u.role === 'driver' && u.customer_id === cid);
+      const drivers = filterDriverRoster(users, cid);
       const fleetIds = new Set(fleet.map(v => v.id));
       const fuelForFleet = fuel.filter(f => fleetIds.has(f.vehicle_id));
       const loadsForCustomer = loads.filter(l => l.customer_id === cid);
 
       setSteps([
         { id: 'vehicle', label: 'Add your first truck or trailer', done: fleet.length > 0, path: '/portal/fleet', icon: Truck },
-        { id: 'driver', label: 'Invite a driver', done: drivers.length > 0, path: '/portal/drivers', icon: Users, skip: !canManageCustomerTeam(user.role) },
+        { id: 'driver', label: 'Driver access (you + team)', done: drivers.length > 0, path: '/portal/drivers', icon: Users, skip: !canManageCustomerTeam(user.role) && drivers.length === 0 },
         { id: 'fuel', label: 'Log a fuel fill-up', done: fuelForFleet.length > 0, path: '/portal/fuel', icon: Fuel },
         { id: 'load', label: 'Create your first load', done: loadsForCustomer.length > 0, path: '/portal/loads', icon: Package },
       ].filter(s => !s.skip));

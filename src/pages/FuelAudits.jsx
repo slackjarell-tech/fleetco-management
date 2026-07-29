@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import FuelLogModal from '@/components/fleet/FuelLogModal';
 import IFTAReport from '@/components/fuel/IFTAReport';
 import { isFleetCoAdmin } from '@/lib/roles';
+import { filterDriverRoster, isPureDriverUser, isDriverCapableUser } from '@/lib/driverAccess';
 
 export default function FuelAudits() {
   const [user, setUser] = useState(null);
@@ -37,7 +38,7 @@ export default function FuelAudits() {
       api.entities.User.list(),
     ]);
     let filtered = ls;
-    if (u?.role === 'driver') filtered = filtered.filter(l => l.driver_id === u.id);
+    if (isPureDriverUser(u)) filtered = filtered.filter(l => l.driver_id === u.id);
     if (u?.customer_id) {
       const customerVehicleIds = vs.filter(v => v.assigned_customer_id === u.customer_id).map(v => v.id);
       filtered = filtered.filter(l => customerVehicleIds.includes(l.vehicle_id));
@@ -67,8 +68,8 @@ export default function FuelAudits() {
   };
 
   const isAdmin = isFleetCoAdmin(user?.role) || user?.role === 'admin';
-  const isDriver = user?.role === 'driver';
-  const canAdd = isAdmin || isDriver;
+  const isDriver = isPureDriverUser(user);
+  const canAdd = isAdmin || isDriverCapableUser(user);
 
   const getVehicle = (id) => vehicles.find(v => v.id === id);
   const getDriver = (id) => users.find(u => u.id === id)?.full_name || '—';
@@ -195,7 +196,7 @@ export default function FuelAudits() {
               <SelectTrigger className="w-44"><SelectValue placeholder="All Drivers" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Drivers</SelectItem>
-                {users.filter(u => u.role === 'driver').map(u => (
+                {filterDriverRoster(users, user?.customer_id || null).map(u => (
                   <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
                 ))}
               </SelectContent>

@@ -13,6 +13,7 @@ import {
   PO_STATUS_LABELS, PAYROLL_RUN_STATUS_LABELS,
 } from '@/lib/accounting/accountingRoles';
 import { calculatePayrollTaxes, summarizeBusinessTaxes } from '@/lib/accounting/taxEngine';
+import { filterDriverRoster } from '@/lib/driverAccess';
 import { buildPurchaseOrderPdfBase64, downloadPurchaseOrderPdf } from '@/lib/accounting/poPdf';
 import { hoursByUser, buildPayrollDraftFromTimeClock } from '@/lib/accounting/timeclockPayroll';
 import { ensureDefaultChart, suggestJournalForPO, suggestJournalForPayrollRun } from '@/lib/accounting/chartOfAccounts';
@@ -106,7 +107,7 @@ export default function Accounting() {
     setCustomers(cust);
     setTimeClockEntries(tc);
     setAllUsers(users);
-    const driverList = users.filter(x => x.role === 'driver' && (!cid || x.customer_id === cid));
+    const driverList = filterDriverRoster(users, cid || null);
     setDrivers(driverList);
     setJournalEntries(journals);
 

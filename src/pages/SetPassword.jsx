@@ -4,6 +4,7 @@ import { api } from '@/api/apiClient';
 import AuthLayout from '@/components/AuthLayout';
 import ChangePasswordForm from '@/components/auth/ChangePasswordForm';
 import { ShieldAlert, Loader2, CheckCircle2 } from 'lucide-react';
+import { canAccessDriverApp } from '@/lib/driverAccess';
 
 export default function SetPassword() {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export default function SetPassword() {
     let destination = '/portal';
     try {
       const me = await api.auth.me();
-      if (me?.role === 'driver') destination = '/driver';
+      if (canAccessDriverApp(me)) destination = '/driver';
     } catch (_) {}
     setTimeout(() => { window.location.href = destination; }, 2000);
   };

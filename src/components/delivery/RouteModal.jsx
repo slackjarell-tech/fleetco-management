@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { filterDriverRoster } from '@/lib/driverAccess';
 
 export default function RouteModal({ route, users, vehicles, onSave, onClose }) {
   const [form, setForm] = useState({
@@ -15,7 +16,7 @@ export default function RouteModal({ route, users, vehicles, onSave, onClose }) 
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  const drivers = users.filter(u => u.role === 'driver');
+  const drivers = filterDriverRoster(users);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">

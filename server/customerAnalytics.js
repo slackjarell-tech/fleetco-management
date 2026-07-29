@@ -3,6 +3,7 @@
  * Append-only tracking; never mutates users or customer accounts.
  */
 import { createEntity, filterEntities, listEntities, listUsers } from './db.js';
+import { filterDriverRoster } from './driverAccess.js';
 
 const SECTION_LABELS = [
   'Dashboard',
@@ -85,7 +86,7 @@ function inferredSectionUsage(customerId) {
     Fleet: vehiclesForCustomer(customerId).length,
     Maintenance: listEntities('WorkOrder').filter((wo) => vIds.has(wo.vehicle_id)).length
       + listEntities('Inspection').filter((i) => vIds.has(i.vehicle_id)).length,
-    'Drivers & Payroll': listUsers().filter((u) => u.customer_id === customerId && u.role === 'driver').length,
+    'Drivers & Payroll': filterDriverRoster(listUsers(), customerId).length,
     Compliance: listEntities('HOSLog').filter((h) => vIds.has(h.vehicle_id)).length
       + listEntities('Incident').filter((i) => vIds.has(i.vehicle_id)).length,
     Finance: listEntities('Invoice').filter((i) => i.customer_id === customerId).length
@@ -136,7 +137,7 @@ export function buildCustomerAnalytics(customerId) {
       inspections: listEntities('Inspection').filter((i) => vehicleIdsForCustomer(customerId).has(i.vehicle_id)).length,
       fuel_logs: listEntities('FuelLog').filter((f) => vehicleIdsForCustomer(customerId).has(f.vehicle_id)).length,
       invoices: listEntities('Invoice').filter((i) => i.customer_id === customerId).length,
-      drivers: teamUsers.filter((u) => u.role === 'driver').length,
+      drivers: filterDriverRoster(teamUsers).length,
     },
     work_orders_by_status: countByField(workOrders, 'status'),
     work_orders_by_type: countByField(workOrders, 'repair_type'),

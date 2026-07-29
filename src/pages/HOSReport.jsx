@@ -7,6 +7,7 @@ import HOSViolations from '@/components/hos/HOSViolations';
 import DVIRModal from '@/components/hos/DVIRModal';
 import DVIRSignoffModal from '@/components/hos/DVIRSignoffModal';
 import { isExecutiveView } from '@/lib/roles';
+import { filterDriverRoster, isPureDriverUser } from '@/lib/driverAccess';
 
 const STATUS_STYLES = {
   draft:     'bg-slate-100 text-slate-600',
@@ -50,10 +51,10 @@ export default function HOSReport() {
     setInspections(allInspections);
     // Drivers see only their own logs; customer roles see their drivers' logs
     let filtered = allLogs;
-    if (u?.role === 'driver') {
+    if (isPureDriverUser(u)) {
       filtered = filtered.filter(l => l.driver_id === u.id);
     } else if (u?.customer_id) {
-      const customerDriverIds = allUsers.filter(d => d.customer_id === u.customer_id).map(d => d.id);
+      const customerDriverIds = filterDriverRoster(allUsers, u.customer_id).map(d => d.id);
       filtered = filtered.filter(l => customerDriverIds.includes(l.driver_id));
     }
     setLogs(filtered);
@@ -64,7 +65,7 @@ export default function HOSReport() {
 
   const userMap = useMemo(() => Object.fromEntries(users.map(u => [u.id, u])), [users]);
   const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map(v => [v.id, v])), [vehicles]);
-  const drivers = users.filter(u => u.role === 'driver');
+  const drivers = filterDriverRoster(users, user?.customer_id || null);
 
   const handleSave = async (data) => {
     if (editing) {

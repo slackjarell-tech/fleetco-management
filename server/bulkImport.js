@@ -1,5 +1,6 @@
 import { createEntity, createUser, findUserByEmail, listEntities, listUsers } from './db.js';
 import bcrypt from 'bcryptjs';
+import { isDriverCapableUser } from './driverAccess.js';
 
 const INTERNAL_EMPLOYEE_ROLES = new Set(['owner', 'executive', 'fleet_manager', 'fleet_coordinator']);
 
@@ -8,7 +9,18 @@ function resolveDriverByEmail(email, customerId) {
   const normalized = String(email).trim().toLowerCase();
   const users = listUsers();
   return users.find(
-    (u) => u.email?.toLowerCase() === normalized && u.role === 'driver' && (!customerId || u.customer_id === customerId),
+    (u) => u.email?.toLowerCase() === normalized && isDriverCapableUser(u) && (!customerId || u.customer_id === customerId),
+  );
+}
+
+function resolveDriverByEmployeeNumber(employeeNumber, customerId) {
+  if (!employeeNumber) return null;
+  const normalized = String(employeeNumber).trim().toUpperCase();
+  return listUsers().find(
+    (u) =>
+      isDriverCapableUser(u) &&
+      String(u.employee_number || '').trim().toUpperCase() === normalized &&
+      (!customerId || u.customer_id === customerId),
   );
 }
 
@@ -75,12 +87,21 @@ function enrichRecord(type, record, user, ctx) {
         if (!cust) throw new Error(`Customer not found: ${data.customer_company}`);
         customerId = cust.id;
       }
-      const driver = resolveDriverByEmail(data.driver_email, customerId);
-      if (!driver) throw new Error(`Driver not found for email: ${data.driver_email}`);
+      const driver =
+        resolveDriverByEmail(data.driver_email, customerId) ||
+        (data.employee_number ? resolveDriverByEmployeeNumber(data.employee_number, customerId) : null);
+      if (!driver) {
+        throw new Error(
+          data.driver_email
+            ? `Driver not found for email: ${data.driver_email}`
+            : `Driver not found for employee_number: ${data.employee_number}`,
+        );
+      }
       data.payee_type = 'driver';
       data.driver_id = driver.id;
       data.driver_name = data.driver_name || driver.full_name || driver.email;
       data.customer_id = driver.customer_id || customerId || '';
+      data.employee_number = data.employee_number || driver.employee_number || '';
       delete data.driver_email;
       delete data.customer_company;
     }
@@ -106,7 +127,7 @@ function createBulkRecord(type, record, user, ctx) {
     if (findUserByEmail(email)) throw new Error(`User already exists: ${email}`);
     const hash = bcrypt.hashSync(password || 'changeme123', 10);
     const customerId = rest.customer_id || ctx?.customerId || user?.customer_id || null;
-    return createUser({ email, passwordHash: hash, ...rest, customerId });
+    return createUser({ email, passwordHash: hash, ...rest, customerId, employeeNumber: rest.employee_number });
   }
 
   const data = enrichRecord(type, record, user, ctx);

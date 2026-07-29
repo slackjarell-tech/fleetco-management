@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, Mail, Truck, Fuel, TrendingUp, Wrench, ClipboardCheck, AlertTriangle, FileCheck, ShieldCheck, FileText, Phone, CreditCard } from 'lucide-react';
+import { X, Mail, Truck, Fuel, TrendingUp, Wrench, ClipboardCheck, AlertTriangle, FileCheck, ShieldCheck, FileText, Phone, CreditCard, Trash2 } from 'lucide-react';
+import { driverRosterLabel } from '@/lib/driverAccess';
 
 function StatBlock({ icon: Icon, label, value, sub, color = 'text-slate-700' }) {
   return (
@@ -14,7 +15,20 @@ function StatBlock({ icon: Icon, label, value, sub, color = 'text-slate-700' }) 
   );
 }
 
-export default function DriverDetailPanel({ driver, assignedVehicles, stats, fuelLogs, loads, workOrders, inspections, onClose, onOpenDocuments }) {
+export default function DriverDetailPanel({
+  driver,
+  assignedVehicles,
+  stats,
+  fuelLogs,
+  loads,
+  workOrders,
+  inspections,
+  onClose,
+  onOpenDocuments,
+  canDelete = false,
+  onDelete,
+  deleting = false,
+}) {
   const recentLoads = loads.slice(0, 5);
   const recentFuel = fuelLogs.slice(0, 5);
   const defectInspections = inspections.filter(i => i.status === 'failed' || i.status === 'needs_attention');
@@ -38,6 +52,7 @@ export default function DriverDetailPanel({ driver, assignedVehicles, stats, fue
             <h2 className="text-lg font-black text-slate-900">{driver.full_name || '—'}</h2>
             <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
               <Mail className="w-3 h-3" /> {driver.email}
+              <span className="text-xs text-amber-600 font-semibold">{driverRosterLabel(driver)}</span>
               {driver.employee_number && (
                 <span className="font-mono font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
                   {driver.employee_number}
@@ -50,13 +65,22 @@ export default function DriverDetailPanel({ driver, assignedVehicles, stats, fue
           </button>
         </div>
 
-        <div className="px-6 py-3 border-b border-slate-100 flex gap-2">
+        <div className="px-6 py-3 border-b border-slate-100 flex flex-wrap gap-2">
           {onOpenDocuments && (
             <button
               onClick={onOpenDocuments}
               className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-sm rounded-lg"
             >
               <FileText className="w-4 h-4" /> Documents (DL, Insurance…)
+            </button>
+          )}
+          {canDelete && onDelete && (
+            <button
+              onClick={onDelete}
+              disabled={deleting}
+              className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 font-bold text-sm rounded-lg disabled:opacity-50"
+            >
+              <Trash2 className="w-4 h-4" /> {deleting ? 'Deleting…' : 'Delete Driver'}
             </button>
           )}
         </div>

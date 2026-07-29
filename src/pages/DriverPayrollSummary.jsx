@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/api/apiClient';
 import { DollarSign, Download, Users, CheckCircle2, MapPin, Route, TrendingUp, Search, Calendar, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { filterDriverRoster } from '@/lib/driverAccess';
 
 const PAY_RATE_DEFAULTS = { per_stop: 1.75, per_route: 25 };
 
@@ -53,7 +54,7 @@ export default function DriverPayrollSummary() {
         api.entities.DeliveryRoute.list('-route_date', 1000),
         api.entities.DeliveryStop.list('-created_date', 5000),
       ]);
-      setDrivers(usrs.filter(u => u.role === 'driver'));
+      setDrivers(filterDriverRoster(usrs, u?.customer_id || null));
       setRoutes(rts);
       setStops(sts);
       setLoading(false);
