@@ -55,8 +55,11 @@ export default function FooterSection() {
           <div>
             <h4 className="text-white font-bold mb-4">Quick Links</h4>
             <ul className="space-y-2 text-slate-400 text-sm">
+              <li><Link to="/features" className="hover:text-amber-400 transition-colors">Platform Features</Link></li>
               <li><Link to="/about" className="hover:text-amber-400 transition-colors">About Us</Link></li>
-              <li><Link to="/#pricing" className="hover:text-amber-400 transition-colors">Pricing</Link></li>
+              <li><Link to="/pricing" className="hover:text-amber-400 transition-colors">Pricing</Link></li>
+              <li><Link to="/driver-app" className="hover:text-amber-400 transition-colors">Driver App</Link></li>
+              <li><Link to="/yard-management" className="hover:text-amber-400 transition-colors">Yard Management</Link></li>
               <li><Link to="/contact" className="hover:text-amber-400 transition-colors">Contact</Link></li>
               <li><Link to="/login" className="hover:text-amber-400 transition-colors">Client Portal</Link></li>
               <li>

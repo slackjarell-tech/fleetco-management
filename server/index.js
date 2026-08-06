@@ -43,6 +43,8 @@ import {
   canManageDatastore,
 } from './roles.js';
 import { bulkCreateEntities } from './bulkImport.js';
+import { stampCustomerNumber, generateNextDriverNumber } from './entityNumbers.js';
+import { isDriverCapableUser } from './driverAccess.js';
 import { buildCustomerAnalytics, buildAllCustomersAnalytics, trackPortalVisit } from './customerAnalytics.js';
 import {
   resolveCustomerContext,
@@ -741,13 +743,17 @@ function handleUserEntity(req, res, action) {
       return res.status(403).json({ error: 'You can only add users to your own organization' });
     }
     const hash = bcrypt.hashSync(password || 'changeme123', 10);
+    let employeeNumber = rest.employee_number || rest.employeeNumber;
+    if (isDriverCapableUser({ role: rest.role, customer_id: effectiveCustomerId }) && !employeeNumber) {
+      employeeNumber = generateNextDriverNumber();
+    }
     const user = createUser({
       email,
       passwordHash: hash,
       customerId: effectiveCustomerId,
       fullName: rest.full_name || rest.fullName,
       role: rest.role,
-      employeeNumber: rest.employee_number || rest.employeeNumber,
+      employeeNumber,
     });
     return res.status(201).json(user);
   }
@@ -823,7 +829,10 @@ app.post('/api/entities/:type', requireAuth, (req, res) => {
   const { type } = req.params;
   if (type === 'User') return handleUserEntity(req, res, 'create');
   const ctx = getEntityContext(req);
-  const payload = stampEntityForCreate(type, req.body, ctx);
+  let payload = stampEntityForCreate(type, req.body, ctx);
+  if (type === 'Customer') {
+    payload = stampCustomerNumber(payload);
+  }
   const item = createEntity(type, payload);
   res.status(201).json(item);
 });

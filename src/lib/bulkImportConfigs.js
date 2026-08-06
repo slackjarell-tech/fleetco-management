@@ -115,9 +115,9 @@ export const BULK_IMPORT_BY_ROUTE = {
   '/portal/customers': {
     entity: 'Customer',
     label: 'Customers',
-    headers: ['company_name', 'contact_name', 'email', 'phone', 'address', 'city', 'state', 'zip', 'mc_number', 'dot_number', 'fleet_size', 'status'],
+    headers: ['company_name', 'contact_name', 'email', 'phone', 'address', 'city', 'state', 'zip', 'mc_number', 'dot_number', 'fleet_size', 'status', 'customer_number'],
     required: ['company_name'],
-    columnHint: 'company_name, contact, email, phone, address, MC/DOT numbers',
+    columnHint: 'company_name, contact, email, phone, address, MC/DOT numbers, customer_number (optional — auto-assigned if blank)',
     exampleRows: [{
       company_name: 'Acme Freight LLC',
       contact_name: 'John Smith',
@@ -145,6 +145,7 @@ export const BULK_IMPORT_BY_ROUTE = {
       dot_number: str(row.dot_number),
       fleet_size: num(row.fleet_size),
       status: str(row.status) || 'prospect',
+      customer_number: str(row.customer_number),
     }),
     preview: (row) => row.company_name,
   },
@@ -360,10 +361,10 @@ export const BULK_IMPORT_BY_ROUTE = {
     entity: 'PayrollRecord',
     label: 'Payroll Records',
     headers: [
-      'driver_email', 'customer_company', 'pay_type', 'pay_period_start', 'pay_period_end',
+      'driver_email', 'employee_number', 'customer_company', 'pay_type', 'pay_period_start', 'pay_period_end',
       'gross_pay', 'deductions', 'net_pay', 'status', 'payment_method', 'hours_worked', 'hourly_rate', 'notes',
     ],
-    required: ['driver_email', 'pay_period_start', 'pay_period_end', 'gross_pay'],
+    required: ['pay_period_start', 'pay_period_end', 'gross_pay'],
     columnHint: 'driver_email (portal driver login), optional customer_company for FleetCo bulk import, pay period, gross/deductions/net',
     exampleRows: [{
       driver_email: 'driver1@fleetco.com',
@@ -382,6 +383,7 @@ export const BULK_IMPORT_BY_ROUTE = {
     }],
     mapRow: (row) => ({
       driver_email: str(row.driver_email),
+      employee_number: str(row.employee_number),
       customer_company: str(row.customer_company),
       pay_type: str(row.pay_type) || 'Hourly',
       pay_period_start: str(row.pay_period_start),
@@ -396,7 +398,7 @@ export const BULK_IMPORT_BY_ROUTE = {
       notes: str(row.notes),
       payee_type: 'driver',
     }),
-    preview: (row) => `${row.driver_email} · ${row.pay_period_start || '?'} → ${row.pay_period_end || '?'}`,
+    preview: (row) => `${row.driver_email || row.employee_number || '?'} · ${row.pay_period_start || '?'} → ${row.pay_period_end || '?'}`,
   },
   '/portal/fleetco-payroll': {
     entity: 'PayrollRecord',
@@ -439,9 +441,9 @@ export const BULK_IMPORT_BY_ROUTE = {
   '/portal/drivers': {
     entity: 'User',
     label: 'Drivers',
-    headers: ['email', 'full_name', 'phone', 'password', 'status'],
+    headers: ['email', 'full_name', 'employee_number', 'phone', 'password', 'status'],
     required: ['email', 'full_name'],
-    columnHint: 'email, full_name, phone, password (optional — defaults to changeme123)',
+    columnHint: 'email, full_name, phone, password (optional). employee_number auto-assigned as 6-digit ID if blank.',
     exampleRows: [{
       email: 'driver.new@fleetco.com',
       full_name: 'Alex Johnson',
@@ -452,6 +454,7 @@ export const BULK_IMPORT_BY_ROUTE = {
     mapRow: (row) => ({
       email: str(row.email),
       full_name: str(row.full_name),
+      employee_number: str(row.employee_number),
       phone: str(row.phone),
       password: str(row.password) || 'changeme123',
       role: 'driver',
@@ -557,6 +560,9 @@ export function validateBulkRows(config, rows) {
       if (!String(row[field] ?? '').trim()) {
         errors.push(`Row ${row._row || i + 2}: "${field}" is required.`);
       }
+    }
+    if (config.entity === 'PayrollRecord' && !String(row.driver_email ?? '').trim() && !String(row.employee_number ?? '').trim()) {
+      errors.push(`Row ${row._row || i + 2}: driver_email or employee_number is required.`);
     }
     try {
       return config.mapRow(row);

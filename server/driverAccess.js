@@ -1,5 +1,11 @@
 import { isCustomerPortalUserRecord } from './customerRoles.js';
-import { generateNextDriverNumber, listUsers, updateUser } from './db.js';
+import {
+  ensureAllDriverNumbers,
+  ensureDriverNumber,
+  generateNextDriverNumber,
+} from './entityNumbers.js';
+
+export { ensureDriverNumber, ensureAllDriverNumbers, generateNextDriverNumber };
 
 /** Dedicated driver login (role slug driver). */
 export function isPureDriverRole(role) {
@@ -21,23 +27,7 @@ export function filterDriverRoster(users, customerId = null) {
   return list;
 }
 
-export function ensureDriverNumber(userId) {
-  const user = listUsers().find((u) => u.id === userId);
-  if (!user || !isDriverCapableUser(user)) return null;
-  if (user.employee_number && /^DRV-/i.test(user.employee_number)) return user.employee_number;
-  const num = generateNextDriverNumber();
-  updateUser(userId, { employee_number: num });
-  return num;
-}
-
-/** Backfill DRV-##### for every customer portal user on startup. */
+/** @deprecated Use ensureAllDriverNumbers — kept for seed import compatibility */
 export function ensureAllCustomerDriverNumbers() {
-  let count = 0;
-  for (const u of listUsers()) {
-    if (!isCustomerPortalUserRecord(u)) continue;
-    if (u.employee_number && /^DRV-/i.test(u.employee_number)) continue;
-    updateUser(u.id, { employee_number: generateNextDriverNumber() });
-    count += 1;
-  }
-  return count;
+  return ensureAllDriverNumbers();
 }

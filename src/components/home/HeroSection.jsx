@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { HOME_IMAGES } from '@/lib/homeImages';
-import { ChevronDown, Shield, Truck, Star, ArrowRight, Loader2, LogIn } from 'lucide-react';
+import { ChevronDown, Shield, Truck, Star, ArrowRight, LogIn, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { api } from '@/api/apiClient';
+
 import PortalLoginForm from '@/components/auth/PortalLoginForm';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
 
@@ -15,7 +15,6 @@ const DEFAULTS = {
 };
 
 export default function HeroSection() {
-  const [loading, setLoading] = useState(false);
   const [site, setSite] = useState(DEFAULTS);
 
   useEffect(() => {
@@ -28,26 +27,6 @@ export default function HeroSection() {
   }, []);
 
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-
-  const handleCheckout = async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.functions.invoke('createCheckout', {
-        priceId: 'price_1TeONARdSUUW62RaxuR5Q5RA',
-        planName: 'Starter'
-      });
-      if (data.url) {
-        const appUrl = window.location.origin;
-        if (window.self !== window.top) {
-          alert('Checkout works only from the published app. Please open in a full browser tab.');
-          return;
-        }
-        window.location.href = data.url;
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <section id="home" className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
@@ -84,16 +63,21 @@ export default function HeroSection() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 mb-12">
-              <button
-                onClick={handleCheckout}
-                disabled={loading}
-                className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-lg px-8 py-4 rounded-lg transition-all transform hover:scale-105 shadow-lg shadow-amber-500/30 flex items-center justify-center gap-2 disabled:opacity-60 disabled:hover:scale-100"
+              <Link
+                to="/contact"
+                className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-lg px-8 py-4 rounded-lg transition-all transform hover:scale-105 shadow-lg shadow-amber-500/30 flex items-center justify-center gap-2"
               >
-                {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Processing...</> : <>Subscribe & Get Started <ArrowRight className="w-5 h-5" /></>}
-              </button>
+                <Calendar className="w-5 h-5" /> Book a Free Demo
+              </Link>
+              <Link
+                to="/pricing"
+                className="border-2 border-amber-400/80 hover:bg-amber-400/10 text-amber-300 hover:text-amber-200 font-semibold text-lg px-8 py-4 rounded-lg transition-all flex items-center justify-center gap-2"
+              >
+                See Pricing <ArrowRight className="w-5 h-5" />
+              </Link>
               <Link
                 to="/login"
-                className="border-2 border-slate-500 hover:border-amber-400 text-white hover:text-amber-400 font-semibold text-lg px-8 py-4 rounded-lg transition-all flex items-center justify-center gap-2"
+                className="border-2 border-slate-500 hover:border-slate-400 text-white hover:text-slate-200 font-semibold text-lg px-8 py-4 rounded-lg transition-all flex items-center justify-center gap-2 sm:hidden"
               >
                 Client Portal
               </Link>

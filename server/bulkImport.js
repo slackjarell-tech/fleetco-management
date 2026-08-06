@@ -1,6 +1,7 @@
 import { createEntity, createUser, findUserByEmail, listEntities, listUsers } from './db.js';
 import bcrypt from 'bcryptjs';
 import { isDriverCapableUser } from './driverAccess.js';
+import { generateNextDriverNumber, stampCustomerNumber } from './entityNumbers.js';
 
 const INTERNAL_EMPLOYEE_ROLES = new Set(['owner', 'executive', 'fleet_manager', 'fleet_coordinator']);
 
@@ -127,10 +128,18 @@ function createBulkRecord(type, record, user, ctx) {
     if (findUserByEmail(email)) throw new Error(`User already exists: ${email}`);
     const hash = bcrypt.hashSync(password || 'changeme123', 10);
     const customerId = rest.customer_id || ctx?.customerId || user?.customer_id || null;
-    return createUser({ email, passwordHash: hash, ...rest, customerId, employeeNumber: rest.employee_number });
+    let employeeNumber = rest.employee_number;
+    if (isDriverCapableUser({ role: rest.role, customer_id: customerId }) && !employeeNumber) {
+      employeeNumber = generateNextDriverNumber();
+    }
+    return createUser({ email, passwordHash: hash, ...rest, customerId, employeeNumber });
   }
 
-  const data = enrichRecord(type, record, user, ctx);
+  let payload = { ...record };
+  if (type === 'Customer') {
+    payload = stampCustomerNumber(payload);
+  }
+  const data = enrichRecord(type, payload, user, ctx);
   return createEntity(type, data);
 }
 

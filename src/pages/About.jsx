@@ -1,6 +1,7 @@
 import React from 'react';
 import NavBar from '@/components/home/NavBar';
 import FooterSection from '@/components/home/FooterSection';
+import PageMeta from '@/components/home/PageMeta';
 import { Truck, Shield, DollarSign, Users, Globe, Award } from 'lucide-react';
 
 const VALUES = [
@@ -14,6 +15,11 @@ const VALUES = [
 export default function About() {
   return (
     <div className="min-h-screen bg-white">
+      <PageMeta
+        title="About Us"
+        description="FleetCo Management LLC — Dallas-based fleet management for owner-operators and small fleets since 2022."
+        path="/about"
+      />
       <NavBar />
       
       {/* Hero */}

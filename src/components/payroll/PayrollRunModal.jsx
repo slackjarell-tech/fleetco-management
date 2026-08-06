@@ -151,7 +151,7 @@ export default function PayrollRunModal({ record, drivers, hosLogs, deliveryStop
             <select value={form.driver_id} onChange={e => handleDriverChange(e.target.value)}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400">
               <option value="">— Select driver —</option>
-              {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+              {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name}{d.employee_number ? ` · ${d.employee_number}` : ''}</option>)}
             </select>
           </div>
 

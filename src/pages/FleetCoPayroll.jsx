@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import BulkCsvImport from '@/components/shared/BulkCsvImport';
 import { BULK_IMPORT_BY_ROUTE } from '@/lib/bulkImportConfigs';
-import { isExecutiveView } from '@/lib/roles';
+import { isExecutiveView, isFleetCoAdmin } from '@/lib/roles';
 
 export default function FleetCoPayroll() {
   const [user, setUser] = useState(null);
@@ -32,12 +32,12 @@ export default function FleetCoPayroll() {
     );
   }
 
-  if (!isExecutiveView(user?.role)) {
+  if (!isExecutiveView(user?.role) && !isFleetCoAdmin(user?.role)) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center bg-slate-950 text-slate-400">
         <div className="text-center">
           <Crown className="w-10 h-10 mx-auto mb-3 opacity-40" />
-          <p>Executive access required for FleetCo employee payroll.</p>
+          <p>Executive or FleetCo HR (fleet manager) access required for FleetCo employee payroll.</p>
         </div>
       </div>
     );

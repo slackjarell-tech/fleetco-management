@@ -87,6 +87,10 @@ import DriverScans from './pages/DriverScans';
 import DriverMedia from './pages/DriverMedia';
 import About from './pages/About';
 import Contact from './pages/Contact';
+import PricingPage from './pages/PricingPage';
+import FeaturesPage from './pages/FeaturesPage';
+import DriverAppPage from './pages/DriverAppPage';
+import YardManagementPage from './pages/YardManagementPage';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 
@@ -201,6 +205,10 @@ const AuthenticatedApp = () => {
       <Route path="/materials" element={<MarketingMaterials />} />
       <Route path="/about" element={<About />} />
       <Route path="/contact" element={<Contact />} />
+      <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/features" element={<FeaturesPage />} />
+      <Route path="/driver-app" element={<DriverAppPage />} />
+      <Route path="/yard-management" element={<YardManagementPage />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/overview" element={<InvestorOverview />} />

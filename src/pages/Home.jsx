@@ -10,6 +10,9 @@ import AboutSection from '@/components/home/AboutSection';
 import VideoPresentationSection from '@/components/home/VideoPresentationSection';
 import TestimonialsSection from '@/components/home/TestimonialsSection';
 import DriverAppDownload from '@/components/shared/DriverAppDownload';
+import OfferModeSection from '@/components/home/OfferModeSection';
+import PlatformSection from '@/components/home/PlatformSection';
+import PageMeta from '@/components/home/PageMeta';
 import MarketingAiWidget from '@/components/marketing/MarketingAiWidget';
 
 export default function Home() {
@@ -28,6 +31,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white font-body">
+      <PageMeta />
       <NavBar />
       {paymentStatus?.type === 'success' && (
         <div className="bg-green-600 text-white py-4 px-4">
@@ -53,7 +57,9 @@ export default function Home() {
         </div>
       )}
       <HeroSection />
+      <OfferModeSection />
       <VideoPresentationSection />
+      <PlatformSection />
       <DriverAppDownload />
       <ServicesSection />
       <YmsSection />

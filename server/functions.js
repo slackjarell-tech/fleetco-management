@@ -53,6 +53,7 @@ import { sendInquiryNotificationEmail } from './inquiryEmails.js';
 import { getEmailConfigStatus, sendEmail as sendEmailDirect } from './email.js';
 import { vehiclePartsLookup, accessorySerialLookup } from './vehiclePartsLookup.js';
 import { isDriverCapableUser, ensureDriverNumber } from './driverAccess.js';
+import { stampCustomerNumber } from './entityNumbers.js';
 
 const SIM_ROUTES = [
   { name: 'I-80 Westbound', id: 'sim_driver_01', userName: '👤 Mike R. (Sim)', steps: [
@@ -367,15 +368,17 @@ async function createUserAccount(body, user) {
 
   const internalRoles = ['executive', 'fleet_manager', 'fleet_coordinator'];
   const customerRoles = [...CUSTOMER_TEAM_ROLES, CUSTOMER_LEGACY_ROLE];
+  const customerId = bodyCustomerId;
 
   let employeeNumber = bodyEmployeeNumber?.trim() || null;
-  if (customerRoles.includes(role) && !employeeNumber) {
+  const effectiveCustomerIdPreview = internalRoles.includes(role)
+    ? null
+    : (customerId || user.customer_id || null);
+  if (isDriverCapableUser({ role, customer_id: effectiveCustomerIdPreview }) && !employeeNumber) {
     employeeNumber = generateNextDriverNumber();
   } else if (employeeNumber && isDriverNumberTaken(employeeNumber)) {
     throw new Error(`Driver number ${employeeNumber} is already assigned`);
   }
-
-  const customerId = bodyCustomerId;
 
   let normalizedEmail = email.trim().toLowerCase();
 
@@ -627,7 +630,7 @@ async function provisionCustomer(body, user) {
   const nextDue = computeNextDueDate(ts, subscription_term);
   const notificationPrefs = normalizeNotificationPrefs(body.notification_prefs);
 
-  const customer = createEntity('Customer', {
+  const customer = createEntity('Customer', stampCustomerNumber({
     ...customerData,
     status: 'active',
     subscription_plan,
@@ -641,7 +644,7 @@ async function provisionCustomer(body, user) {
     system_paused: false,
     provisioned_by: user.email,
     notification_prefs: notificationPrefs,
-  });
+  }));
 
   createEntity('Subscription', {
     customer_id: customer.id,

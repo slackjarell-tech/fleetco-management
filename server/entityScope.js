@@ -140,6 +140,11 @@ export function entityBelongsToCustomer(type, item, customerId, scopeIndex) {
     if (item.employee_user_id && userIds?.has(item.employee_user_id)) return true;
   }
 
+  if (type === 'EmployeeTaxProfile') {
+    if (matchesCustomerField(item, customerId)) return true;
+    if (item.user_id && userIds?.has(item.user_id)) return true;
+  }
+
   if (type === 'VehicleAccessory') {
     if (matchesCustomerField(item, customerId)) return true;
     if (item.vehicle_id && vehicleIds?.has(item.vehicle_id)) return true;
@@ -181,6 +186,7 @@ export function stampEntityForCreate(type, data, ctx) {
     'PurchaseOrder',
     'PayrollRun',
     'PayrollRecord',
+    'EmployeeTaxProfile',
     'ChartOfAccount',
     'JournalEntry',
     'Yard',

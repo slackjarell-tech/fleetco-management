@@ -301,7 +301,7 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
                   <option value="">All customers (FleetCo)</option>
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.company_name || c.contact_name || c.id}
+                      {c.customer_number ? `#${c.customer_number} · ` : ''}{c.company_name || c.contact_name || c.id}
                     </option>
                   ))}
                 </select>

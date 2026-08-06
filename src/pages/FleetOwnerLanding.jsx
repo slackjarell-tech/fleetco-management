@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CheckCircle, ArrowRight, Phone, Mail, Truck, Shield, Fuel, Wrench, Star, DollarSign, Clock, FileText } from 'lucide-react';
 import { api } from '@/api/apiClient';
 import SiteLegalNotice from '@/components/home/SiteLegalNotice';
+import { BRAND } from '@/lib/brand';
 
 const painPoints = [
   { icon: DollarSign, text: 'Overpaying for fuel and parts with no leverage?' },
@@ -92,7 +93,7 @@ export default function FleetOwnerLanding() {
               Get a Free Consultation <ArrowRight className="w-5 h-5" />
             </a>
             <a
-              href="tel:+1-800-FLEETCO"
+              href={`tel:${BRAND.phoneTel}`}
               className="border-2 border-slate-500 hover:border-amber-400 text-white hover:text-amber-400 font-semibold text-lg px-10 py-4 rounded-lg transition-all flex items-center justify-center gap-2"
             >
               <Phone className="w-5 h-5" /> Call Us Now
@@ -234,11 +235,11 @@ export default function FleetOwnerLanding() {
           )}
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8 text-sm text-slate-500">
-            <a href="mailto:support@fleetcomanagement.org" className="flex items-center gap-2 hover:text-amber-600">
-              <Mail className="w-4 h-4" /> support@fleetcomanagement.org
+            <a href={`mailto:${BRAND.email}`} className="flex items-center gap-2 hover:text-amber-600">
+              <Mail className="w-4 h-4" /> {BRAND.email}
             </a>
-            <a href="tel:+12145550100" className="flex items-center gap-2 hover:text-amber-600">
-              <Phone className="w-4 h-4" /> (214) 555-0100
+            <a href={`tel:${BRAND.phoneTel}`} className="flex items-center gap-2 hover:text-amber-600">
+              <Phone className="w-4 h-4" /> {BRAND.phone}
             </a>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import NavBar from '@/components/home/NavBar';
 import FooterSection from '@/components/home/FooterSection';
+import PageMeta from '@/components/home/PageMeta';
 import { Mail, Phone, MapPin, Send, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,11 @@ export default function Contact() {
 
   return (
     <div className="min-h-screen bg-white">
+      <PageMeta
+        title="Contact"
+        description="Contact FleetCo Management for a free fleet consultation, demo, or enterprise quote. Dallas, TX — serving owner-operators nationwide."
+        path="/contact"
+      />
       <NavBar />
 
       {/* Hero */}

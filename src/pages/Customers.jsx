@@ -228,7 +228,8 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
   const filtered = customers.filter(c => {
     const q = search.toLowerCase();
     const matchSearch = !q || c.company_name?.toLowerCase().includes(q) ||
-      c.contact_name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q);
+      c.contact_name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) ||
+      String(c.customer_number || '').includes(q);
     const matchStatus = statusFilter === 'all' || c.status === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -271,7 +272,7 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search by company, contact, or email..."
+              placeholder="Search by company, contact, email, or customer #..."
               className="w-64 pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
           </div>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
@@ -321,6 +322,9 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
                   <div className="min-w-0">
                     <div className="font-black text-slate-900 text-sm leading-tight">{c.company_name}</div>
                     <div className="text-xs text-slate-500 mt-0.5">{c.contact_name}</div>
+                    {c.customer_number && (
+                      <div className="text-[10px] font-mono font-bold text-amber-700 mt-0.5">#{c.customer_number}</div>
+                    )}
                   </div>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize flex-shrink-0 ${STATUS_COLORS[c.status]}`}>

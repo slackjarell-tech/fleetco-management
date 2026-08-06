@@ -248,7 +248,10 @@ export default function PricingSection() {
         </div>
 
         <p className="text-center text-slate-500 text-sm mt-8">
-          Need a custom plan for a larger fleet? <button onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })} className="text-amber-400 underline">Contact us</button> for enterprise pricing.
+          Need a custom plan for a larger fleet?{' '}
+          <a href="/contact" className="text-amber-400 underline hover:text-amber-300">Contact us</a>
+          {' '}for enterprise pricing, or{' '}
+          <a href="/contact" className="text-amber-400 underline hover:text-amber-300">book a free demo</a> first.
         </p>
       </div>
     </section>
