@@ -20,8 +20,8 @@ import Accounting from './pages/Accounting';
 import AppLayout from './components/AppLayout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import BrokerRegister from './pages/BrokerRegister';
 
-import FleetOwnerLanding from './pages/FleetOwnerLanding';
 import WorkOrders from './pages/WorkOrders';
 import Customers from './pages/Customers';
 import Team from './pages/Team';
@@ -37,6 +37,7 @@ import Diagnostics from './pages/Diagnostics';
 import Vendors from './pages/Vendors';
 import Assistant from './pages/Assistant';
 import ExecutiveDashboard from './pages/ExecutiveDashboard';
+import LoadMarketplaceExecutive from './pages/LoadMarketplaceExecutive';
 import Messages from './pages/Messages';
 import Navigation from './pages/Navigation';
 import FleetPnL from './pages/FleetPnL';
@@ -79,10 +80,14 @@ import EldPortal from './pages/EldPortal';
 import RouteDashboard from './pages/RouteDashboard';
 import DomainEmails from './pages/DomainEmails';
 import DataBackup from './pages/DataBackup';
+import DriverLogin from './pages/driver/DriverLogin';
 import DriverMobileLayout from './components/mobile/DriverMobileLayout';
 import DriverMobileHome from './pages/driver/DriverMobileHome';
 import DriverScan from './pages/driver/DriverScan';
 import DriverDashcam from './pages/driver/DriverDashcam';
+import DriverFuelStations from './pages/driver/DriverFuelStations';
+import DriverFuelCards from './pages/driver/DriverFuelCards';
+import DriverWorkOrders from './pages/driver/DriverWorkOrders';
 import DriverScans from './pages/DriverScans';
 import DriverMedia from './pages/DriverMedia';
 import About from './pages/About';
@@ -118,12 +123,15 @@ const AuthenticatedApp = () => {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/login/driver" element={<Navigate to="/driver/login" replace />} />
+      <Route path="/driver/login" element={<DriverLogin />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/broker-signup" element={<BrokerRegister />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* FleetCo Driver mobile app — iOS / Android + mobile web */}
-      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login?app=driver" replace />} />}>
+      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/driver/login" replace />} />}>
         <Route path="/driver" element={<DriverMobileLayout />}>
           <Route index element={<DriverMobileHome />} />
           <Route path="clock" element={<TimeClock />} />
@@ -136,6 +144,10 @@ const AuthenticatedApp = () => {
           <Route path="hos" element={<HOSReport />} />
           <Route path="inspections" element={<Inspections />} />
           <Route path="fuel" element={<FuelAudits />} />
+          <Route path="fuel-stations" element={<DriverFuelStations />} />
+          <Route path="fuel-cards" element={<DriverFuelCards />} />
+          <Route path="workorders" element={<DriverWorkOrders />} />
+          <Route path="pretrip" element={<PreTripChecklist />} />
           <Route path="incidents" element={<IncidentReports />} />
           <Route path="change-password" element={<ChangePassword />} />
         </Route>
@@ -168,6 +180,7 @@ const AuthenticatedApp = () => {
           <Route path="vendors" element={<Vendors />} />
           <Route path="assistant" element={<Assistant />} />
           <Route path="executive" element={<ExecutiveDashboard />} />
+          <Route path="load-marketplace" element={<LoadMarketplaceExecutive />} />
           <Route path="billing" element={<SubscriptionBilling />} />
           <Route path="fleetco-payroll" element={<FleetCoPayroll />} />
           <Route path="customer-insights" element={<CustomerInsights />} />
@@ -207,7 +220,7 @@ const AuthenticatedApp = () => {
           <Route path="driver-media" element={<DriverMedia />} />
         </Route>
       </Route>
-      <Route path="/fleet-owners" element={<FleetOwnerLanding />} />
+      <Route path="/fleet-owners" element={<Navigate to="/for-fleets" replace />} />
       <Route path="/manual" element={<CustomerManual />} />
       <Route path="/system-manual" element={<SystemManual />} />
       <Route path="/materials" element={<MarketingMaterials />} />

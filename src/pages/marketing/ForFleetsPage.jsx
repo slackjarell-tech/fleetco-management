@@ -1,10 +1,9 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import MarketingShell, { MarketingHero } from '@/components/marketing/public/MarketingShell';
 import { PLATFORM_FEATURES } from '@/lib/marketingContent';
-import { ELD_DISCLAIMER } from '@/lib/marketing/compareData';
 import PricingRoiCalculator from '@/components/home/PricingRoiCalculator';
-import { ArrowRight, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 
 export default function ForFleetsPage() {
   const highlights = PLATFORM_FEATURES.slice(0, 6);
@@ -47,13 +46,6 @@ export default function ForFleetsPage() {
           </Link>
         </div>
         <PricingRoiCalculator />
-      </section>
-
-      <section className="py-12 bg-amber-50 border-y border-amber-100">
-        <div className="max-w-3xl mx-auto px-4 flex gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-900"><strong>ELD & telematics:</strong> {ELD_DISCLAIMER}</p>
-        </div>
       </section>
 
       <section className="py-16 max-w-3xl mx-auto px-4 text-center">

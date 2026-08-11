@@ -18,11 +18,7 @@ export const COMPARE_ROWS = [
   { feature: 'QuickBooks export', values: { fleetco: 'Yes', fleetlegend: 'Sync', samsara: 'No', motive: 'No', fleetio: 'Yes' } },
   { feature: 'Electronic BOL on loads', values: { fleetco: 'Yes', fleetlegend: 'Docs', samsara: 'No', motive: 'No', fleetio: 'No' } },
   { feature: 'IFTA reporting', values: { fleetco: 'Yes', fleetlegend: 'Yes', samsara: 'Yes', motive: 'Yes', fleetio: 'Add-on' } },
-  { feature: 'FMCSA-certified ELD hardware', values: { fleetco: 'Software logs*', fleetlegend: 'Integration', samsara: 'Yes', motive: 'Yes', fleetio: 'Via partner' } },
-  { feature: 'Managed fleet services (human)', values: { fleetco: 'Yes', fleetlegend: 'No', samsara: 'No', motive: 'No', fleetio: 'No' } },
+  { feature: 'HOS & compliance tools', values: { fleetco: 'Yes', fleetlegend: 'Yes', samsara: 'Yes', motive: 'Yes', fleetio: 'Add-on' } },
   { feature: 'Android driver app', values: { fleetco: 'Yes', fleetlegend: 'Yes', samsara: 'Yes', motive: 'Yes', fleetio: 'Yes' } },
   { feature: 'AI assistant', values: { fleetco: 'Yes', fleetlegend: 'No', samsara: 'Add-on', motive: 'Limited', fleetio: 'No' } },
 ];
-
-export const ELD_DISCLAIMER =
-  'FleetCo ELD Portal provides HOS logging and DVIR workflows in software. It is not a replacement for FMCSA-certified connected ELD hardware required for most interstate carriers. Telematics integrations are available on Enterprise plans.';

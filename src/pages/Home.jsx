@@ -1,19 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import HeroSection from '@/components/home/HeroSection';
+import PlatformSection from '@/components/home/PlatformSection';
+import VideoPresentationSection from '@/components/home/VideoPresentationSection';
+import FunnelSection from '@/components/home/FunnelSection';
+import FreightBrokerSection from '@/components/home/FreightBrokerSection';
+import DriverAppDownload from '@/components/shared/DriverAppDownload';
 import ServicesSection from '@/components/home/ServicesSection';
-import PricingSection from '@/components/home/PricingSection';
 import YmsSection from '@/components/home/YmsSection';
+import PricingSection from '@/components/home/PricingSection';
+import AboutSection from '@/components/home/AboutSection';
+import TestimonialsSection from '@/components/home/TestimonialsSection';
 import InquiryForm from '@/components/home/InquiryForm';
 import FooterSection from '@/components/home/FooterSection';
 import NavBar from '@/components/home/NavBar';
-import AboutSection from '@/components/home/AboutSection';
-import VideoPresentationSection from '@/components/home/VideoPresentationSection';
-import TestimonialsSection from '@/components/home/TestimonialsSection';
-import DriverAppDownload from '@/components/shared/DriverAppDownload';
-import OfferModeSection from '@/components/home/OfferModeSection';
-import FunnelSection from '@/components/home/FunnelSection';
-import FreightBrokerSection from '@/components/home/FreightBrokerSection';
-import PlatformSection from '@/components/home/PlatformSection';
 import PageMeta from '@/components/home/PageMeta';
 import MarketingAiWidget from '@/components/marketing/MarketingAiWidget';
 
@@ -34,8 +33,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white font-body">
       <PageMeta
-        title="Fleet Operations & Load Board for Brokers"
-        description="FleetCo Management — fleet portal for owner-operators plus a load board where freight brokers post loads free. Only 3.5% platform fee when freight moves."
+        title="Fleet Software & Load Board for Carriers"
+        description="FleetCo Management — all-in-one fleet portal and load board for owner-operators and small carriers. Dispatch, drivers, maintenance, fuel, payroll, and compliance from $299/mo."
       />
       <NavBar />
       {paymentStatus?.type === 'success' && (
@@ -62,11 +61,10 @@ export default function Home() {
         </div>
       )}
       <HeroSection />
-      <FunnelSection />
-      <OfferModeSection />
-      <FreightBrokerSection />
       <VideoPresentationSection />
       <PlatformSection />
+      <FunnelSection />
+      <FreightBrokerSection />
       <DriverAppDownload />
       <ServicesSection />
       <YmsSection />

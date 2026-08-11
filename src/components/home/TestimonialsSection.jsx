@@ -3,25 +3,22 @@ import { Star, Quote } from 'lucide-react';
 
 const testimonials = [
   {
-    name: 'Marcus T.',
-    role: 'Owner Operator — Dallas, TX',
-    quote: 'FleetCo saved me thousands on parts for my Freightliner. They found an NBO part in 24 hours that I couldn\'t find anywhere. Kept me on the road instead of sitting in a shop for 3 weeks.',
-    stars: 5,
-    type: 'managed',
-  },
-  {
     name: 'James H.',
     role: 'Fleet Manager — 6 trucks, dry van',
     quote: 'We moved dispatch, DVIR, fuel logs, and driver payroll off spreadsheets in one weekend. The load board let us book backhaul freight without calling a broker.',
     stars: 5,
-    type: 'software',
   },
   {
     name: 'Keisha R.',
     role: 'Owner Operator — OTR Driver',
     quote: 'Owner-operator mode is a game changer — I dispatch from the portal and clock in on the driver app with the same login. BOL downloads straight to my phone.',
     stars: 5,
-    type: 'software',
+  },
+  {
+    name: 'David M.',
+    role: 'Operations — 12-unit reefer fleet',
+    quote: 'Maintenance work orders and fuel audits alone paid for the subscription. My dispatchers finally work from one screen instead of three tabs and a shared Google Sheet.',
+    stars: 5,
   },
 ];
 
@@ -31,9 +28,9 @@ export default function TestimonialsSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
           <span className="text-amber-500 font-bold text-sm tracking-widest uppercase">Testimonials</span>
-          <h2 className="text-3xl sm:text-4xl font-black text-white mt-2">Trusted by Drivers & Fleet Managers</h2>
+          <h2 className="text-3xl sm:text-4xl font-black text-white mt-2">Trusted by drivers & fleet managers</h2>
           <p className="text-slate-400 mt-3 max-w-2xl mx-auto">
-            Software and managed services outcomes from FleetCo customers.
+            Real outcomes from carriers running on the FleetCo platform.
           </p>
         </div>
 
@@ -50,9 +47,6 @@ export default function TestimonialsSection() {
               <div className="mt-6 pt-4 border-t border-slate-700">
                 <div className="text-white font-bold text-sm">{t.name}</div>
                 <div className="text-slate-400 text-xs">{t.role}</div>
-                <span className={`inline-block mt-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${t.type === 'software' ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-400'}`}>
-                  {t.type === 'software' ? 'Platform' : 'Managed services'}
-                </span>
               </div>
             </div>
           ))}

@@ -8,12 +8,12 @@ import { DRIVER_APP } from '@/lib/platform';
 import DriverAppDownload from '@/components/shared/DriverAppDownload';
 
 const SERVICE_LINKS = [
-  { label: 'Fleet Management', href: '/#services' },
-  { label: 'Parts Sourcing', href: '/#services' },
-  { label: 'Fuel Optimization', href: '/#services' },
-  { label: 'Safety Coordination', href: '/#services' },
-  { label: 'Towing & Repair', href: '/#services' },
-  { label: 'Tax Documentation', href: '/#services' },
+  { label: 'Platform Features', href: '/features' },
+  { label: 'Load Board', href: '/load-board' },
+  { label: 'Driver App', href: '/driver-app' },
+  { label: 'Yard Management', href: '/yard-management' },
+  { label: 'Pricing', href: '/pricing' },
+  { label: 'Compare', href: '/compare' },
 ];
 
 const SOCIAL_ICONS = [
@@ -33,7 +33,7 @@ export default function FooterSection() {
               <FleetcoLogo size={48} variant="full" />
             </Link>
             <p className="text-slate-400 text-sm leading-relaxed mb-4">
-              Quality, low-cost fleet management services for owner operators and small fleet owners across the nation.
+              Fleet software for owner-operators and small carriers — portal, driver app, and load board in one company.
             </p>
             <div className="flex gap-3">
               {SOCIAL_ICONS.map(({ Icon, label, href }) => (
@@ -68,7 +68,7 @@ export default function FooterSection() {
                   Download Driver App (Android)
                 </a>
               </li>
-              <li><Link to="/login?app=driver" className="hover:text-amber-400 transition-colors">Driver Sign In</Link></li>
+              <li><Link to="/driver/login" className="hover:text-amber-400 transition-colors">Driver Sign In</Link></li>
               <li><Link to="/manual" className="hover:text-amber-400 transition-colors">Customer Manual</Link></li>
               <li><a href={USER_MANUAL_PDF} className="hover:text-amber-400 transition-colors">Download User Guide (PDF)</a></li>
               <li><Link to="/overview" className="hover:text-amber-400 transition-colors">Investors</Link></li>
@@ -77,11 +77,11 @@ export default function FooterSection() {
 
           {/* Services */}
           <div>
-            <h4 className="text-white font-bold mb-4">Our Services</h4>
+            <h4 className="text-white font-bold mb-4">Platform</h4>
             <ul className="space-y-2 text-slate-400 text-sm">
               {SERVICE_LINKS.map(({ label, href }) => (
                 <li key={label}>
-                  <a href={href} className="hover:text-amber-400 transition-colors">{label}</a>
+                  <Link to={href} className="hover:text-amber-400 transition-colors">{label}</Link>
                 </li>
               ))}
             </ul>

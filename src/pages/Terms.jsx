@@ -29,7 +29,7 @@ export default function Terms() {
 
         <h2>Service description</h2>
         <p>
-          FleetCo provides a cloud-based fleet operations platform (portal and driver tools) and optional managed fleet services such as parts sourcing, fuel optimization, and repair coordination. Subscription plans include portal access; hands-on managed services may vary by plan tier as described on our pricing page.
+          FleetCo provides a cloud-based fleet operations platform (portal and driver tools). Subscription plans include full portal and mobile driver app access as described on our pricing page.
         </p>
 
         <h2>Accounts & access</h2>

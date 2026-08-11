@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Monitor, Headphones, Package, ArrowRight } from 'lucide-react';
+import { Monitor, Package, Smartphone, ArrowRight } from 'lucide-react';
 
 const FUNNELS = [
   {
@@ -15,20 +15,20 @@ const FUNNELS = [
   {
     icon: Package,
     title: 'Load Board',
-    desc: 'Brokers post loads free. Carriers book freight. 3.5% platform fee only when it moves.',
+    desc: 'Brokers post loads free. Carriers book freight. Each side pays 1.5% only when freight moves.',
     cta: 'Load Board',
     to: '/load-board',
     accent: 'bg-slate-900 border-slate-800 text-white',
     iconBg: 'bg-amber-500/20 text-amber-400',
   },
   {
-    icon: Headphones,
-    title: 'Managed Services',
-    desc: 'Parts sourcing, fuel optimization, repairs, and compliance — we handle the back office.',
-    cta: 'Managed Fleet Help',
-    to: '/fleet-owners',
-    accent: 'bg-amber-50 border-amber-200 text-slate-900',
-    iconBg: 'bg-amber-500/20 text-amber-700',
+    icon: Smartphone,
+    title: 'Driver App',
+    desc: 'Clock-in, routes, fuel logs, DVIR, dashcam, and messaging — synced to your portal in real time.',
+    cta: 'Driver App',
+    to: '/driver-app',
+    accent: 'bg-emerald-50 border-emerald-200 text-slate-900',
+    iconBg: 'bg-emerald-500/20 text-emerald-700',
   },
 ];
 
@@ -37,10 +37,10 @@ export default function FunnelSection() {
     <section className="py-16 bg-white border-b border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-10">
-          <span className="text-amber-600 font-bold text-sm tracking-widest uppercase">Choose Your Path</span>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">Software, Load Board, or Full Service</h2>
+          <span className="text-amber-600 font-bold text-sm tracking-widest uppercase">Built for trucking</span>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">Software, load board, and driver tools</h2>
           <p className="text-slate-600 mt-3 max-w-2xl mx-auto text-sm sm:text-base">
-            FleetCo is three products in one company — pick what fits your operation today.
+            FleetCo is one platform — pick the path that matches how you run freight today.
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-6">

@@ -16,7 +16,7 @@ export const BRAND = {
       name: 'Starter',
       price: '$299/mo',
       fleetSize: '1–5 vehicles',
-      detail: 'Fleet manager · parts sourcing · fuel optimization · monthly reports',
+      detail: 'Full portal · driver app · fuel & maintenance · monthly reports',
     },
     {
       name: 'Growth',

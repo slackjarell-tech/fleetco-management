@@ -26,7 +26,7 @@ export default function OwnerOperatorSoftwarePage() {
         </ul>
         <div className="flex flex-wrap gap-3 mt-8 not-prose">
           <Link to="/start-trial" className="bg-amber-500 text-slate-900 font-bold px-6 py-3 rounded-lg text-sm">Start trial</Link>
-          <Link to="/fleet-owners" className="border border-slate-300 font-bold px-6 py-3 rounded-lg text-sm">Need managed help?</Link>
+          <Link to="/contact" className="border border-slate-300 font-bold px-6 py-3 rounded-lg text-sm">Book a demo</Link>
         </div>
       </section>
     </MarketingShell>

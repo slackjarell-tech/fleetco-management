@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CheckCircle, Loader2, Star } from 'lucide-react';
 import { api } from '@/api/apiClient';
 import { SUBSCRIPTION_PLANS, subscriptionAmount, yearlyMonthlyEquivalent, formatPrice } from '@/lib/subscriptions';
+import LoadBoardFeeAcknowledgment from '@/components/loadboard/LoadBoardFeeAcknowledgment';
 
 const plans = [
   {
@@ -10,11 +11,11 @@ const plans = [
     description: 'Perfect for owner operators and micro-fleets',
     fleetSize: '1–5 Vehicles',
     features: [
-      'Dedicated Fleet Manager',
-      'Parts sourcing & NBO locating',
-      'Fuel price optimization',
-      'Towing & repair coordination',
-      'Monthly expense report',
+      'Full FleetCo portal access',
+      'Fleet map & vehicle registry',
+      'Fuel logs & audit tools',
+      'Driver app (up to 5 drivers)',
+      'Maintenance & work orders',
       'Email & phone support',
     ],
     highlighted: false,
@@ -26,10 +27,10 @@ const plans = [
     fleetSize: '6–15 Vehicles',
     features: [
       'Everything in Starter',
-      'Safety Coordinator',
-      'Preventive maintenance scheduling',
-      'Fuel station relationship discounts',
-      'Quarterly budget review',
+      'Load board marketplace access',
+      'Payroll & time clock',
+      'IFTA & compliance reports',
+      'Quarterly fleet analytics',
       'Priority support',
     ],
     highlighted: true,
@@ -42,10 +43,10 @@ const plans = [
     fleetSize: '16+ Vehicles',
     features: [
       'Everything in Growth',
-      'Telematics integration',
-      'Full tax documentation per unit',
-      'EV fleet transition planning',
-      'Annual budget optimization',
+      'Telematics integrations',
+      'Custom roles & permissions',
+      'Dedicated onboarding',
+      'API & export options',
       'Dedicated account team',
     ],
     highlighted: false,
@@ -56,6 +57,7 @@ const plans = [
 export default function PricingSection() {
   const [loading, setLoading] = useState(null);
   const [billingTerm, setBillingTerm] = useState('monthly');
+  const [feeAcknowledged, setFeeAcknowledged] = useState(false);
 
   const getDisplayPrice = (planName) => {
     const monthly = SUBSCRIPTION_PLANS[planName]?.monthly;
@@ -84,6 +86,10 @@ export default function PricingSection() {
       alert('Payment checkout is only available from the published app, not the preview. Please open the live site to subscribe.');
       return;
     }
+    if (!feeAcknowledged) {
+      alert('Please agree to the load board platform fee and credit card on file terms before subscribing.');
+      return;
+    }
 
     setLoading(plan.name);
     try {
@@ -91,6 +97,7 @@ export default function PricingSection() {
         priceId: plan.priceId,
         planName: plan.name,
         billingTerm,
+        load_board_fee_acknowledged: true,
       });
       if (response?.url) {
         window.location.href = response.url;
@@ -112,8 +119,7 @@ export default function PricingSection() {
             No hidden fees. Cancel anytime. Pay monthly or save 10% with annual billing.
           </p>
           <p className="text-slate-500 text-sm mt-4 max-w-2xl mx-auto leading-relaxed">
-            Every plan includes full access to the FleetCo portal — fleet tracking, fuel, maintenance, drivers, and reports.
-            Optional hands-on managed services (parts sourcing, repair coordination, safety support) scale with Growth and Enterprise.
+            Every plan includes the full FleetCo portal and driver app — fleet tracking, maintenance, drivers, fuel, compliance, and reports.
           </p>
         </div>
 
@@ -160,6 +166,14 @@ export default function PricingSection() {
               </span>
             </button>
           </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto mb-10">
+          <LoadBoardFeeAcknowledgment
+            variant="dark"
+            checked={feeAcknowledged}
+            onChange={setFeeAcknowledged}
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -227,7 +241,7 @@ export default function PricingSection() {
 
                 <button
                   onClick={() => handleCheckout(plan)}
-                  disabled={loading === plan.name}
+                  disabled={loading === plan.name || (!plan.contactOnly && !feeAcknowledged)}
                   className={`w-full font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2 ${
                     plan.highlighted
                       ? 'bg-slate-900 hover:bg-slate-800 text-white'

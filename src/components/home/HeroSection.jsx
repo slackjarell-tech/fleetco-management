@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { HOME_IMAGES } from '@/lib/homeImages';
-import { ChevronDown, Shield, Truck, Star, ArrowRight, LogIn, Calendar, Package } from 'lucide-react';
+import { ChevronDown, Shield, Truck, Star, ArrowRight, LogIn, Calendar, Package, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import PortalLoginForm from '@/components/auth/PortalLoginForm';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
 
 const DEFAULTS = {
-  hero_badge: 'Dallas, TX — Serving Owner Operators Nationwide',
-  hero_title_line1: 'Keep Your Fleet',
-  hero_title_highlight: 'Running Strong.',
+  hero_badge: 'Dallas, TX — Fleet software for owner-operators',
+  hero_title_line1: 'Run your fleet.',
+  hero_title_highlight: 'One platform.',
   hero_description:
-    'FleetCo Management LLC helps owner operators and small fleet owners cut costs, find parts, optimize fuel, and stay compliant — so you can focus on moving freight, not managing breakdowns.',
+    'FleetCo Management gives owner-operators and small carriers dispatch, maintenance, fuel, payroll, compliance, and a driver app — in one portal from $299/mo. No spreadsheets. No juggling five apps.',
 };
 
 export default function HeroSection() {
   const [site, setSite] = useState(DEFAULTS);
+  const [loginTab, setLoginTab] = useState('portal');
 
   useEffect(() => {
     fetch('/api/public-settings')
@@ -76,8 +77,14 @@ export default function HeroSection() {
                 See Pricing <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
+                to="/driver/login"
+                className="border-2 border-emerald-500/80 hover:bg-emerald-500/10 text-emerald-300 hover:text-emerald-200 font-semibold text-lg px-8 py-4 rounded-lg transition-all flex items-center justify-center gap-2"
+              >
+                <Smartphone className="w-5 h-5" /> Driver Sign In
+              </Link>
+              <Link
                 to="/login"
-                className="border-2 border-slate-500 hover:border-slate-400 text-white hover:text-slate-200 font-semibold text-lg px-8 py-4 rounded-lg transition-all flex items-center justify-center gap-2 sm:hidden"
+                className="border-2 border-slate-500 hover:border-slate-400 text-white hover:text-slate-200 font-semibold text-lg px-8 py-4 rounded-lg transition-all flex items-center justify-center gap-2 lg:hidden"
               >
                 Client Portal
               </Link>
@@ -102,35 +109,65 @@ export default function HeroSection() {
               className="inline-flex items-center gap-2 text-sm font-bold text-amber-300 hover:text-amber-200 border border-amber-500/40 hover:border-amber-400/60 bg-amber-500/10 hover:bg-amber-500/15 px-4 py-2 rounded-lg transition-colors"
             >
               <Package className="w-4 h-4" />
-              Freight Brokers — Post Loads Free, 3.5% When It Moves
+              Freight Brokers — Post Loads Free, 1.5% When It Moves
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
-          {/* Right: Client portal sign-in */}
+          {/* Right: Dual sign-in — Client Portal & Driver App */}
           <div className="hidden lg:block">
             <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8">
               <div className="flex justify-center mb-4">
                 <FleetcoLogo size={40} variant="full" />
               </div>
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm tracking-widest uppercase mb-2">
-                <LogIn className="w-4 h-4" />
-                Client Portal
+
+              <div className="flex rounded-xl bg-slate-900/50 p-1 mb-6">
+                <button
+                  type="button"
+                  onClick={() => setLoginTab('portal')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${loginTab === 'portal' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <LogIn className="w-3.5 h-3.5" /> Client Portal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLoginTab('driver')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${loginTab === 'driver' ? 'bg-emerald-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <Smartphone className="w-3.5 h-3.5" /> Driver App
+                </button>
               </div>
-              <p className="text-slate-300 text-sm mb-6">
-                Sign in with the email and temporary password from your welcome message. You'll set a new password on first login.
-              </p>
-              <PortalLoginForm variant="hero" compact submitLabel="Sign In" />
-              <p className="text-xs text-slate-500 mt-4 text-center">
-                <Link to="/forgot-password" className="text-amber-400/90 hover:underline">Forgot password?</Link>
-              </p>
+
+              {loginTab === 'portal' ? (
+                <>
+                  <p className="text-slate-300 text-sm mb-6">
+                    Sign in with the email and temporary password from your welcome message. You&apos;ll set a new password on first login.
+                  </p>
+                  <PortalLoginForm variant="hero" compact submitLabel="Sign In to Portal" />
+                  <p className="text-xs text-slate-500 mt-4 text-center">
+                    <Link to="/forgot-password" className="text-amber-400/90 hover:underline">Forgot password?</Link>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-slate-300 text-sm mb-6">
+                    Drivers — clock in, routes, fuel logs, and messaging. Use credentials from your fleet administrator.
+                  </p>
+                  <PortalLoginForm variant="hero" compact submitLabel="Sign In to Driver App" driverMode />
+                  <p className="text-xs text-slate-500 mt-4 text-center">
+                    <Link to="/driver/login" className="text-emerald-400/90 hover:underline">Open full driver app page</Link>
+                    {' · '}
+                    <Link to="/forgot-password" className="text-amber-400/90 hover:underline">Forgot password?</Link>
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
       </div>
 
       <button
-        onClick={() => scrollTo('services')}
+        onClick={() => scrollTo('platform-tour')}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 text-slate-400 hover:text-amber-400 transition-colors animate-bounce"
       >
         <ChevronDown className="w-8 h-8" />

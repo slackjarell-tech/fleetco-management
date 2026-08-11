@@ -13,7 +13,7 @@ import {
 import { LOAD_BOARD_MARKETPLACE } from '@/lib/marketingContent';
 
 export default function FreightBrokerSection() {
-  const { platformFeePercent, equipmentExamples, brokerBenefits, feeNote } = LOAD_BOARD_MARKETPLACE;
+  const { posterFeePercent, carrierFeePercent, equipmentExamples, brokerBenefits, feeNote } = LOAD_BOARD_MARKETPLACE;
 
   return (
     <section id="load-board" className="py-20 bg-slate-900 relative overflow-hidden">
@@ -30,7 +30,7 @@ export default function FreightBrokerSection() {
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mt-2 leading-tight">
             Post Loads Free.
-            <span className="block text-amber-400 mt-1">Pay {platformFeePercent}% Only When Freight Moves.</span>
+            <span className="block text-amber-400 mt-1">Pay {posterFeePercent}% Only When Freight Moves.</span>
           </h2>
           <p className="text-slate-400 mt-4 max-w-3xl mx-auto text-base sm:text-lg leading-relaxed">
             {LOAD_BOARD_MARKETPLACE.description}
@@ -51,17 +51,17 @@ export default function FreightBrokerSection() {
             <div className="w-12 h-12 rounded-xl bg-amber-500/30 flex items-center justify-center mx-auto mb-4">
               <Percent className="w-6 h-6 text-amber-400" />
             </div>
-            <div className="text-3xl font-black text-amber-400">{platformFeePercent}%</div>
-            <div className="text-sm font-bold text-white mt-1">Platform Fee</div>
-            <p className="text-xs text-slate-400 mt-2">On total load revenue when freight is hauled</p>
+            <div className="text-3xl font-black text-amber-400">{posterFeePercent}%</div>
+            <div className="text-sm font-bold text-white mt-1">Poster / Broker Fee</div>
+            <p className="text-xs text-slate-400 mt-2">Of total load value when freight is hauled</p>
           </div>
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center">
             <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
               <Truck className="w-6 h-6 text-blue-400" />
             </div>
-            <div className="text-lg font-black text-white leading-snug">Split Between Poster & Driver</div>
-            <div className="text-sm font-bold text-slate-300 mt-1">Fair & Transparent</div>
-            <p className="text-xs text-slate-500 mt-2">Fee shared by load poster and carrier</p>
+            <div className="text-3xl font-black text-blue-400">{carrierFeePercent}%</div>
+            <div className="text-sm font-bold text-white mt-1">Carrier Fee</div>
+            <p className="text-xs text-slate-400 mt-2">Carriers pay the same {carrierFeePercent}% on load value</p>
           </div>
         </div>
 
@@ -76,10 +76,10 @@ export default function FreightBrokerSection() {
             </h3>
             <div className="space-y-4">
               {[
-                { step: '1', title: 'Create a broker account', desc: 'Sign up for FleetCo broker access — no subscription required to post loads.' },
+                { step: '1', title: 'Register your broker business', desc: 'Provide legal company name, MC/DOT numbers, business address, and equipment profile — required for load board access.' },
                 { step: '2', title: 'Post your freight', desc: 'Enter lane, rate, dates, and required equipment (dry van, reefer, box truck, power only, and more).' },
                 { step: '3', title: 'Carriers book & haul', desc: 'Owner-operators and fleet drivers on FleetCo see matched loads and book freight that fits their equipment.' },
-                { step: '4', title: 'Pay only on completion', desc: `FleetCo deducts ${platformFeePercent}% from total load revenue — split between you and the carrier. No fee to list.` },
+                { step: '4', title: 'Pay only on completion', desc: `You pay ${posterFeePercent}% of load value; the carrier pays ${carrierFeePercent}%. No fee to list.` },
               ].map(({ step, title, desc }) => (
                 <div key={step} className="flex gap-4">
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-500 text-slate-900 font-black text-sm flex items-center justify-center">
@@ -126,20 +126,20 @@ export default function FreightBrokerSection() {
         <div className="bg-gradient-to-r from-amber-500/20 to-amber-600/10 border border-amber-500/30 rounded-2xl p-8 sm:p-10 text-center">
           <h3 className="text-2xl font-black text-white mb-2">Ready to Post Loads on FleetCo?</h3>
           <p className="text-slate-400 text-sm max-w-xl mx-auto mb-6">
-            Broker accounts are opening now. Contact us to get early access to the FleetCo Load Board — post freight free and keep more of every load.
+            Create a free broker account — no monthly fee. Post freight on the FleetCo Load Board and pay the 3.5% platform fee only when loads deliver.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
-              to="/for-brokers"
+              to="/broker-signup"
               className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-8 py-3.5 rounded-lg transition-colors"
             >
-              Request Broker Access <ArrowRight className="w-4 h-4" />
+              Create Broker Account <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               to="/login"
               className="inline-flex items-center justify-center gap-2 border border-slate-600 hover:border-amber-400 text-white hover:text-amber-300 font-bold px-8 py-3.5 rounded-lg transition-colors"
             >
-              Broker Portal Sign In
+              Broker Sign In
             </Link>
           </div>
         </div>

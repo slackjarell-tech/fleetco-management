@@ -13,7 +13,6 @@
   <url><loc>https://fleetcomanagement.org/yard-management</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://fleetcomanagement.org/about</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://fleetcomanagement.org/contact</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://fleetcomanagement.org/fleet-owners</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://fleetcomanagement.org/login</loc><changefreq>yearly</changefreq><priority>0.5</priority></url>
   <url><loc>https://fleetcomanagement.org/manual</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
   <url><loc>https://fleetcomanagement.org/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>

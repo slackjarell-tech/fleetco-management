@@ -1,51 +1,51 @@
 import React from 'react';
-import { Wrench, MapPin, Fuel, FileText, ShieldCheck, Truck, Search, BarChart3, Warehouse } from 'lucide-react';
+import { MapPin, Route, Shield, DollarSign, Smartphone, Bot, Fuel, Wrench, BarChart3 } from 'lucide-react';
 
-const services = [
-  {
-    icon: Search,
-    title: 'Parts Sourcing',
-    description: 'We locate OEM and aftermarket parts for national back-order items fast, so your rig gets back on the road.',
-  },
-  {
-    icon: Fuel,
-    title: 'Fuel Optimization',
-    description: 'We find the best fuel prices along your routes to help you cut one of your biggest operating costs.',
-  },
+const modules = [
   {
     icon: MapPin,
-    title: 'Towing & Repair',
-    description: 'When your unit goes down, we coordinate the nearest tow and qualified repair shop — warranty or out-of-pocket.',
+    title: 'Live Fleet Map',
+    description: 'Track vehicles and drivers on one map with real-time status and assignments.',
   },
   {
-    icon: ShieldCheck,
-    title: 'Safety Coordination',
-    description: 'Our Safety Coordinators keep your fleet compliant with federal and state regulations to avoid costly violations.',
-  },
-  {
-    icon: FileText,
-    title: 'Tax Documentation',
-    description: 'Full documentation of all invoices and expenses per unit for year-end tax prep and budget planning.',
+    icon: Route,
+    title: 'Dispatch & Loads',
+    description: 'Create loads, assign drivers, and monitor pickup and delivery milestones.',
   },
   {
     icon: Wrench,
-    title: 'Preventive Maintenance',
-    description: 'Custom maintenance schedules and guides to reduce breakdowns and extend the life of your vehicles.',
+    title: 'Maintenance & PM',
+    description: 'Work orders, preventive maintenance schedules, and shop documentation.',
+  },
+  {
+    icon: Fuel,
+    title: 'Fuel & Audits',
+    description: 'Fuel logs with receipt photos, station maps, and audit reports.',
+  },
+  {
+    icon: Shield,
+    title: 'Compliance Hub',
+    description: 'HOS logs, DVIR inspections, IFTA reporting, and incident tracking.',
+  },
+  {
+    icon: DollarSign,
+    title: 'Payroll & Finance',
+    description: 'Time clock, driver payroll, invoicing, and fleet P&L in one place.',
+  },
+  {
+    icon: Smartphone,
+    title: 'Driver App',
+    description: 'Mobile clock-in, routes, fuel, dashcam, and messaging synced to the portal.',
+  },
+  {
+    icon: Bot,
+    title: 'FleetCo AI',
+    description: 'Ask questions about your fleet and get help navigating the portal faster.',
   },
   {
     icon: BarChart3,
-    title: 'Fleet Analytics',
-    description: 'Track total cost per unit and get insights to help you budget and optimize your fleet for the coming year.',
-  },
-  {
-    icon: Warehouse,
-    title: 'Yard Management (YMS)',
-    description: 'Design your own yard size and layout — docks, gates, parking spots — and track trailer placement live.',
-  },
-  {
-    icon: Truck,
-    title: 'Full Fleet Management',
-    description: 'End-to-end management so you can focus on driving — we handle the details from parts to paperwork.',
+    title: 'Reports & Scorecards',
+    description: 'Executive dashboards, driver scorecards, and exportable fleet reports.',
   },
 ];
 
@@ -54,15 +54,15 @@ export default function ServicesSection() {
     <section id="services" className="py-20 bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
-          <span className="text-amber-500 font-bold text-sm tracking-widest uppercase">What We Do</span>
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mt-2">Services Built for Your Fleet</h2>
+          <span className="text-amber-500 font-bold text-sm tracking-widest uppercase">Platform modules</span>
+          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mt-2">Everything in one subscription</h2>
           <p className="text-slate-500 mt-3 max-w-2xl mx-auto">
-            From finding back-ordered parts to optimizing fuel costs, FleetCo handles everything so you can keep moving.
+            FleetCo is software — portal plus driver app — built for carriers who want one system instead of a patchwork of tools.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {services.map(({ icon: Icon, title, description }) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {modules.map(({ icon: Icon, title, description }) => (
             <div
               key={title}
               className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 hover:shadow-md hover:border-amber-200 transition-all group"

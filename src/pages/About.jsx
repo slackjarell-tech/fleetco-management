@@ -39,15 +39,15 @@ export default function About() {
       <section className="py-16 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="prose prose-lg prose-slate max-w-none space-y-6 text-slate-700 leading-relaxed">
           <p>
-            FleetCo Management LLC is a Dallas, Texas-based fleet management services company founded in 2022. We are dedicated to providing quality, low-cost fleet management solutions to owner-operators and small fleet owners across the United States. Our mission is to level the playing field by giving independent carriers access to the same tools, data, and operational support that large enterprise fleets enjoy — without the enterprise price tag.
+            FleetCo Management LLC is a Dallas, Texas-based fleet software company founded in 2022. We build tools for owner-operators and small fleet owners across the United States — one portal and one driver app instead of a patchwork of spreadsheets and disconnected apps.
           </p>
           
           <p>
-            Our platform covers every aspect of fleet operations: from vehicle maintenance scheduling and parts sourcing to fuel optimization, safety coordination, towing and repair dispatch, and comprehensive tax documentation. We handle the back-office complexity so our clients can focus on what they do best — keeping their trucks moving and their businesses growing. Whether you run a single truck or a fleet of fifty vehicles, FleetCo adapts to your needs.
+            Our platform covers dispatch and loads, vehicle maintenance, fuel tracking, payroll, compliance, yard management, and reporting. Whether you run a single truck or a fleet of fifty vehicles, FleetCo adapts to how you operate — subscription software you can start using quickly.
           </p>
 
           <p>
-            At the heart of FleetCo is a powerful, custom-built management portal that gives fleet owners real-time visibility into their operations. Track fuel expenses and IFTA compliance, manage preventive maintenance schedules, monitor driver hours of service and DVIR inspections, process payroll, and generate financial reports — all from a single dashboard. Our technology automates the tedious tasks that eat up hours of a fleet manager's week, reducing errors and uncovering cost savings that directly impact the bottom line.
+            At the heart of FleetCo is a custom-built management portal that gives fleet owners real-time visibility into their operations. Track fuel and IFTA, manage preventive maintenance, monitor driver hours and DVIR inspections, process payroll, and generate financial reports — all from a single dashboard.
           </p>
 
           <p>
@@ -55,7 +55,7 @@ export default function About() {
           </p>
 
           <p>
-            FleetCo Management is more than a software platform — we are a strategic partner invested in the success of every carrier we serve. Our clients consistently report improved safety scores, reduced downtime, lower per-mile operating costs, and greater peace of mind knowing that compliance and paperwork are handled by professionals. We are proud to be based in Dallas, Texas, and to support the backbone of the American economy: the men and women who move freight across this country every day.
+            FleetCo Management is fleet software for carriers who move freight for a living — built in Dallas and used nationwide. We are proud to support owner-operators and small fleets with tools that help them run tighter operations without enterprise overhead.
           </p>
         </div>
 

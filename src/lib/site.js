@@ -9,7 +9,7 @@ export const SITE = {
   phone: '(360) 952-1249',
   location: 'Dallas, TX',
   description:
-    'Fleet management for owner-operators and small fleets — parts sourcing, fuel optimization, DOT compliance, and fleet operations in one portal.',
+    'Fleet software for owner-operators and small carriers — dispatch, maintenance, fuel, payroll, compliance, and driver app in one portal.',
   tagline: 'Move freight. We handle the rest.',
 };
 

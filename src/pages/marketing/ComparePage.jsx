@@ -1,8 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import MarketingShell, { MarketingHero } from '@/components/marketing/public/MarketingShell';
-import { COMPARE_COMPETITORS, COMPARE_ROWS, ELD_DISCLAIMER } from '@/lib/marketing/compareData';
-import { AlertCircle } from 'lucide-react';
+import { COMPARE_COMPETITORS, COMPARE_ROWS } from '@/lib/marketing/compareData';
 
 export default function ComparePage() {
   return (
@@ -43,13 +42,6 @@ export default function ComparePage() {
             ))}
           </tbody>
         </table>
-      </section>
-
-      <section className="py-8 max-w-3xl mx-auto px-4">
-        <div className="flex gap-3 bg-slate-50 border border-slate-200 rounded-xl p-5">
-          <AlertCircle className="w-5 h-5 text-slate-500 shrink-0" />
-          <p className="text-sm text-slate-600">{ELD_DISCLAIMER}</p>
-        </div>
       </section>
 
       <section className="py-12 text-center">

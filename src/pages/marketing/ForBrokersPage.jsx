@@ -1,101 +1,77 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '@/api/apiClient';
 import MarketingShell, { MarketingHero } from '@/components/marketing/public/MarketingShell';
 import { LOAD_BOARD_MARKETPLACE } from '@/lib/marketingContent';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { LOAD_BOARD_TRANSACTION_FEE_PERCENT } from '@/lib/loadBoardFeeDisclosure';
+import { ArrowRight, CheckCircle2, DollarSign, Package } from 'lucide-react';
 
 export default function ForBrokersPage() {
-  const [form, setForm] = useState({
-    company_name: '', contact_name: '', email: '', phone: '', mc_number: '', dot_number: '',
-    loads_per_week: '', equipment_types: '', message: '',
-  });
-  const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
-  const [error, setError] = useState('');
-
-  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    try {
-      await api.functions.invoke('submitBrokerApplication', form);
-      setDone(true);
-    } catch {
-      setError('Could not submit — email support@fleetcomanagement.org');
-    }
-    setLoading(false);
-  };
-
   return (
     <MarketingShell
       title="Freight Broker Access"
-      description="Apply for free FleetCo Load Board access. Post loads, attach BOLs, and connect with carriers."
+      description="Create a free FleetCo broker account. Post loads, attach BOLs, and pay only the 3.5% platform fee when freight moves — no monthly subscription."
       path="/for-brokers"
     >
       <MarketingHero
-        badge="Broker Application"
-        title="Post Loads Free on FleetCo"
-        subtitle={`${LOAD_BOARD_MARKETPLACE.feeNote} Apply below — we review MC/DOT info and send portal credentials within 1–2 business days.`}
+        badge="Freight Brokers"
+        title="Post Loads Free — No Monthly Fee"
+        subtitle={`Create your broker account with full company and FMCSA details. Pay ${LOAD_BOARD_TRANSACTION_FEE_PERCENT}% on load value only when freight moves. A credit card stays on file for transaction fees.`}
         dark
-      />
+      >
+        <Link
+          to="/broker-signup"
+          className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-8 py-3 rounded-lg text-sm inline-flex items-center gap-2"
+        >
+          Create broker account <ArrowRight className="w-4 h-4" />
+        </Link>
+        <Link to="/login" className="border border-slate-600 hover:border-amber-400 text-white font-bold px-8 py-3 rounded-lg text-sm">
+          Sign in
+        </Link>
+      </MarketingHero>
 
-      <section className="py-16 max-w-2xl mx-auto px-4">
-        {done ? (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-10 text-center">
-            <CheckCircle2 className="w-14 h-14 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-black text-slate-900">Application received</h2>
-            <p className="text-slate-600 mt-2">We will email you at {form.email} with broker portal access instructions.</p>
-            <Link to="/load-board" className="inline-block mt-6 text-amber-600 font-bold hover:underline">Back to load board info</Link>
+      <section className="py-16 max-w-4xl mx-auto px-4">
+        <div className="grid md:grid-cols-3 gap-5 mb-12">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center">
+            <DollarSign className="w-8 h-8 text-green-500 mx-auto mb-3" />
+            <div className="text-2xl font-black text-slate-900">$0/mo</div>
+            <p className="text-sm text-slate-600 mt-1">No fleet subscription required for brokers</p>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm space-y-4">
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-bold text-slate-700">Company name *</label>
-                <input required value={form.company_name} onChange={(e) => set('company_name', e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2" />
-              </div>
-              <div>
-                <label className="text-sm font-bold text-slate-700">Contact name *</label>
-                <input required value={form.contact_name} onChange={(e) => set('contact_name', e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2" />
-              </div>
-              <div>
-                <label className="text-sm font-bold text-slate-700">Email *</label>
-                <input type="email" required value={form.email} onChange={(e) => set('email', e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2" />
-              </div>
-              <div>
-                <label className="text-sm font-bold text-slate-700">Phone</label>
-                <input value={form.phone} onChange={(e) => set('phone', e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2" />
-              </div>
-              <div>
-                <label className="text-sm font-bold text-slate-700">MC number</label>
-                <input value={form.mc_number} onChange={(e) => set('mc_number', e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2" />
-              </div>
-              <div>
-                <label className="text-sm font-bold text-slate-700">DOT number</label>
-                <input value={form.dot_number} onChange={(e) => set('dot_number', e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2" />
-              </div>
+          <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 text-center">
+            <Package className="w-8 h-8 text-amber-600 mx-auto mb-3" />
+            <div className="text-2xl font-black text-slate-900">{LOAD_BOARD_TRANSACTION_FEE_PERCENT}%</div>
+            <p className="text-sm text-slate-600 mt-1">Platform fee when a load delivers</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center">
+            <CheckCircle2 className="w-8 h-8 text-blue-500 mx-auto mb-3" />
+            <div className="text-lg font-black text-slate-900">Full business profile</div>
+            <p className="text-sm text-slate-600 mt-1">Company, MC/DOT, address &amp; equipment required at signup</p>
+          </div>
+        </div>
+
+        <p className="text-center text-slate-600 text-sm max-w-2xl mx-auto mb-10">{LOAD_BOARD_MARKETPLACE.feeNote}</p>
+
+        <div className="grid sm:grid-cols-2 gap-4 mb-10">
+          {LOAD_BOARD_MARKETPLACE.brokerBenefits.map(({ title, desc }) => (
+            <div key={title} className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <div className="font-bold text-slate-900 text-sm">{title}</div>
+              <p className="text-xs text-slate-600 mt-1">{desc}</p>
             </div>
-            <div>
-              <label className="text-sm font-bold text-slate-700">Loads posted per week (estimate)</label>
-              <input value={form.loads_per_week} onChange={(e) => set('loads_per_week', e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2" placeholder="e.g. 10–50" />
-            </div>
-            <div>
-              <label className="text-sm font-bold text-slate-700">Equipment types</label>
-              <input value={form.equipment_types} onChange={(e) => set('equipment_types', e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2" placeholder="Dry van, reefer, flatbed…" />
-            </div>
-            <div>
-              <label className="text-sm font-bold text-slate-700">Notes</label>
-              <textarea value={form.message} onChange={(e) => set('message', e.target.value)} rows={3} className="w-full mt-1 border rounded-lg px-3 py-2" />
-            </div>
-            {error && <p className="text-red-600 text-sm">{error}</p>}
-            <button type="submit" disabled={loading} className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3 rounded-lg flex items-center justify-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit broker application'}
-            </button>
-          </form>
-        )}
+          ))}
+        </div>
+
+        <div className="text-center">
+          <Link
+            to="/broker-signup"
+            className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-8 py-3 rounded-lg"
+          >
+            Create broker account <ArrowRight className="w-4 h-4" />
+          </Link>
+          <p className="text-xs text-slate-500 mt-4">
+            Need help? <Link to="/contact" className="text-amber-600 font-bold hover:underline">Contact FleetCo</Link>
+            {' · '}
+            <Link to="/load-board" className="text-amber-600 font-bold hover:underline">Load board overview</Link>
+          </p>
+        </div>
       </section>
     </MarketingShell>
   );

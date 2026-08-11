@@ -68,6 +68,12 @@ export default function NavBar() {
               Get Started
             </Link>
             <Link
+              to="/driver/login"
+              className="flex items-center gap-1.5 border border-emerald-600/60 hover:border-emerald-400 text-emerald-300 hover:text-emerald-200 text-sm font-medium px-4 py-2 rounded transition-colors"
+            >
+              <LogIn className="w-4 h-4" /> Driver
+            </Link>
+            <Link
               to="/login"
               className="flex items-center gap-1.5 border border-slate-600 hover:border-amber-400 text-slate-300 hover:text-amber-400 text-sm font-medium px-4 py-2 rounded transition-colors"
             >
@@ -109,6 +115,9 @@ export default function NavBar() {
           </Link>
           <Link to="/pricing" className="block w-full text-center bg-amber-500 text-slate-900 font-bold text-sm px-4 py-2 rounded mt-2" onClick={() => setOpen(false)}>
             Get Started
+          </Link>
+          <Link to="/driver/login" className="w-full flex items-center justify-center gap-2 border border-emerald-600/60 text-emerald-300 text-sm font-medium px-4 py-2 rounded mt-2" onClick={() => setOpen(false)}>
+            <LogIn className="w-4 h-4" /> Driver Sign In
           </Link>
           <Link to="/login" className="w-full flex items-center justify-center gap-2 border border-slate-600 text-slate-300 text-sm font-medium px-4 py-2 rounded mt-2" onClick={() => setOpen(false)}>
             <LogIn className="w-4 h-4" /> Client Portal

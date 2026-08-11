@@ -3,14 +3,14 @@ import { CheckCircle } from 'lucide-react';
 import { HOME_IMAGES } from '@/lib/homeImages';
 
 const advantages = [
-  'Dedicated Fleet Manager & Safety Coordinator per account',
-  'National back-order (NBO) parts network partnerships',
-  'Fuel station relationships for maximized discounts',
-  'Full invoice documentation for year-end tax preparation',
-  'Telematics integration (Detroit Connect, Volvo Assist & more)',
-  'Planning for EV fleet transitions',
-  'Cost-per-unit tracking and annual budget optimization',
-  'Virtual company — low overhead, savings passed to you',
+  'All-in-one portal — dispatch, fleet, fuel, payroll, and compliance',
+  'FleetCo Driver app synced to the same data in real time',
+  'Load board for brokers and carriers — pay only when freight moves',
+  'Owner-operator mode — run the business and drive on one login',
+  'Yard management with live trailer placement maps',
+  'Executive dashboards, scorecards, and exportable reports',
+  'FleetCo AI assistant built into the portal',
+  'Transparent pricing from $299/mo — no enterprise sales call required',
 ];
 
 export default function AboutSection() {
@@ -18,7 +18,6 @@ export default function AboutSection() {
     <section id="about" className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Image */}
           <div className="relative">
             <div className="rounded-2xl overflow-hidden shadow-2xl">
               <img
@@ -33,21 +32,16 @@ export default function AboutSection() {
             </div>
           </div>
 
-          {/* Content */}
           <div>
             <span className="text-amber-500 font-bold text-sm tracking-widest uppercase">About FleetCo</span>
             <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mt-2 mb-4">
-              Your Fleet's Trusted Partner
+              Fleet software built for independents
             </h2>
             <p className="text-slate-600 leading-relaxed mb-4">
-              FleetCo Management LLC was founded in Dallas, Texas to serve owner operators and small fleet
-              owners who can't afford the downtime or the rising cost of doing it alone. We handle the logistics
-              so you can handle the road.
+              FleetCo Management LLC was founded in Dallas, Texas to give owner-operators and small fleets the same operational tools large carriers use — without the enterprise price tag or six-month implementation project.
             </p>
             <p className="text-slate-600 leading-relaxed mb-6">
-              Our mission is simple: <strong>quality, low-cost service to keep your fleet running.</strong> 
-              We partner with parts suppliers, repair shops, fuel stations, and towing companies nationwide 
-              to make sure you're never stranded and never overpaying.
+              Our mission is simple: <strong>one platform to run your fleet.</strong> Portal for the office, app for the road, load board when you need freight — subscription software you can start using this week.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
