@@ -421,6 +421,9 @@ const sltMarketing = {
       body: JSON.stringify({ force }),
     });
   },
+  runAutopilot() {
+    return apiFetch('/slt-marketing/autopilot/run', { method: 'POST', body: JSON.stringify({}) });
+  },
   emailPlatformGuide(to) {
     return apiFetch('/slt-marketing/platform-guide-email', {
       method: 'POST',

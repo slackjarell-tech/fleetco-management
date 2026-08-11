@@ -318,8 +318,14 @@ app.get('/api/public-settings', (_req, res) => {
 const conversations = new Map();
 
 app.get('/api/marketing-ai/status', async (_req, res) => {
-  const { getAiStatus } = await import('./aiProvider.js');
-  res.json({ ...getAiStatus(), public_agent: 'fleetco_guide', free_tier: 'groq_or_gemini' });
+  const { verifyAiProvider } = await import('./aiProvider.js');
+  const status = await verifyAiProvider();
+  res.json({
+    ...status,
+    public_agent: 'fleetco_guide',
+    free_tier: 'groq_or_gemini',
+    autopilot: true,
+  });
 });
 
 app.post('/api/marketing-ai/conversations', async (req, res) => {
@@ -335,7 +341,7 @@ app.post('/api/marketing-ai/conversations', async (req, res) => {
 
 app.post('/api/marketing-ai/conversations/:id/messages', async (req, res) => {
   try {
-    const { appendPublicMessage } = await import('./marketingAiSessions.js');
+    const { appendPublicMessage, savePublicMarketingConversation } = await import('./marketingAiSessions.js');
     const { content } = req.body || {};
     const result = appendPublicMessage(req, req.params.id, content);
     if (result.error) {
@@ -356,6 +362,7 @@ app.post('/api/marketing-ai/conversations/:id/messages', async (req, res) => {
       actions: actions?.length ? actions : undefined,
     });
     conversation.updated_at = new Date().toISOString();
+    savePublicMarketingConversation(conversation);
 
     res.json({
       ...conversation,
@@ -383,7 +390,7 @@ app.post('/api/agents/conversations', requireAuth, (req, res) => {
     agent_name === 'revan'
       ? 'Revan online — executive commander with Cursor-style control. I can change fleetcomanagement.org content, manage fleet records, run audits, and update users. Try: "Run a system health audit" or "Change the homepage headline to …"'
       : agent_name === 'slt_marketing'
-        ? 'FleetCo Marketing AI online — SLT command center. Website prospects talk to FleetCo Guide; their leads appear here. I can manage pipeline, email follow-ups, social posts, and schedule calls. Daily interested-lead report at 3:00 PM CST.'
+        ? 'FleetCo Marketing AI online — Autopilot handles lead nurture emails automatically (no HubSpot needed). Website prospects talk to FleetCo Guide; leads enroll in the 4-step sequence. I can manage pipeline, social posts, and schedule calls. Daily lead report at 3:00 PM CST.'
         : 'Site Commander online. I can read your fleet data and make real changes — like Cursor for your portal. Try: "Show open work orders" or "Change the homepage headline to …"';
   const conversation = {
     id,
@@ -437,9 +444,30 @@ app.post('/api/agents/conversations/:id/messages', requireAuth, async (req, res)
 app.get('/api/slt-marketing/dashboard', requireAuth, async (req, res) => {
   try {
     const { getMarketingDashboard } = await import('./sltMarketing.js');
-    res.json(getMarketingDashboard(req.user));
+    const { getAutopilotStatus } = await import('./marketingAutopilot.js');
+    const { verifyAiProvider } = await import('./aiProvider.js');
+    const dashboard = getMarketingDashboard(req.user);
+    const ai = await verifyAiProvider();
+    res.json({
+      ...dashboard,
+      autopilot: getAutopilotStatus(),
+      ai_status: ai,
+    });
   } catch (err) {
     res.status(err.message?.includes('SLT') ? 403 : 400).json({ error: err.message });
+  }
+});
+
+app.post('/api/slt-marketing/autopilot/run', requireAuth, async (req, res) => {
+  if (!['owner', 'executive', 'fleet_manager'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'SLT access required' });
+  }
+  try {
+    const { runAutopilotTick } = await import('./marketingAutopilot.js');
+    const result = await runAutopilotTick();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -673,6 +701,7 @@ const ENTITY_NAMES = [
   'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
   'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
   'MarketingSocialPost', 'MarketingScheduledCall', 'MarketingActivityLog', 'MarketingReportRun',
+  'MarketingConversation', 'MarketingAutopilotRun',
   'CustomerFundingAccount', 'PayeeBankAccount', 'PayrollDisbursement', 'PayrollDisbursementBatch',
   'EmployeeTaxProfile',
   'BrokerApplication', 'TrialRequest',
@@ -1054,6 +1083,9 @@ async function startServer() {
     import('./sltMarketing.js').then(({ startSltMarketingScheduler }) => {
       startSltMarketingScheduler();
     }).catch((err) => console.warn('[slt-marketing] scheduler not started', err.message));
+    import('./marketingAutopilot.js').then(({ startMarketingAutopilotScheduler }) => {
+      startMarketingAutopilotScheduler();
+    }).catch((err) => console.warn('[marketing-autopilot] scheduler not started', err.message));
   });
 }
 

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '@/api/apiClient';
-import { Loader2, Megaphone, Calendar, Users, RefreshCw, Send, Globe, Bot } from 'lucide-react';
+import { Loader2, Megaphone, Calendar, Users, RefreshCw, Send, Globe, Bot, Zap } from 'lucide-react';
 import AssistantChat from '@/components/assistant/AssistantChat';
 import PortalPageShell from '@/components/layout/PortalPageShell';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ export default function SltMarketingHub() {
   const [dashboard, setDashboard] = useState(null);
   const [loadingDash, setLoadingDash] = useState(true);
   const [reportSending, setReportSending] = useState(false);
+  const [autopilotRunning, setAutopilotRunning] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     setLoadingDash(true);
@@ -56,6 +57,16 @@ export default function SltMarketingHub() {
     }
   };
 
+  const runAutopilotNow = async () => {
+    setAutopilotRunning(true);
+    try {
+      await api.sltMarketing.runAutopilot();
+      await loadDashboard();
+    } finally {
+      setAutopilotRunning(false);
+    }
+  };
+
   if (loadingUser) {
     return (
       <PortalPageShell variant="fullBleed" className="items-center justify-center">
@@ -81,6 +92,10 @@ export default function SltMarketingHub() {
   const summary = dashboard?.summary;
   const social = dashboard?.social_config || {};
   const aiLeads = summary?.marketing_ai_leads ?? '—';
+  const autopilot = dashboard?.autopilot;
+  const aiStatus = dashboard?.ai_status;
+  const aiHealthy = aiStatus?.healthy;
+  const aiConfigured = aiStatus?.configured;
 
   return (
     <PortalPageShell variant="fullBleed">
@@ -92,7 +107,7 @@ export default function SltMarketingHub() {
                 <Megaphone className="w-5 h-5 text-cyan-400" />
                 FleetCo Marketing AI
               </h1>
-              <p className="text-slate-500 text-xs mt-0.5">SLT command · website AI · 3:00 PM CST report</p>
+              <p className="text-slate-500 text-xs mt-0.5">Autopilot · website AI · 3 PM CST report</p>
             </div>
             <button
               type="button"
@@ -104,13 +119,40 @@ export default function SltMarketingHub() {
             </button>
           </div>
 
+          <div className="mb-4 p-3 rounded-lg border border-amber-900/50 bg-amber-950/20 text-xs text-slate-300">
+            <div className="flex items-center gap-2 text-amber-400 font-semibold mb-1">
+              <Zap className="w-3.5 h-3.5" />
+              Marketing Autopilot
+            </div>
+            <p className="text-slate-400 leading-relaxed">
+              Runs on its own — no HubSpot or Apollo. New leads get a 4-step nurture email sequence via Resend.
+              Social drafts generate Monday mornings. Chat uses free Groq/Gemini.
+            </p>
+            {autopilot && (
+              <p className="mt-2 text-slate-500">
+                {autopilot.enrolled_count} enrolled · {autopilot.due_now} due now
+                {autopilot.enabled ? '' : ' · paused'}
+              </p>
+            )}
+          </div>
+
           <div className="mb-4 p-3 rounded-lg border border-slate-800 bg-slate-900/80 text-xs text-slate-400">
             <div className="flex items-center gap-2 text-cyan-400 font-semibold mb-1">
               <Globe className="w-3.5 h-3.5" />
               Public FleetCo Guide
             </div>
-            Prospects chat on the website via <strong className="text-slate-300">Ask FleetCo AI</strong>. Leads save to your pipeline automatically.
+            Prospects chat on the website via <strong className="text-slate-300">Ask FleetCo AI</strong>. Leads auto-enroll in Autopilot.
           </div>
+
+          {aiConfigured && (
+            <div className={`mb-4 px-3 py-2 rounded-lg border text-xs ${
+              aiHealthy
+                ? 'border-emerald-800/60 bg-emerald-950/30 text-emerald-400'
+                : 'border-red-800/60 bg-red-950/30 text-red-400'
+            }`}>
+              AI ({aiStatus?.provider}): {aiHealthy ? 'connected' : (aiStatus?.health_error || 'key invalid — update GROQ_API_KEY on Render')}
+            </div>
+          )}
 
           {loadingDash && !summary ? (
             <Loader2 className="w-6 h-6 text-cyan-500 animate-spin mx-auto my-8" />
@@ -118,12 +160,12 @@ export default function SltMarketingHub() {
             <>
               <div className="grid grid-cols-2 gap-2 mb-4">
                 <StatCard label="Interested" value={summary?.interested_count ?? '—'} icon={Users} />
+                <StatCard label="Autopilot" value={summary?.autopilot_enrolled ?? '—'} icon={Zap} />
                 <StatCard label="Website AI" value={aiLeads} icon={Bot} />
                 <StatCard label="Social drafts" value={summary?.social_draft ?? '—'} icon={Megaphone} />
-                <StatCard label="Calls booked" value={summary?.upcoming_calls ?? '—'} icon={Calendar} />
               </div>
 
-              <div className="text-xs text-slate-500 mb-2">Social accounts (server env)</div>
+              <div className="text-xs text-slate-500 mb-2">Social accounts (optional env tokens)</div>
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {['facebook', 'linkedin', 'instagram', 'x'].map((p) => (
                   <span
@@ -138,6 +180,17 @@ export default function SltMarketingHub() {
                   </span>
                 ))}
               </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mb-2 border-amber-800 text-amber-300 hover:bg-amber-950"
+                disabled={autopilotRunning}
+                onClick={runAutopilotNow}
+              >
+                {autopilotRunning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
+                Run autopilot now
+              </Button>
 
               <Button
                 variant="outline"
@@ -160,8 +213,22 @@ export default function SltMarketingHub() {
                         <div className="text-slate-500 truncate">{l.email}</div>
                         <div className="text-cyan-500/80 mt-0.5 flex gap-2">
                           <span>{l.lead_status}</span>
+                          {l.autopilot_enrolled_at && <span className="text-amber-500/80">· autopilot</span>}
                           {l.source === 'marketing_ai' && <span className="text-amber-500/80">· website AI</span>}
                         </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {autopilot?.recent_activity?.length > 0 && (
+                <div className="mb-4">
+                  <h2 className="text-xs font-bold uppercase text-slate-400 mb-2">Autopilot activity</h2>
+                  <ul className="space-y-1 max-h-32 overflow-y-auto text-[11px] text-slate-500">
+                    {autopilot.recent_activity.slice(0, 6).map((a) => (
+                      <li key={a.id} className="truncate">
+                        {a.action} · {(a.created_at || '').slice(0, 16).replace('T', ' ')}
                       </li>
                     ))}
                   </ul>
@@ -181,15 +248,15 @@ export default function SltMarketingHub() {
             variant="slt_marketing"
             channel="portal"
             title="SLT Command Center"
-            subtitle="Leads · email · social · calls · website AI pipeline"
-            placeholder="Ask to follow up on website leads, draft posts, or schedule sales calls…"
-            emptyTitle="Grow FleetCo"
-            emptySubtitle="Manage leads from FleetCo Guide on the website, queue social content, send emails via Resend, and schedule discovery calls."
+            subtitle="Autopilot nurture · leads · social · calls"
+            placeholder="Ask about autopilot status, follow up on leads, draft posts, or schedule calls…"
+            emptyTitle="Self-contained marketing"
+            emptySubtitle="Autopilot emails new leads automatically. Manage pipeline, approve social drafts, and schedule discovery calls — all inside FleetCo, no paid CRM required."
             suggestedQuestions={[
-              'Show leads captured by the website marketing AI',
-              'Draft a follow-up email for each interested lead',
-              'Queue a Facebook post about our driver app and fleet portal',
-              'Schedule a discovery call next Tuesday at 10am for Patricia Nguyen',
+              'Show autopilot status and leads due for nurture emails',
+              'List leads captured by the website marketing AI',
+              'Draft a LinkedIn post about our driver app',
+              'Which social posts are waiting for approval?',
             ]}
           />
         </div>

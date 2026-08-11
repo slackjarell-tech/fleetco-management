@@ -340,6 +340,7 @@ export function getMarketingDashboard(user) {
       social_draft: socialQueue.filter((p) => p.status === 'draft').length,
       social_scheduled: socialQueue.filter((p) => ['approved', 'manual'].includes(p.status)).length,
       upcoming_calls: upcomingCalls.length,
+      autopilot_enrolled: leads.filter((l) => l.autopilot_enrolled_at).length,
     },
     interested_leads: interested.slice(0, 50),
     new_leads: newLeads.slice(0, 20),

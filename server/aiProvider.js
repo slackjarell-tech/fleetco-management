@@ -28,14 +28,64 @@ function isGroqRateLimit(status, message) {
   return status === 429 || /rate limit reached/i.test(String(message || ''));
 }
 
+let healthCache = { at: 0, healthy: null, error: null };
+const HEALTH_TTL_MS = 5 * 60 * 1000;
+
 export function getAiStatus() {
   if (process.env.GROQ_API_KEY) {
-    return { configured: true, provider: 'groq', model: groqModel() };
+    return {
+      configured: true,
+      provider: 'groq',
+      model: groqModel(),
+      healthy: healthCache.healthy,
+      health_error: healthCache.error,
+      health_checked_at: healthCache.at ? new Date(healthCache.at).toISOString() : null,
+    };
   }
   if (process.env.GEMINI_API_KEY) {
-    return { configured: true, provider: 'gemini', model: process.env.GEMINI_MODEL || 'gemini-2.0-flash' };
+    return {
+      configured: true,
+      provider: 'gemini',
+      model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+      healthy: healthCache.healthy,
+      health_error: healthCache.error,
+      health_checked_at: healthCache.at ? new Date(healthCache.at).toISOString() : null,
+    };
   }
-  return { configured: false, provider: null, model: null };
+  return { configured: false, provider: null, model: null, healthy: false, health_error: null };
+}
+
+export async function verifyAiProvider({ force = false } = {}) {
+  const status = getAiStatus();
+  if (!status.configured) {
+    healthCache = { at: Date.now(), healthy: false, error: 'not_configured' };
+    return { ...status, healthy: false, health_error: 'not_configured' };
+  }
+
+  if (!force && healthCache.at && Date.now() - healthCache.at < HEALTH_TTL_MS) {
+    return { ...status, healthy: healthCache.healthy, health_error: healthCache.error };
+  }
+
+  try {
+    const msg = await chatCompletion({
+      messages: [{ role: 'user', content: 'Reply with exactly: ok' }],
+    });
+    if (msg.error === 'not_configured') {
+      healthCache = { at: Date.now(), healthy: false, error: 'not_configured' };
+    } else if (!msg.content && !msg.tool_calls) {
+      healthCache = { at: Date.now(), healthy: false, error: 'empty_response' };
+    } else {
+      healthCache = { at: Date.now(), healthy: true, error: null };
+    }
+  } catch (err) {
+    healthCache = { at: Date.now(), healthy: false, error: err.message || 'verify_failed' };
+  }
+
+  return {
+    ...getAiStatus(),
+    healthy: healthCache.healthy,
+    health_error: healthCache.error,
+  };
 }
 
 async function chatGroq({ messages, tools, model }) {

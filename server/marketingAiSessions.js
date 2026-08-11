@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
+import { createEntity, getEntity, listEntities, nowIso, updateEntity } from './db.js';
 
-const publicConversations = new Map();
 const rateBuckets = new Map();
 
 const MAX_MESSAGES_PER_HOUR = 40;
@@ -27,34 +27,65 @@ function checkRateLimit(key) {
 }
 
 function pruneOldConversations() {
-  const cutoff = Date.now() - CONVERSATION_TTL_MS;
-  for (const [id, conv] of publicConversations.entries()) {
-    if (new Date(conv.updated_at).getTime() < cutoff) publicConversations.delete(id);
+  const cutoff = new Date(Date.now() - CONVERSATION_TTL_MS).toISOString();
+  const stale = listEntities('MarketingConversation', '-updated_at', 200)
+    .filter((c) => (c.updated_at || c.created_at || '') < cutoff);
+  for (const conv of stale.slice(0, 50)) {
+    updateEntity('MarketingConversation', conv.id, { archived: true });
   }
 }
+
+function parseMessages(raw) {
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+const WELCOME = 'Hi — I\'m the FleetCo assistant. I can explain our fleet portal, pricing ($299–$599/mo), and help you request a demo or get started. What size fleet are you running?';
 
 export function createPublicMarketingConversation(guestId) {
   pruneOldConversations();
   const id = randomUUID();
-  const conversation = {
+  const ts = nowIso();
+  const messages = [{ role: 'assistant', content: WELCOME }];
+  const conversation = createEntity('MarketingConversation', {
     id,
     agent_name: 'fleetco_guide',
     guest_id: guestId,
-    messages: [{
-      role: 'assistant',
-      content: 'Hi — I\'m the FleetCo assistant. I can explain our fleet portal, pricing ($299–$599/mo), and help you request a demo or get started. What size fleet are you running?',
-    }],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-  publicConversations.set(id, conversation);
-  return conversation;
+    messages: JSON.stringify(messages),
+    created_at: ts,
+    updated_at: ts,
+    archived: false,
+  });
+  return toClientConversation(conversation);
 }
 
 export function getPublicMarketingConversation(id, guestId) {
-  const conv = publicConversations.get(id);
-  if (!conv || conv.guest_id !== guestId) return null;
-  return conv;
+  const conv = getEntity('MarketingConversation', id);
+  if (!conv || conv.guest_id !== guestId || conv.archived) return null;
+  return toClientConversation(conv);
+}
+
+function toClientConversation(stored) {
+  return {
+    id: stored.id,
+    agent_name: stored.agent_name || 'fleetco_guide',
+    guest_id: stored.guest_id,
+    messages: parseMessages(stored.messages),
+    created_at: stored.created_at,
+    updated_at: stored.updated_at,
+  };
+}
+
+export function savePublicMarketingConversation(conversation) {
+  updateEntity('MarketingConversation', conversation.id, {
+    messages: JSON.stringify(conversation.messages),
+    updated_at: conversation.updated_at || nowIso(),
+  });
 }
 
 export function appendPublicMessage(req, conversationId, content) {
@@ -73,7 +104,8 @@ export function appendPublicMessage(req, conversationId, content) {
   if (!conversation) return { error: 'Conversation not found', status: 404 };
 
   conversation.messages.push({ role: 'user', content: text });
-  conversation.updated_at = new Date().toISOString();
+  conversation.updated_at = nowIso();
+  savePublicMarketingConversation(conversation);
 
   return { conversation, guestId };
 }

@@ -17,6 +17,8 @@ export const GLOBAL_ENTITY_TYPES = new Set([
   'MarketingScheduledCall',
   'MarketingActivityLog',
   'MarketingReportRun',
+  'MarketingConversation',
+  'MarketingAutopilotRun',
   'DomainEmail',
   'UsageFeedback',
   'FuelStation',

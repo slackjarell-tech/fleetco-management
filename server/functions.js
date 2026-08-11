@@ -364,23 +364,24 @@ async function submitInquiry(body) {
   const inquiry = createEntity('Inquiry', {
     ...body,
     status: 'new',
+    lead_status: body.lead_status || 'interested',
+    source: body.source || 'contact_form',
   });
   console.log('[inquiry received]', inquiry.id, email);
 
-  let notificationEmail = { success: false, skipped: true };
+  let autopilot = { enrolled: false };
   try {
-    notificationEmail = await sendInquiryNotificationEmail(inquiry);
-    if (!notificationEmail.success) {
-      console.warn('[inquiry email not sent]', inquiry.id, notificationEmail.error || notificationEmail.reason);
-    }
+    const { onNewLead } = await import('./marketingAutopilot.js');
+    autopilot = await onNewLead(inquiry);
   } catch (err) {
-    console.error('[inquiry email failed]', inquiry.id, err.message);
+    console.error('[inquiry autopilot failed]', inquiry.id, err.message);
   }
 
   return {
     success: true,
     id: inquiry.id,
-    emailSent: !!notificationEmail.success,
+    autopilot_enrolled: !!autopilot.enrolled,
+    emailSent: !!autopilot.enrolled,
   };
 }
 

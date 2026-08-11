@@ -1,6 +1,6 @@
 import { createEntity, nowIso } from './db.js';
 import { SUBSCRIPTION_PLANS } from './roles.js';
-import { sendInquiryNotificationEmail } from './inquiryEmails.js';
+import { onNewLead } from './marketingAutopilot.js';
 import { defaultCalendarUrl } from './sltMarketing.js';
 
 export const PUBLIC_MARKETING_AGENT = 'fleetco_guide';
@@ -134,19 +134,18 @@ export async function executePublicMarketingTool(_guest, name, args) {
         captured_at: nowIso(),
       });
 
-      let emailSent = false;
+      let autopilot = { enrolled: false };
       try {
-        const notify = await sendInquiryNotificationEmail(inquiry);
-        emailSent = !!notify.success;
+        autopilot = await onNewLead(inquiry);
       } catch {
-        emailSent = false;
+        autopilot = { enrolled: false, error: 'autopilot_failed' };
       }
 
       return {
         success: true,
         inquiry_id: inquiry.id,
-        emailSent,
-        message: 'Lead saved — a FleetCo team member will follow up soon.',
+        autopilot_enrolled: !!autopilot.enrolled,
+        message: 'Lead saved — FleetCo Autopilot will send a welcome email and our team will follow up.',
       };
     }
 
