@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { HOME_IMAGES } from '@/lib/homeImages';
-import { ChevronDown, Shield, Truck, Star, ArrowRight, LogIn, Calendar } from 'lucide-react';
+import { ChevronDown, Shield, Truck, Star, ArrowRight, LogIn, Calendar, Package } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import PortalLoginForm from '@/components/auth/PortalLoginForm';
@@ -84,7 +84,7 @@ export default function HeroSection() {
             </div>
 
             {/* Trust badges */}
-            <div className="flex flex-wrap gap-6">
+            <div className="flex flex-wrap gap-6 mb-6">
               {[
                 { icon: Star, label: '5-Star Rated Service' },
                 { icon: Shield, label: 'Fully Licensed & Insured' },
@@ -96,6 +96,16 @@ export default function HeroSection() {
                 </div>
               ))}
             </div>
+
+            <button
+              type="button"
+              onClick={() => scrollTo('load-board')}
+              className="inline-flex items-center gap-2 text-sm font-bold text-amber-300 hover:text-amber-200 border border-amber-500/40 hover:border-amber-400/60 bg-amber-500/10 hover:bg-amber-500/15 px-4 py-2 rounded-lg transition-colors"
+            >
+              <Package className="w-4 h-4" />
+              Freight Brokers — Post Loads Free, 3.5% When It Moves
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Right: Client portal sign-in */}

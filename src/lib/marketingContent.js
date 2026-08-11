@@ -15,6 +15,31 @@ import {
   Clock,
 } from 'lucide-react';
 
+export const LOAD_BOARD_MARKETPLACE = {
+  headline: 'FleetCo Load Board',
+  subheadline: 'Post Freight Free. Pay Only When It Moves.',
+  description:
+    'Freight brokers, shippers, and fleet owners can post loads on the FleetCo Load Board at no cost. When a carrier books and completes the load, FleetCo charges a simple 3.5% platform fee on total load revenue — shared between the load poster and the driver.',
+  brokerPostingFee: 0,
+  platformFeePercent: 3.5,
+  feeNote:
+    'The 3.5% fee applies to total load revenue and is split between the party posting the load and the carrier (driver) who hauls it. No monthly load-board fees. No per-post charges.',
+  equipmentExamples: [
+    'Cargo Van / Sprinter',
+    'Box Truck & Liftgate',
+    'Dry Van & Reefer',
+    'Flatbed & Step Deck',
+    'Power Only',
+    'Hotshot & Car Hauler',
+  ],
+  brokerBenefits: [
+    { title: 'Free to Post', desc: 'List unlimited loads — dry van, reefer, flatbed, box truck, power only, and more.' },
+    { title: 'Built-In Equipment Matching', desc: 'Specify required equipment so carriers see loads that fit their fleet.' },
+    { title: 'One Portal', desc: 'Post loads, track status, and manage your shippers from the same FleetCo platform.' },
+    { title: 'Low Transaction Fee', desc: 'Only 3.5% when freight moves — not when you post.' },
+  ],
+};
+
 export const PLATFORM_FEATURES = [
   {
     icon: MapPin,
@@ -30,8 +55,8 @@ export const PLATFORM_FEATURES = [
   },
   {
     icon: Package,
-    title: 'Load Board',
-    desc: 'Assign loads to drivers, track pickup and delivery, and keep freight moving without spreadsheets.',
+    title: 'Load Board & Marketplace',
+    desc: 'Post loads free as a broker or shipper. Carriers book freight matched to equipment type — FleetCo takes only 3.5% when the load moves.',
     tag: 'Operations',
   },
   {
@@ -103,6 +128,10 @@ export const PLATFORM_FEATURES = [
 ];
 
 export const PRICING_FAQ = [
+  {
+    q: 'How much does it cost to post loads on the FleetCo Load Board?',
+    a: 'Posting loads is free for freight brokers and shippers. When a carrier completes a load, FleetCo charges a 3.5% platform fee on total load revenue — split between the load poster and the driver. There are no per-post or monthly load-board fees.',
+  },
   {
     q: 'What is included in every plan?',
     a: 'Full access to the FleetCo portal — fleet tracking, maintenance, drivers, fuel, compliance, reports, and the driver mobile app. Managed services (parts sourcing, repair coordination, dedicated fleet manager) scale with Growth and Enterprise.',

@@ -9,6 +9,8 @@ import LoadModal from '@/components/fleet/LoadModal';
 import WeightScaleModal from '@/components/loadboard/WeightScaleModal';
 import { isFleetCoAdmin, filterByCustomerId } from '@/lib/roles';
 import { isPureDriverUser, isDriverCapableUser } from '@/lib/driverAccess';
+import { canPostLoad, canDispatchLoad, isCustomerLoadPoster } from '@/lib/loadBoardAccess';
+import { equipmentLabel } from '@/lib/equipmentTypes';
 
 const STATUS_COLORS = {
   available: 'bg-green-100 text-green-700',
@@ -27,6 +29,7 @@ export default function LoadBoard() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [equipmentFilter, setEquipmentFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [editLoad, setEditLoad] = useState(null);
   const [scaleLoad, setScaleLoad] = useState(null);
@@ -66,11 +69,15 @@ export default function LoadBoard() {
   };
 
   const handleSave = async (data) => {
+    const payload = {
+      ...data,
+      customer_id: data.customer_id || user?.customer_id || null,
+    };
     if (editLoad) {
-      const updated = await api.entities.Load.update(editLoad.id, data);
+      const updated = await api.entities.Load.update(editLoad.id, payload);
       setLoads(prev => prev.map(l => l.id === editLoad.id ? updated : l));
     } else {
-      const created = await api.entities.Load.create(data);
+      const created = await api.entities.Load.create(payload);
       setLoads(prev => [created, ...prev]);
     }
     setShowModal(false);
@@ -83,6 +90,9 @@ export default function LoadBoard() {
   };
 
   const isAdmin = isFleetCoAdmin(user?.role) || user?.role === 'admin';
+  const canPost = canPostLoad(user);
+  const canDispatch = canDispatchLoad(user);
+  const customerPoster = isCustomerLoadPoster(user);
   const canWeigh = isAdmin || isDriverCapableUser(user);
 
   const SCALE_STATUS_STYLE = {
@@ -97,7 +107,8 @@ export default function LoadBoard() {
       l.origin?.toLowerCase().includes(search.toLowerCase()) ||
       l.destination?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || l.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchEquipment = equipmentFilter === 'all' || l.required_equipment_type === equipmentFilter;
+    return matchSearch && matchStatus && matchEquipment;
   });
 
   const getDriverName = (id) => users.find(u => u.id === id)?.full_name || '—';
@@ -110,11 +121,14 @@ export default function LoadBoard() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Load Board</h1>
-          <p className="text-slate-500 text-sm">{filtered.length} loads</p>
+          <p className="text-slate-500 text-sm">
+            {filtered.length} loads
+            {customerPoster && ' — post freight for carriers to book'}
+          </p>
         </div>
-        {isAdmin && (
+        {canPost && (
           <Button onClick={() => { setEditLoad(null); setShowModal(true); }} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold">
-            <Plus className="w-4 h-4 mr-2" /> New Load
+            <Plus className="w-4 h-4 mr-2" /> {customerPoster ? 'Post Load' : 'New Load'}
           </Button>
         )}
       </div>
@@ -124,6 +138,15 @@ export default function LoadBoard() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input placeholder="Search loads..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
         </div>
+        <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="All Equipment" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Equipment</SelectItem>
+            {['dry_van', 'reefer', 'flatbed', 'box_truck', 'power_only', 'cargo_van', 'step_deck', 'hotshot'].map((eq) => (
+              <SelectItem key={eq} value={eq}>{equipmentLabel(eq)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-44"><SelectValue placeholder="All Status" /></SelectTrigger>
           <SelectContent>
@@ -149,6 +172,11 @@ export default function LoadBoard() {
                       {load.status?.replace('_', ' ')}
                     </span>
                     {load.commodity && <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{load.commodity}</span>}
+                    {load.required_equipment_type && (
+                      <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-medium">
+                        {equipmentLabel(load.required_equipment_type)}
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-4 text-sm text-slate-600">
                     <span className="flex items-center gap-1">
@@ -178,8 +206,8 @@ export default function LoadBoard() {
                       </span>
                     )}
                     {load.broker && <span>Broker: {load.broker}</span>}
-                    {isAdmin && load.assigned_driver_id && <span>Driver: {getDriverName(load.assigned_driver_id)}</span>}
-                    {isAdmin && load.assigned_vehicle_id && <span>Unit: #{getVehicle(load.assigned_vehicle_id)}</span>}
+                    {canDispatch && load.assigned_driver_id && <span>Driver: {getDriverName(load.assigned_driver_id)}</span>}
+                    {canDispatch && load.assigned_vehicle_id && <span>Unit: #{getVehicle(load.assigned_vehicle_id)}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -195,9 +223,9 @@ export default function LoadBoard() {
                         <Scale className={`w-4 h-4 ${load.scale_status === 'pass' ? 'text-green-500' : load.scale_status === 'overweight' ? 'text-red-500' : 'text-slate-400'}`} />
                       </Button>
                     )}
-                    {isAdmin && (
+                    {(canDispatch || (canPost && load.customer_id === user?.customer_id)) && (
                       <>
-                        {load.assigned_driver_id && (
+                        {canDispatch && load.assigned_driver_id && (
                           <Button size="icon" variant="ghost" title="Notify driver" onClick={() => handleNotifyDriver(load)}>
                             <Bell className="w-4 h-4 text-blue-500" />
                           </Button>
@@ -205,9 +233,11 @@ export default function LoadBoard() {
                         <Button size="icon" variant="ghost" onClick={() => { setEditLoad(load); setShowModal(true); }}>
                           <Edit className="w-4 h-4 text-slate-500" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => handleDelete(load.id)}>
-                          <Trash2 className="w-4 h-4 text-red-400" />
-                        </Button>
+                        {(canDispatch || (customerPoster && load.status === 'available')) && (
+                          <Button size="icon" variant="ghost" onClick={() => handleDelete(load.id)}>
+                            <Trash2 className="w-4 h-4 text-red-400" />
+                          </Button>
+                        )}
                       </>
                     )}
                   </div>
@@ -238,6 +268,7 @@ export default function LoadBoard() {
           vehicles={vehicles}
           users={users}
           customers={customers}
+          currentUser={user}
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditLoad(null); }}
         />

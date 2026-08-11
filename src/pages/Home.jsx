@@ -11,6 +11,7 @@ import VideoPresentationSection from '@/components/home/VideoPresentationSection
 import TestimonialsSection from '@/components/home/TestimonialsSection';
 import DriverAppDownload from '@/components/shared/DriverAppDownload';
 import OfferModeSection from '@/components/home/OfferModeSection';
+import FreightBrokerSection from '@/components/home/FreightBrokerSection';
 import PlatformSection from '@/components/home/PlatformSection';
 import PageMeta from '@/components/home/PageMeta';
 import MarketingAiWidget from '@/components/marketing/MarketingAiWidget';
@@ -31,7 +32,10 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white font-body">
-      <PageMeta />
+      <PageMeta
+        title="Fleet Operations & Load Board for Brokers"
+        description="FleetCo Management — fleet portal for owner-operators plus a load board where freight brokers post loads free. Only 3.5% platform fee when freight moves."
+      />
       <NavBar />
       {paymentStatus?.type === 'success' && (
         <div className="bg-green-600 text-white py-4 px-4">
@@ -58,6 +62,7 @@ export default function Home() {
       )}
       <HeroSection />
       <OfferModeSection />
+      <FreightBrokerSection />
       <VideoPresentationSection />
       <PlatformSection />
       <DriverAppDownload />

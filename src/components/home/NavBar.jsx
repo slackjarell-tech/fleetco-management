@@ -5,6 +5,7 @@ import FleetcoLogo from '@/components/home/FleetcoLogo';
 
 const NAV_LINKS = [
   { label: 'Features', to: '/features' },
+  { label: 'Load Board', hash: 'load-board', onHome: true },
   { label: 'Platform Tour', hash: 'platform-tour', onHome: true },
   { label: 'Yard Management', to: '/yard-management' },
   { label: 'Driver App', to: '/driver-app' },

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { X, Search, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { filterDriverRoster } from '@/lib/driverAccess';
+import { EQUIPMENT_CATEGORIES } from '@/lib/equipmentTypes';
 
 export default function VehicleModal({ vehicle, users, customers = [], onSave, onClose }) {
   const drivers = filterDriverRoster(users);
@@ -19,6 +20,7 @@ export default function VehicleModal({ vehicle, users, customers = [], onSave, o
   const [form, setForm] = useState({
     unit_number: vehicle?.unit_number || '',
     unit_type: vehicle?.unit_type || 'truck',
+    equipment_class: vehicle?.equipment_class || '',
     make: vehicle?.make || '',
     model: vehicle?.model || '',
     year: vehicle?.year || '',
@@ -100,6 +102,17 @@ export default function VehicleModal({ vehicle, users, customers = [], onSave, o
                 <SelectContent>
                   <SelectItem value="truck">Truck (Power Unit)</SelectItem>
                   <SelectItem value="trailer">Trailer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Equipment Class *</Label>
+              <Select value={form.equipment_class} onValueChange={v => set('equipment_class', v)} required>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select equipment type" /></SelectTrigger>
+                <SelectContent>
+                  {EQUIPMENT_CATEGORIES.map((eq) => (
+                    <SelectItem key={eq.id} value={eq.id}>{eq.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
