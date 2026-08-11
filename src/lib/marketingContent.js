@@ -36,6 +36,7 @@ export const LOAD_BOARD_MARKETPLACE = {
     { title: 'Free to Post', desc: 'List unlimited loads — dry van, reefer, flatbed, box truck, power only, and more.' },
     { title: 'Built-In Equipment Matching', desc: 'Specify required equipment so carriers see loads that fit their fleet.' },
     { title: 'One Portal', desc: 'Post loads, track status, and manage your shippers from the same FleetCo platform.' },
+    { title: 'Electronic BOL', desc: 'Attach bill of lading PDFs to loads — drivers download directly from the load board.' },
     { title: 'Low Transaction Fee', desc: 'Only 3.5% when freight moves — not when you post.' },
   ],
 };
@@ -142,7 +143,7 @@ export const PRICING_FAQ = [
   },
   {
     q: 'Is there a free trial?',
-    a: 'Book a free demo first — we walk you through the portal and driver app. Paid plans start at $299/mo with no long-term contract; cancel anytime.',
+    a: 'Yes — request a 14-day guided demo sandbox at fleetcomanagement.org/start-trial. No credit card required. You can also subscribe directly from the pricing page after a live walkthrough.',
   },
   {
     q: 'Do drivers need their own login?',

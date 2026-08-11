@@ -93,6 +93,13 @@ import DriverAppPage from './pages/DriverAppPage';
 import YardManagementPage from './pages/YardManagementPage';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
+import LoadBoardMarketingPage from './pages/marketing/LoadBoardMarketingPage';
+import ForBrokersPage from './pages/marketing/ForBrokersPage';
+import ForFleetsPage from './pages/marketing/ForFleetsPage';
+import ComparePage from './pages/marketing/ComparePage';
+import StartTrialPage from './pages/marketing/StartTrialPage';
+import OwnerOperatorSoftwarePage from './pages/marketing/OwnerOperatorSoftwarePage';
+import BrokerApplications from './pages/BrokerApplications';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings } = useAuth();
@@ -191,6 +198,7 @@ const AuthenticatedApp = () => {
           <Route path="competitive-analysis" element={<CompetitiveAnalysis />} />
           <Route path="revan" element={<Revan />} />
           <Route path="slt-marketing" element={<SltMarketingHub />} />
+          <Route path="broker-applications" element={<BrokerApplications />} />
           <Route path="slt-billing" element={<SltBillingHub />} />
           <Route path="eld" element={<EldPortal />} />
           <Route path="domain-emails" element={<DomainEmails />} />
@@ -209,6 +217,12 @@ const AuthenticatedApp = () => {
       <Route path="/features" element={<FeaturesPage />} />
       <Route path="/driver-app" element={<DriverAppPage />} />
       <Route path="/yard-management" element={<YardManagementPage />} />
+      <Route path="/load-board" element={<LoadBoardMarketingPage />} />
+      <Route path="/for-brokers" element={<ForBrokersPage />} />
+      <Route path="/for-fleets" element={<ForFleetsPage />} />
+      <Route path="/compare" element={<ComparePage />} />
+      <Route path="/start-trial" element={<StartTrialPage />} />
+      <Route path="/owner-operator-software" element={<OwnerOperatorSoftwarePage />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/overview" element={<InvestorOverview />} />

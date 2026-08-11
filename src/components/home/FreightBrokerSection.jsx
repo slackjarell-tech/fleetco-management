@@ -130,7 +130,7 @@ export default function FreightBrokerSection() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
-              to="/contact"
+              to="/for-brokers"
               className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-8 py-3.5 rounded-lg transition-colors"
             >
               Request Broker Access <ArrowRight className="w-4 h-4" />

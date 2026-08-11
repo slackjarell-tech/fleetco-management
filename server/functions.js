@@ -213,6 +213,50 @@ export async function invokeFunction(name, body, user) {
       const { syncCheckoutSession } = await import('./stripeBilling.js');
       return syncCheckoutSession(body.sessionId, user);
     }
+    case 'submitBrokerApplication': {
+      const { submitBrokerApplication } = await import('./brokerApplications.js');
+      return submitBrokerApplication(body);
+    }
+    case 'listBrokerApplications': {
+      const { listBrokerApplications } = await import('./brokerApplications.js');
+      return { applications: listBrokerApplications(user) };
+    }
+    case 'updateBrokerApplicationStatus': {
+      const { updateBrokerApplicationStatus } = await import('./brokerApplications.js');
+      return updateBrokerApplicationStatus(user, body);
+    }
+    case 'submitTrialRequest': {
+      const { submitTrialRequest } = await import('./trialRequests.js');
+      return submitTrialRequest(body);
+    }
+    case 'listMarketplaceLoads': {
+      const { listMarketplaceLoads } = await import('./loadMarketplace.js');
+      return { loads: listMarketplaceLoads(user) };
+    }
+    case 'bookLoad': {
+      const { bookLoad } = await import('./loadMarketplace.js');
+      return bookLoad(user, body);
+    }
+    case 'respondToLoadBooking': {
+      const { respondToLoadBooking } = await import('./loadMarketplace.js');
+      return respondToLoadBooking(user, body);
+    }
+    case 'completeLoadWithFee': {
+      const { completeLoadWithFee } = await import('./loadMarketplace.js');
+      return completeLoadWithFee(user, body.loadId);
+    }
+    case 'exportQuickBooks': {
+      const { exportQuickBooksCsv } = await import('./quickbooksExport.js');
+      return exportQuickBooksCsv(user, body);
+    }
+    case 'getLoadFeeConnectStatus': {
+      const { getConnectConfigStatus } = await import('./stripeConnect.js');
+      return getConnectConfigStatus();
+    }
+    case 'createLoadPlatformFeeCheckout': {
+      const { createLoadPlatformFeeSession } = await import('./stripeConnect.js');
+      return createLoadPlatformFeeSession(user, body);
+    }
     default:
       throw new Error(`Unknown function: ${name}`);
   }
@@ -938,15 +982,20 @@ async function sendNotification(body) {
 
     const route = `${load.origin_city || '?'}, ${load.origin_state || ''} → ${load.destination_city || '?'}, ${load.destination_state || ''}`.trim();
     const subject = `Load ${load.load_number} — assignment update`;
+    const appUrl = process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org';
+    const bolLine = load.bol_file_url
+      ? `Bill of Lading: ${appUrl}${load.bol_file_url} (also available on the Load Board)`
+      : null;
     const text = [
       `Hi ${recipientName || 'there'},`,
       '',
       `Load ${load.load_number} has been updated.`,
       `Route: ${route}`,
       `Status: ${load.status || 'updated'}`,
+      bolLine,
       '',
-      `View in portal: ${process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org'}/portal/load-board`,
-    ].join('\n');
+      `View in portal: ${appUrl}/portal/loads`,
+    ].filter(Boolean).join('\n');
     const html = `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:640px"><p>${text.replace(/\n/g, '<br/>')}</p></div>`;
     return sendEmail({ to: recipientEmail, subject, html, text });
   }

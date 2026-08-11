@@ -8,6 +8,8 @@ import { X } from 'lucide-react';
 import { filterDriverRoster } from '@/lib/driverAccess';
 import { EQUIPMENT_CATEGORIES, EQUIPMENT_ACCESSORIES } from '@/lib/equipmentTypes';
 import { canDispatchLoad, isCustomerLoadPoster } from '@/lib/loadBoardAccess';
+import { canUploadBol } from '@/lib/loadBol';
+import LoadBolUpload from '@/components/loadboard/LoadBolUpload';
 
 const CUSTOMER_STATUSES = ['available', 'cancelled'];
 const DISPATCH_STATUSES = ['available', 'assigned', 'in_transit', 'delivered', 'cancelled'];
@@ -21,6 +23,7 @@ export default function LoadModal({ load, vehicles, users, customers = [], curre
   const drivers = filterDriverRoster(users);
   const customerPoster = isCustomerLoadPoster(currentUser);
   const showDispatch = canDispatchLoad(currentUser) && !customerPoster;
+  const showBolUpload = canUploadBol(currentUser);
 
   const customerOptions = customers.length > 0
     ? customers.map((c) => ({ id: c.id, label: c.company_name || c.contact_name }))
@@ -49,6 +52,10 @@ export default function LoadModal({ load, vehicles, users, customers = [], curre
     customer_id: load?.customer_id || currentUser?.customer_id || '',
     posting_source: load?.posting_source || (customerPoster ? 'customer' : 'internal'),
     syndication_status: load?.syndication_status || 'draft',
+    bol_file_url: load?.bol_file_url || '',
+    bol_file_name: load?.bol_file_name || '',
+    bol_uploaded_at: load?.bol_uploaded_at || '',
+    bol_uploaded_by: load?.bol_uploaded_by || '',
     notes: load?.notes || '',
   });
 
@@ -66,6 +73,14 @@ export default function LoadModal({ load, vehicles, users, customers = [], curre
     });
   };
 
+  const handleBolChange = (bolFields) => {
+    setForm((p) => ({
+      ...p,
+      ...bolFields,
+      bol_uploaded_by: bolFields.bol_file_url ? (currentUser?.email || currentUser?.id) : null,
+    }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const origin = form.origin || (form.origin_city && form.origin_state ? `${form.origin_city}, ${form.origin_state}` : '');
@@ -79,6 +94,12 @@ export default function LoadModal({ load, vehicles, users, customers = [], curre
       assigned_driver_id: showDispatch ? form.assigned_driver_id || null : load?.assigned_driver_id || null,
       assigned_vehicle_id: showDispatch ? form.assigned_vehicle_id || null : load?.assigned_vehicle_id || null,
       customer_id: form.customer_id || currentUser?.customer_id || null,
+      marketplace_visible: customerPoster || showDispatch ? form.marketplace_visible !== false : true,
+      booking_status: form.booking_status || load?.booking_status || 'open',
+      bol_file_url: form.bol_file_url || null,
+      bol_file_name: form.bol_file_name || null,
+      bol_uploaded_at: form.bol_uploaded_at || null,
+      bol_uploaded_by: form.bol_uploaded_by || null,
     });
   };
 
@@ -247,6 +268,14 @@ export default function LoadModal({ load, vehicles, users, customers = [], curre
               </>
             )}
           </div>
+          {showBolUpload && (
+            <LoadBolUpload
+              load={load}
+              bolFileUrl={form.bol_file_url}
+              bolFileName={form.bol_file_name}
+              onBolChange={handleBolChange}
+            />
+          )}
           <div>
             <Label>Notes</Label>
             <Textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} className="mt-1" rows={3} placeholder={customerPoster ? 'Special instructions, dock hours, contact info...' : ''} />

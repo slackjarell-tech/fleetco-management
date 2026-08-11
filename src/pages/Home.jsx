@@ -11,6 +11,7 @@ import VideoPresentationSection from '@/components/home/VideoPresentationSection
 import TestimonialsSection from '@/components/home/TestimonialsSection';
 import DriverAppDownload from '@/components/shared/DriverAppDownload';
 import OfferModeSection from '@/components/home/OfferModeSection';
+import FunnelSection from '@/components/home/FunnelSection';
 import FreightBrokerSection from '@/components/home/FreightBrokerSection';
 import PlatformSection from '@/components/home/PlatformSection';
 import PageMeta from '@/components/home/PageMeta';
@@ -61,6 +62,7 @@ export default function Home() {
         </div>
       )}
       <HeroSection />
+      <FunnelSection />
       <OfferModeSection />
       <FreightBrokerSection />
       <VideoPresentationSection />

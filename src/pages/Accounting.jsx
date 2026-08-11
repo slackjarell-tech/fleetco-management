@@ -411,6 +411,18 @@ export default function Accounting() {
             Fleet managers / HR / owners approve, accounting issues the PO, then receive parts into inventory.
             Payroll runs batch draft entries with automatic W-2 tax withholding estimates.
           </div>
+          <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={async () => {
+              const res = await api.functions.invoke('exportQuickBooks', {});
+              const blob = new Blob([res.content], { type: 'text/csv' });
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(blob);
+              a.download = res.filename || 'quickbooks-export.csv';
+              a.click();
+            }}>
+              <Download className="w-3.5 h-3.5" /> Export QuickBooks CSV
+            </Button>
+          </div>
         </div>
       )}
 

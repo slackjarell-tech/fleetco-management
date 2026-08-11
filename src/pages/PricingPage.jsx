@@ -4,6 +4,7 @@ import FooterSection from '@/components/home/FooterSection';
 import PageMeta from '@/components/home/PageMeta';
 import PricingSection from '@/components/home/PricingSection';
 import PricingFaq from '@/components/home/PricingFaq';
+import PricingRoiCalculator from '@/components/home/PricingRoiCalculator';
 import MarketingAiWidget from '@/components/marketing/MarketingAiWidget';
 import { Link } from 'react-router-dom';
 
@@ -29,6 +30,11 @@ export default function PricingPage() {
         </div>
       </section>
       <PricingSection />
+      <section className="py-12 bg-slate-50">
+        <div className="max-w-xl mx-auto px-4">
+          <PricingRoiCalculator />
+        </div>
+      </section>
       <PricingFaq />
       <FooterSection />
       <MarketingAiWidget />

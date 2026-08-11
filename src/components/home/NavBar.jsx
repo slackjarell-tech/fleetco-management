@@ -4,8 +4,11 @@ import { Link, useLocation } from 'react-router-dom';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
 
 const NAV_LINKS = [
+  { label: 'For Fleets', to: '/for-fleets' },
+  { label: 'Load Board', to: '/load-board' },
+  { label: 'For Brokers', to: '/for-brokers' },
   { label: 'Features', to: '/features' },
-  { label: 'Load Board', hash: 'load-board', onHome: true },
+  { label: 'Compare', to: '/compare' },
   { label: 'Platform Tour', hash: 'platform-tour', onHome: true },
   { label: 'Yard Management', to: '/yard-management' },
   { label: 'Driver App', to: '/driver-app' },

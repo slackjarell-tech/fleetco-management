@@ -5,7 +5,8 @@ import PageMeta from '@/components/home/PageMeta';
 import DriverAppDownload from '@/components/shared/DriverAppDownload';
 import MarketingAiWidget from '@/components/marketing/MarketingAiWidget';
 import { Link } from 'react-router-dom';
-import { Smartphone, Clock, Camera, Route, Fuel, MessageSquare, ArrowRight } from 'lucide-react';
+import { Smartphone, Clock, Camera, Route, Fuel, MessageSquare, ArrowRight, AlertCircle } from 'lucide-react';
+import { ELD_DISCLAIMER } from '@/lib/marketing/compareData';
 import { BRAND } from '@/lib/brand';
 
 const DRIVER_FEATURES = [
@@ -74,6 +75,13 @@ export default function DriverAppPage() {
               <p className="text-slate-600 text-sm">{desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="py-8 bg-amber-50 border-y border-amber-100">
+        <div className="max-w-3xl mx-auto px-4 flex gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-900"><strong>ELD note:</strong> {ELD_DISCLAIMER}</p>
         </div>
       </section>
 

@@ -675,6 +675,7 @@ const ENTITY_NAMES = [
   'MarketingSocialPost', 'MarketingScheduledCall', 'MarketingActivityLog', 'MarketingReportRun',
   'CustomerFundingAccount', 'PayeeBankAccount', 'PayrollDisbursement', 'PayrollDisbursementBatch',
   'EmployeeTaxProfile',
+  'BrokerApplication', 'TrialRequest',
 ];
 
 function filterUsersForActor(actor, users) {
