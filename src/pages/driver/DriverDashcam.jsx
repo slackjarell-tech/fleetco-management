@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '@/api/apiClient';
-import { takePhoto, getCurrentPosition } from '@/lib/nativeBridge';
+import { useDriverDevice } from '@/components/mobile/DriverDeviceProvider';
 import {
   Video, Camera, ChevronDown, ChevronUp, Battery, MapPin, AlertTriangle,
   Square, Play, Image as ImageIcon, Mic, Wind,
@@ -9,6 +9,7 @@ import {
 
 const MODES = [
   { id: 'view_ahead', label: 'View Ahead', desc: 'Dashcam time-lapse (photo every few seconds)' },
+  { id: 'dual_monitoring', label: 'Road + Driver (Dual ELD)', desc: 'Road view + in-cabin driver camera at the same time — fleet can check distraction', fleetOption: true },
   { id: 'cabin', label: 'In-Cabin', desc: 'Driver/passenger vlog & reactions' },
   { id: 'broll', label: 'B-Roll', desc: 'Manual clips at stops (scenic, fuel, etc.)' },
 ];
@@ -46,35 +47,106 @@ const SETUP_GUIDES = {
       'For hours-long continuous recording, a dedicated action cam (GoPro) avoids phone overheating.',
     ],
   },
+  dual_monitoring: {
+    title: 'Dual ELD — Road + Driver Monitoring',
+    tips: [
+      'Mount the phone so the rear camera sees the road (dash/windshield mount).',
+      'Angle the front camera toward the driver — sun visor or headrest mount works.',
+      'Your fleet enabled this so managers can review road view and driver focus together.',
+      'Keep the phone plugged in — dual cameras use more battery.',
+      'Some iPhones only support one live camera; road view is always captured, cabin when supported.',
+    ],
+  },
 };
 
 export default function DriverDashcam() {
   const { user } = useOutletContext();
+  const {
+    captureEldFrame,
+    captureDualEldFrames,
+    position,
+    cameraActive,
+    dualCameraEnabled,
+    dualCameraActive,
+    dualCameraSupported,
+    bindRoadPreview,
+    bindCabinPreview,
+    refreshPosition,
+  } = useDriverDevice();
+  const roadPreviewRef = useRef(null);
+  const cabinPreviewRef = useRef(null);
   const [mode, setMode] = useState('view_ahead');
   const [intervalSec, setIntervalSec] = useState(5);
   const [session, setSession] = useState(null);
   const [recording, setRecording] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
   const [lastPreview, setLastPreview] = useState(null);
+  const [lastCabinPreview, setLastCabinPreview] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [capturing, setCapturing] = useState(false);
+  const [pendingFrames, setPendingFrames] = useState(0);
   const [guideOpen, setGuideOpen] = useState(true);
   const timerRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const { getOfflineQueueCounts } = await import('@/lib/offline/offlineSync');
+        const c = await getOfflineQueueCounts();
+        if (!cancelled) setPendingFrames((c.dashcam || 0) + (c.uploads || 0));
+      } catch { /* ignore */ }
+    };
+    refresh();
+    const t = setInterval(refresh, 5000);
+    const onSync = () => refresh();
+    window.addEventListener('fleetco:offline-sync-complete', onSync);
+    return () => { cancelled = true; clearInterval(t); window.removeEventListener('fleetco:offline-sync-complete', onSync); };
+  }, []);
+
+  const isDualMode = mode === 'dual_monitoring';
+  const isTimelapse = mode === 'view_ahead' || isDualMode;
 
   const captureFrame = async (activeSession) => {
     if (!activeSession) return;
     setCapturing(true);
     try {
-      const { file, previewUrl } = await takePhoto();
-      setLastPreview(previewUrl);
-      const upload = await api.integrations.Core.UploadFile({ file });
+      let roadFile;
+      let cabinFile = null;
+      let roadPreview;
+      let cabinPreview = null;
+
+      if (isDualMode) {
+        const { road, cabin } = await captureDualEldFrames();
+        roadFile = road.file;
+        roadPreview = road.previewUrl;
+        if (cabin) {
+          cabinFile = cabin.file;
+          cabinPreview = cabin.previewUrl;
+        }
+      } else {
+        const shot = await captureEldFrame();
+        roadFile = shot.file;
+        roadPreview = shot.previewUrl;
+      }
+
+      setLastPreview(roadPreview);
+      setLastCabinPreview(cabinPreview);
+
+      const upload = await api.integrations.Core.UploadFile({ file: roadFile });
+      let cabinImageUrl;
+      if (cabinFile) {
+        const cabinUpload = await api.integrations.Core.UploadFile({ file: cabinFile });
+        cabinImageUrl = cabinUpload.file_url;
+      }
+
       let lat = null;
       let lng = null;
       let heading = 0;
       let speed = 0;
       try {
-        const pos = await getCurrentPosition();
+        const pos = position || await refreshPosition();
         lat = pos.lat;
         lng = pos.lng;
         heading = pos.heading;
@@ -84,6 +156,7 @@ export default function DriverDashcam() {
       const result = await api.functions.invoke('captureDashcamFrame', {
         sessionId: activeSession.id,
         imageUrl: upload.file_url,
+        cabinImageUrl,
         lat,
         lng,
         heading,
@@ -103,7 +176,7 @@ export default function DriverDashcam() {
     try {
       const result = await api.functions.invoke('startDashcamSession', {
         mode,
-        intervalSec: mode === 'view_ahead' ? intervalSec : 0,
+        intervalSec: isTimelapse ? intervalSec : 0,
         mountNotes: SETUP_GUIDES[mode].title,
       });
       setSession(result.session);
@@ -111,7 +184,7 @@ export default function DriverDashcam() {
       setFrameCount(0);
       setMessage(result.message);
 
-      if (mode === 'view_ahead') {
+      if (isTimelapse) {
         timerRef.current = setInterval(() => captureFrame(result.session), intervalSec * 1000);
         captureFrame(result.session);
       }
@@ -140,7 +213,15 @@ export default function DriverDashcam() {
     if (timerRef.current) clearInterval(timerRef.current);
   }, []);
 
-  const guide = SETUP_GUIDES[mode];
+  useEffect(() => {
+    if (recording && cameraActive) {
+      if (roadPreviewRef.current) bindRoadPreview(roadPreviewRef.current);
+      if (isDualMode && cabinPreviewRef.current) bindCabinPreview(cabinPreviewRef.current);
+    }
+  }, [recording, cameraActive, isDualMode, bindRoadPreview, bindCabinPreview]);
+
+  const availableModes = MODES.filter((m) => !m.fleetOption || dualCameraEnabled);
+  const guide = SETUP_GUIDES[mode] || SETUP_GUIDES.view_ahead;
 
   return (
     <div className="p-4 space-y-4 pb-8">
@@ -186,7 +267,7 @@ export default function DriverDashcam() {
           <div>
             <label className="text-xs font-bold text-slate-500 uppercase">Recording mode</label>
             <div className="grid gap-2 mt-2">
-              {MODES.map((m) => (
+              {availableModes.map((m) => (
                 <button
                   key={m.id}
                   type="button"
@@ -200,7 +281,7 @@ export default function DriverDashcam() {
             </div>
           </div>
 
-          {mode === 'view_ahead' && (
+          {isTimelapse && (
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase">Time-lapse interval</label>
               <div className="flex flex-wrap gap-2 mt-2">
@@ -226,30 +307,92 @@ export default function DriverDashcam() {
             </div>
           )}
 
+          {isDualMode && !dualCameraSupported && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
+              This device may only support one live camera at a time (common on iPhone). Road view will always record; driver view captures when supported.
+            </div>
+          )}
+
           <button
             type="button"
             onClick={startRecording}
             className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-bold py-3.5 rounded-xl"
           >
-            <Play className="w-5 h-5" /> Start {mode === 'view_ahead' ? 'Time-Lapse' : 'Session'}
+            <Play className="w-5 h-5" /> Start {isTimelapse ? 'Time-Lapse' : 'Session'}
           </button>
         </>
       )}
 
       {recording && (
         <div className="space-y-4">
+          {cameraActive && (
+            <div className={`grid gap-2 ${isDualMode ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              <div className="rounded-xl overflow-hidden border border-slate-200 bg-black">
+                <video
+                  ref={roadPreviewRef}
+                  className="w-full h-36 object-cover"
+                  playsInline
+                  muted
+                  aria-label="Live road camera"
+                />
+                <div className="px-2 py-1.5 bg-slate-900 text-[10px] text-slate-300 font-bold">ROAD</div>
+              </div>
+              {isDualMode && (
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-black">
+                  <video
+                    ref={cabinPreviewRef}
+                    className="w-full h-36 object-cover"
+                    playsInline
+                    muted
+                    aria-label="Live driver camera"
+                  />
+                  <div className="px-2 py-1.5 bg-slate-900 text-[10px] text-slate-300 font-bold">
+                    DRIVER {dualCameraActive ? '' : '(limited)'}
+                  </div>
+                </div>
+              )}
+              <div className={`px-3 py-2 bg-slate-900 text-xs text-slate-300 flex items-center justify-between ${isDualMode ? 'col-span-2' : ''}`}>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" /> ELD {isDualMode ? 'dual' : ''} camera live
+                </span>
+                {position && (
+                  <span className="flex items-center gap-1 text-slate-400">
+                    <MapPin className="w-3 h-3" /> GPS ±{Math.round(position.accuracy || 0)}m
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="bg-red-600 text-white rounded-xl p-4 flex items-center gap-3">
             <span className="w-3 h-3 bg-white rounded-full animate-pulse" />
             <div className="flex-1">
               <div className="font-black text-sm">REC — {MODES.find((m) => m.id === mode)?.label}</div>
               <div className="text-xs text-red-100">{frameCount} frame{frameCount !== 1 ? 's' : ''} captured</div>
             </div>
-            {mode === 'view_ahead' && (
+            {isTimelapse && (
               <span className="text-xs font-bold bg-red-800 px-2 py-1 rounded">every {intervalSec}s</span>
             )}
           </div>
 
-          {lastPreview && (
+          {(lastPreview || lastCabinPreview) && (
+            <div className={`grid gap-2 ${lastCabinPreview ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              {lastPreview && (
+                <div className="rounded-xl overflow-hidden border border-slate-200">
+                  <img src={lastPreview} alt="Last road frame" className="w-full h-32 object-cover" />
+                  <div className="px-2 py-1.5 bg-slate-50 text-[10px] text-slate-500">Road · synced</div>
+                </div>
+              )}
+              {lastCabinPreview && (
+                <div className="rounded-xl overflow-hidden border border-slate-200">
+                  <img src={lastCabinPreview} alt="Last driver frame" className="w-full h-32 object-cover" />
+                  <div className="px-2 py-1.5 bg-slate-50 text-[10px] text-slate-500">Driver · synced</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {lastPreview && !lastCabinPreview && !isDualMode && (
             <div className="rounded-xl overflow-hidden border border-slate-200">
               <img src={lastPreview} alt="Last frame" className="w-full h-40 object-cover" />
               <div className="px-3 py-2 bg-slate-50 text-xs text-slate-500 flex items-center gap-1">
@@ -258,7 +401,7 @@ export default function DriverDashcam() {
             </div>
           )}
 
-          {(mode === 'cabin' || mode === 'broll') && (
+          {!isTimelapse && (
             <button
               type="button"
               disabled={capturing}
@@ -276,6 +419,12 @@ export default function DriverDashcam() {
           >
             <Square className="w-4 h-4" /> Stop & Save Session
           </button>
+        </div>
+      )}
+
+      {pendingFrames > 0 && (
+        <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2">
+          {pendingFrames} dashcam upload(s) queued — will sync when online
         </div>
       )}
 

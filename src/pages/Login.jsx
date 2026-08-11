@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import AuthLayout from "@/components/AuthLayout";
 import PortalLoginForm from "@/components/auth/PortalLoginForm";
 import DriverAppDownload from "@/components/shared/DriverAppDownload";
+import DriverAppBranding from "@/components/mobile/DriverAppBranding";
 
 export default function Login() {
   const [searchParams] = useSearchParams();
@@ -26,9 +27,14 @@ export default function Login() {
           </>
         ) : (
           <>
-            Don't have an account?{" "}
-            <Link to="/register" className="text-amber-400 font-semibold hover:underline">
-              Contact your fleet administrator
+            Fleet broker?{' '}
+            <Link to="/broker-signup" className="text-amber-400 font-semibold hover:underline">
+              Create a free load board account
+            </Link>
+            {' · '}
+            Fleet customer?{' '}
+            <Link to="/pricing" className="text-slate-400 hover:text-amber-300">
+              See subscription plans
             </Link>
           </>
         )
@@ -50,6 +56,7 @@ export default function Login() {
           ? "Install the app above, then sign in with the credentials from your fleet administrator."
           : "First time signing in? Use the temporary password from your welcome email, then you'll be prompted to choose a new password."}
       </p>
+      {isDriverLogin && <DriverAppBranding variant="login" />}
     </AuthLayout>
   );
 }

@@ -12,6 +12,37 @@ The **FleetCo Driver** app uses the same backend as [fleetcomanagement.org](http
 | Delivery route & POD | Route tab | Route Dashboard, PD Command |
 | Loads, HOS, Fuel, Messages | More menu | Same modules |
 
+## Test on your PC (phone-sized window)
+
+Fastest way to exercise the driver UI without a physical phone or Play Store install:
+
+```powershell
+npm run driver:preview
+```
+
+On first login, drivers see an **Allow Camera & Location** screen (same as the native app). Both permissions are required before the ELD dashcam and fleet GPS features activate.
+
+Then sign in: **driver1@fleetco.com** / **demo123**, press **F12** → device toolbar → **iPhone 14 Pro**.
+
+Seed drivers only (dev server already running):
+
+```bash
+npm run seed:local-drivers
+```
+
+### Full native Android app on PC (emulator)
+
+For Capacitor camera/GPS/permissions (closer to the real Play Store app):
+
+```powershell
+npm run driver:android-emulator   # one-time: SDK + Pixel 7 AVD (~2 GB download)
+emulator -avd FleetCo_Phone         # start emulator, wait for home screen
+npm run dev:server                  # local API on :3001 (separate terminal)
+npm run driver:android-debug        # builds debug APK + installs on emulator
+```
+
+The debug build uses `.env.mobile.local` with `VITE_API_BASE=http://10.0.2.2:3001` so the emulator reaches your PC’s API.
+
 ## Try on mobile browser (no app store yet)
 
 1. Open **https://fleetcomanagement.org/login?app=driver**
@@ -58,7 +89,9 @@ npm run cap:open:ios
 - **App name:** FleetCo Driver
 - **Bundle ID:** `org.fleetcomanagement.driver`
 - **Category:** Business / Productivity
-- **Description:** Fleet management for drivers — clock in, share live location, scan barcodes, complete routes, HOS, and inspections. Syncs with FleetCo Management portal.
+- **Short description (Play Store, 80 chars):** Clock in, share live GPS, complete routes & scans. Syncs to FleetCo portal.
+- **Full description:** Copy-paste ready text in [scripts/play-store-listing.txt](scripts/play-store-listing.txt) and [marketing/play-store-listing.txt](marketing/play-store-listing.txt).
+- **App access (Play Console):** See [scripts/play-console-app-access.txt](scripts/play-console-app-access.txt) for copy-paste reviewer instructions and credentials.
 
 ### Permissions (required for review)
 
@@ -67,6 +100,29 @@ npm run cap:open:ios
 | Location (always while clocked in) | Live fleet map for dispatch |
 | Camera | POD photos, inspections, clock-in verification |
 | Cellular data | Works on the road without Wi‑Fi |
+
+## Google Play Review Credentials
+
+**Two different logins — do not mix them up:**
+
+| Purpose | Account | Password | Where to use |
+|---------|---------|----------|--------------|
+| **Play Console sign-in** (developer) | `jarell.slack@fleetcomanagement.org` | *(your Google password)* | [Google Play Console](https://play.google.com/console) only |
+| **In-app / reviewer test** (executive portal) | `admin@fleetco.com` | `admin123` | https://fleetcomanagement.org/login |
+| **In-app / reviewer test** (driver app) | `driver1@fleetco.com` | `demo123` | https://fleetcomanagement.org/login?app=driver or in-app webview |
+
+- **Play Console** uses your Google account (`jarell.slack@fleetcomanagement.org`) — this is *not* an in-app login.
+- **Google Play reviewers** use the in-app credentials above. They never use the Play Console Google account inside the app.
+- For **App access** (Policy → App content → App access), paste the copy-ready text from [`scripts/play-console-app-access.txt`](scripts/play-console-app-access.txt).
+
+### Reviewer walkthrough
+
+1. Install **FleetCo Driver** from the Play review track.
+2. Open the app — the sign-in screen loads via webview.
+3. Sign in with **driver1@fleetco.com** / **demo123** (driver features: Time Clock, Route, Scan, HOS).
+4. Optionally open **https://fleetcomanagement.org/login** in a browser with **admin@fleetco.com** / **admin123** to view the executive portal (Fleet Map, Route Dashboard, Driver Scans).
+
+Demo driver accounts are seeded in production via `node scripts/seed-demo-drivers.mjs`. Do **not** change the admin password for review — reviewers rely on the documented demo credentials.
 
 ## Architecture
 

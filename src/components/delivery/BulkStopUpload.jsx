@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Upload, Download, X, CheckCircle2, AlertTriangle, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-const CSV_HEADERS = ['recipient_name', 'recipient_phone', 'address', 'city', 'state', 'zip', 'package_description', 'notes'];
+const CSV_HEADERS = ['tracking_number', 'recipient_name', 'recipient_phone', 'address', 'city', 'state', 'zip', 'package_description', 'notes'];
 
 function parseCSV(text) {
   const lines = text.trim().split('\n').filter(l => l.trim());
@@ -34,7 +34,7 @@ function parseCSV(text) {
 
 function downloadTemplate() {
   const header = CSV_HEADERS.join(',');
-  const example = 'John Smith,555-123-4567,123 Main St,Dallas,TX,75201,2 boxes electronics,Gate code: 1234\nJane Doe,555-987-6543,456 Oak Ave,Plano,TX,75023,1 pallet,Leave at door';
+  const example = 'PKG10001,John Smith,555-123-4567,123 Main St,Dallas,TX,75201,2 boxes electronics,Gate code: 1234\nPKG10002,Jane Doe,555-987-6543,456 Oak Ave,Plano,TX,75023,1 pallet,Leave at door';
   const blob = new Blob([header + '\n' + example], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

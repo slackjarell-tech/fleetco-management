@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import RouteCard from '@/components/delivery/RouteCard';
 import RouteModal from '@/components/delivery/RouteModal';
 import RouteStopsPanel from '@/components/delivery/RouteStopsPanel';
+import DeliveryFleetSettings from '@/components/delivery/DeliveryFleetSettings';
+import BulkManifestImport from '@/components/delivery/BulkManifestImport';
 
 const STATUS_COLORS = {
   pending: 'bg-slate-100 text-slate-600',
@@ -24,6 +26,7 @@ export default function PDCommandTower() {
   const [showModal, setShowModal] = useState(false);
   const [editRoute, setEditRoute] = useState(null);
   const [viewRoute, setViewRoute] = useState(null);
+  const [showManifestImport, setShowManifestImport] = useState(false);
   const [filterDate, setFilterDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   const load = async () => {
@@ -106,11 +109,16 @@ export default function PDCommandTower() {
               <ListOrdered className="w-4 h-4 mr-1" /> Route Builder
             </Button>
           </Link>
+          <Button onClick={() => setShowManifestImport(true)} variant="outline">
+            <Plus className="w-4 h-4 mr-1" /> Import Manifest
+          </Button>
           <Button onClick={() => { setEditRoute(null); setShowModal(true); }} variant="outline">
             <Plus className="w-4 h-4 mr-1" /> Quick Route
           </Button>
         </div>
       </div>
+
+      <DeliveryFleetSettings user={user} />
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -171,6 +179,14 @@ export default function PDCommandTower() {
           driver={getDriver(viewRoute.driver_id)}
           onClose={() => { setViewRoute(null); load(); }}
           onStopsChanged={load}
+        />
+      )}
+
+      {showManifestImport && (
+        <BulkManifestImport
+          routeDate={filterDate}
+          onImported={() => { setShowManifestImport(false); load(); }}
+          onClose={() => setShowManifestImport(false)}
         />
       )}
     </div>

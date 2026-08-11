@@ -54,6 +54,7 @@ import { getEmailConfigStatus, sendEmail as sendEmailDirect } from './email.js';
 import { vehiclePartsLookup, accessorySerialLookup } from './vehiclePartsLookup.js';
 import { isDriverCapableUser, ensureDriverNumber } from './driverAccess.js';
 import { stampCustomerNumber } from './entityNumbers.js';
+import { isBrokerAccount } from './brokerAccounts.js';
 
 const SIM_ROUTES = [
   { name: 'I-80 Westbound', id: 'sim_driver_01', userName: '👤 Mike R. (Sim)', steps: [
@@ -111,6 +112,38 @@ export async function invokeFunction(name, body, user) {
       return recordCustomerPayment(body, user);
     case 'setCustomerPause':
       return setCustomerPause(body, user);
+    case 'parseDeliveryBarcode': {
+      const { parseDeliveryBarcodeHandler } = await import('./deliveryRouting.js');
+      return parseDeliveryBarcodeHandler(body, user);
+    }
+    case 'addDeliveryStopFromScan': {
+      const { addDeliveryStopFromScan } = await import('./deliveryRouting.js');
+      return addDeliveryStopFromScan(body, user);
+    }
+    case 'scanDeliveryPackage': {
+      const { scanDeliveryPackage } = await import('./deliveryRouting.js');
+      return scanDeliveryPackage(body, user);
+    }
+    case 'optimizeDeliveryRoute': {
+      const { optimizeDeliveryRoute } = await import('./deliveryRouting.js');
+      return optimizeDeliveryRoute(body, user);
+    }
+    case 'updateCustomerDeliverySettings': {
+      const { updateCustomerDeliverySettings } = await import('./deliveryRouting.js');
+      return updateCustomerDeliverySettings(body, user);
+    }
+    case 'getCustomerDeliverySettings': {
+      const { getCustomerDeliverySettingsHandler } = await import('./deliveryRouting.js');
+      return getCustomerDeliverySettingsHandler(body, user);
+    }
+    case 'geocodeDeliveryRoute': {
+      const { geocodeDeliveryRoute } = await import('./deliveryRouting.js');
+      return geocodeDeliveryRoute(body, user);
+    }
+    case 'importDeliveryManifest': {
+      const { importDeliveryManifest } = await import('./deliveryRouting.js');
+      return importDeliveryManifest(body, user);
+    }
     case 'startDashcamSession':
       return startDashcamSession(body, user);
     case 'captureDashcamFrame':
@@ -256,6 +289,27 @@ export async function invokeFunction(name, body, user) {
     case 'createLoadPlatformFeeCheckout': {
       const { createLoadPlatformFeeSession } = await import('./stripeConnect.js');
       return createLoadPlatformFeeSession(user, body);
+    }
+    case 'getExecutiveLoadMarketplace': {
+      const { getExecutiveLoadMarketplace } = await import('./loadMarketplaceExecutive.js');
+      return getExecutiveLoadMarketplace(user);
+    }
+    case 'listLoadMessages': {
+      const { listLoadMessages } = await import('./loadMarketplaceExecutive.js');
+      return listLoadMessages(user, body);
+    }
+    case 'postLoadMessage': {
+      const { postLoadMessage } = await import('./loadMarketplaceExecutive.js');
+      return postLoadMessage(user, body);
+    }
+    case 'acknowledgeLoadBoardFee': {
+      const { acknowledgeLoadBoardFee } = await import('./loadBoardFeeAcknowledgment.js');
+      requireLoadBoardFeeAcknowledgment(body);
+      return acknowledgeLoadBoardFee(user, { source: body.source || 'portal' });
+    }
+    case 'getLoadBoardFeeAcknowledgment': {
+      const { hasLoadBoardFeeAcknowledgment } = await import('./loadBoardFeeAcknowledgment.js');
+      return { acknowledged: hasLoadBoardFeeAcknowledgment(user) };
     }
     default:
       throw new Error(`Unknown function: ${name}`);
@@ -1076,6 +1130,7 @@ function customersForUser(user) {
 }
 
 function buildAlertRow(customer) {
+  if (isBrokerAccount(customer)) return null;
   const billing = getBillingSnapshot(customer);
   if (!billing || billing.status === 'current') return null;
   return {
@@ -1282,7 +1337,7 @@ function setCustomerPause(body, user) {
   };
 }
 
-const DASHCAM_MODES = ['view_ahead', 'cabin', 'broll'];
+const DASHCAM_MODES = ['view_ahead', 'cabin', 'broll', 'dual_monitoring'];
 const DASHCAM_INTERVALS = [3, 5, 10, 15];
 
 function assertDriver(user) {
@@ -1295,11 +1350,18 @@ function startDashcamSession(body, user) {
 
   const { mode = 'view_ahead', intervalSec = 5, mountNotes = '', vehicleId = '' } = body;
   if (!DASHCAM_MODES.includes(mode)) {
-    throw new Error('mode must be view_ahead, cabin, or broll');
+    throw new Error('mode must be view_ahead, cabin, broll, or dual_monitoring');
   }
   const interval = Number(intervalSec);
-  if (!DASHCAM_INTERVALS.includes(interval) && mode === 'view_ahead') {
+  if (!DASHCAM_INTERVALS.includes(interval) && (mode === 'view_ahead' || mode === 'dual_monitoring')) {
     throw new Error('intervalSec must be 3, 5, 10, or 15 for time-lapse');
+  }
+
+  if (mode === 'dual_monitoring') {
+    const customer = user.customer_id ? getEntity('Customer', user.customer_id) : null;
+    if (!customer?.driver_dual_camera_enabled) {
+      throw new Error('Dual camera monitoring is not enabled for your fleet — ask your fleet manager to turn it on in Driver Media.');
+    }
   }
 
   const active = filterEntities('DashcamSession', { driver_id: user.id, status: 'recording' }, null, 1)[0];
@@ -1313,7 +1375,7 @@ function startDashcamSession(body, user) {
     driver_name: user.full_name || user.email,
     customer_id: user.customer_id || '',
     mode,
-    interval_sec: mode === 'view_ahead' ? interval : 0,
+    interval_sec: (mode === 'view_ahead' || mode === 'dual_monitoring') ? interval : 0,
     mount_notes: mountNotes,
     vehicle_id: vehicleId,
     status: 'recording',
@@ -1328,14 +1390,16 @@ function startDashcamSession(body, user) {
     session,
     message: mode === 'view_ahead'
       ? `View-ahead time-lapse started — 1 frame every ${interval}s (photos only, saves memory).`
-      : `${mode.replace('_', ' ')} capture session started.`,
+      : mode === 'dual_monitoring'
+        ? `Dual ELD monitoring started — road + driver view every ${interval}s. Your fleet office can review both feeds.`
+        : `${mode.replace('_', ' ')} capture session started.`,
   };
 }
 
 function captureDashcamFrame(body, user) {
   assertDriver(user);
 
-  const { sessionId, imageUrl, lat, lng, heading, speed } = body;
+  const { sessionId, imageUrl, cabinImageUrl, lat, lng, heading, speed } = body;
   if (!sessionId || !imageUrl) throw new Error('sessionId and imageUrl are required');
 
   const session = getEntity('DashcamSession', sessionId);
@@ -1344,23 +1408,40 @@ function captureDashcamFrame(body, user) {
   if (session.status !== 'recording') throw new Error('Session is not actively recording');
 
   const frameIndex = (session.frame_count || 0) + 1;
-  const frame = createEntity('DashcamFrame', {
+  const ts = nowIso();
+  const base = {
     session_id: sessionId,
     driver_id: user.id,
     customer_id: user.customer_id || '',
     frame_index: frameIndex,
-    image_url: imageUrl,
     lat: lat ?? null,
     lng: lng ?? null,
     heading: heading ?? 0,
     speed: speed ?? 0,
-    captured_at: nowIso(),
+    captured_at: ts,
     mode: session.mode,
+  };
+
+  const roadFrame = createEntity('DashcamFrame', {
+    ...base,
+    image_url: imageUrl,
+    camera_facing: 'road',
   });
+
+  let cabinFrame = null;
+  if (cabinImageUrl) {
+    cabinFrame = createEntity('DashcamFrame', {
+      ...base,
+      image_url: cabinImageUrl,
+      camera_facing: 'cabin',
+      pair_frame_id: roadFrame.id,
+    });
+    updateEntity('DashcamFrame', roadFrame.id, { pair_frame_id: cabinFrame.id });
+  }
 
   updateEntity('DashcamSession', sessionId, { frame_count: frameIndex });
 
-  return { success: true, frame, frameIndex };
+  return { success: true, frame: roadFrame, cabinFrame, frameIndex };
 }
 
 function stopDashcamSession(body, user) {

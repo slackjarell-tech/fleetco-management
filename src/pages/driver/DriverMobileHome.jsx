@@ -6,13 +6,26 @@ import DriverDashboard from '@/components/dashboard/DriverDashboard';
 export default function DriverMobileHome() {
   const { user } = useOutletContext();
   const [data, setData] = useState(null);
+  const [delivery, setDelivery] = useState(null);
 
   useEffect(() => {
     if (!user) return;
+    const today = new Date().toISOString().split('T')[0];
+
     Promise.all([
       api.entities.Load.filter({ assigned_driver_id: user.id }),
       api.entities.FuelLog.filter({ driver_id: user.id }),
-    ]).then(([loads, fuel]) => {
+      api.entities.DeliveryRoute.filter({ driver_id: user.id }),
+    ]).then(async ([loads, fuel, routes]) => {
+      const todayRoute = routes.find((r) => r.route_date === today && r.status !== 'cancelled');
+      let deliveryInfo = null;
+      if (todayRoute) {
+        const stops = await api.entities.DeliveryStop.filter({ route_id: todayRoute.id });
+        const sorted = stops.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+        const pendingStops = sorted.filter((s) => !['delivered', 'failed'].includes(s.status)).length;
+        deliveryInfo = { route: todayRoute, stops: sorted, pendingStops };
+      }
+      setDelivery(deliveryInfo);
       setData({ loads, fuel, invoices: [], vehicles: [], workOrders: [], customers: [] });
     });
   }, [user?.id]);
@@ -25,5 +38,5 @@ export default function DriverMobileHome() {
     );
   }
 
-  return <DriverDashboard user={user} data={data} />;
+  return <DriverDashboard user={user} data={data} delivery={delivery} />;
 }

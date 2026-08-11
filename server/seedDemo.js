@@ -453,7 +453,7 @@ function seedGapDemoEntities() {
 
   if (entityCount('DeliveryRoute') === 0) {
     const route = createEntity('DeliveryRoute', {
-      name: 'Dallas Metro — Demo Route A',
+      route_name: 'Dallas Metro — Demo Route A',
       route_date: dateOnly(0),
       status: 'in_progress',
       driver_id: driver?.id,
@@ -464,9 +464,9 @@ function seedGapDemoEntities() {
     });
     if (entityCount('DeliveryStop') === 0) {
       [
-        { stop_number: 1, recipient_name: 'ABC Warehouse', address: '1200 Commerce St', city: 'Dallas', state: 'TX', zip: '75201', status: 'delivered', phone: '(214) 555-0101' },
-        { stop_number: 2, recipient_name: 'Metro Parts Co', address: '4500 Industrial Blvd', city: 'Irving', state: 'TX', zip: '75061', status: 'pending', phone: '(972) 555-0102' },
-        { stop_number: 3, recipient_name: 'Southside Distribution', address: '800 E Jefferson Blvd', city: 'Dallas', state: 'TX', zip: '75203', status: 'pending', phone: '(214) 555-0103' },
+        { sequence: 1, recipient_name: 'ABC Warehouse', address: '1200 Commerce St', city: 'Dallas', state: 'TX', zip: '75201', status: 'delivered', phone: '(214) 555-0101', lat: 32.7767, lng: -96.7970 },
+        { sequence: 2, recipient_name: 'Metro Parts Co', address: '4500 Industrial Blvd', city: 'Irving', state: 'TX', zip: '75061', status: 'pending', phone: '(972) 555-0102', lat: 32.8140, lng: -96.9489 },
+        { sequence: 3, recipient_name: 'Southside Distribution', address: '800 E Jefferson Blvd', city: 'Dallas', state: 'TX', zip: '75203', status: 'pending', phone: '(214) 555-0103', lat: 32.7420, lng: -96.7960 },
       ].forEach((stop) => createEntity('DeliveryStop', { ...stop, route_id: route.id }));
     }
   }

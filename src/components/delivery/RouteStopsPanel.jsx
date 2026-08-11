@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import StopPODModal from './StopPODModal';
 import RouteMapView from './RouteMapView';
+import { buildNavigationUrl } from '@/lib/fleetMaps';
 
 const STATUS_STYLES = {
   pending: 'bg-slate-100 text-slate-600',
@@ -125,7 +126,7 @@ export default function RouteStopsPanel({ route, stops: initialStops, driver, on
                   </div>
                 </div>
                 <div className="flex gap-2 mt-3">
-                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(fullAddress)}`} target="_blank" rel="noopener noreferrer">
+                  <a href={buildNavigationUrl({ address: stop.address, city: stop.city, state: stop.state, zip: stop.zip, lat: stop.lat, lng: stop.lng, label: stop.recipient_name }).href} target="_blank" rel="noopener noreferrer">
                     <Button size="sm" variant="outline" className="text-xs"><Navigation className="w-3 h-3 mr-1" /> Nav</Button>
                   </a>
                   {!isDone && (

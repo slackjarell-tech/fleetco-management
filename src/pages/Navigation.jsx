@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '@/api/apiClient';
 import { MapPin, Navigation as NavIcon, ExternalLink, Package, Calendar, Truck, AlertCircle, User } from 'lucide-react';
 import { isPureDriverUser } from '@/lib/driverAccess';
+import LoadRoutePreview from '@/components/maps/LoadRoutePreview';
+import { buildLoadRouteUrl, buildNavigationUrl, openLoadRoute, openNavigation } from '@/lib/fleetMaps';
 
 const STATUS_COLORS = {
   available: 'bg-green-100 text-green-700',
@@ -10,22 +12,6 @@ const STATUS_COLORS = {
   delivered: 'bg-slate-100 text-slate-600',
   cancelled: 'bg-red-100 text-red-700',
 };
-
-function openGoogleMaps(origin, destination) {
-  const url = `https://www.google.com/maps/dir/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}`;
-  window.open(url, '_blank');
-}
-
-function openGoogleMapsNavigation(destination) {
-  // Deep link to Google Maps navigation (works on mobile too)
-  const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
-  window.open(url, '_blank');
-}
-
-function openGoogleMapsRoute(origin, destination) {
-  const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
-  window.open(url, '_blank');
-}
 
 export default function Navigation() {
   const [user, setUser] = useState(null);
@@ -48,7 +34,6 @@ export default function Navigation() {
       setLoads(myLoads);
       if (myLoads.length > 0) setSelectedLoad(myLoads[0]);
 
-      // Latest driver locations (last 8 hours)
       const eightHoursAgo = Date.now() - 8 * 60 * 60 * 1000;
       const recent = (locs || []).filter(l => new Date(l.timestamp).getTime() > eightHoursAgo);
       const latest = {};
@@ -78,7 +63,7 @@ export default function Navigation() {
           <NavIcon className="w-6 h-6 text-amber-500" /> Navigation
         </h1>
         <p className="text-slate-500 text-sm mt-0.5">
-          {isDriver ? 'Your active loads with turn-by-turn navigation' : 'All active & in-transit loads'}
+          {isDriver ? 'Freight, delivery, and live GPS — no paid map API required' : 'Active loads with license-free routing'}
         </p>
       </div>
 
@@ -93,13 +78,13 @@ export default function Navigation() {
       <div className="grid gap-4">
         {loads.map(load => {
           const isSelected = selectedLoad?.id === load.id;
+          const routeUrl = buildLoadRouteUrl(load.origin, load.destination);
           return (
             <div
               key={load.id}
               onClick={() => setSelectedLoad(load)}
               className={`bg-white border-2 rounded-2xl p-5 cursor-pointer transition-all ${isSelected ? 'border-amber-500 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
             >
-              {/* Load Header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-amber-100 p-2 rounded-xl">
@@ -115,7 +100,6 @@ export default function Navigation() {
                 </span>
               </div>
 
-              {/* Route */}
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex flex-col items-center gap-1">
                   <div className="w-3 h-3 rounded-full bg-green-500" />
@@ -140,7 +124,6 @@ export default function Navigation() {
                 )}
               </div>
 
-              {/* Dates */}
               {(load.pickup_date || load.delivery_date) && (
                 <div className="flex gap-4 text-xs text-slate-500 mb-4">
                   {load.pickup_date && (
@@ -156,20 +139,21 @@ export default function Navigation() {
                 </div>
               )}
 
-              {/* Navigation Buttons */}
               <div className="flex flex-col sm:flex-row gap-2">
                 {load.origin && load.destination && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); openGoogleMapsRoute(load.origin, load.destination); }}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); openLoadRoute(load.origin, load.destination); }}
                     className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-colors"
                   >
                     <NavIcon className="w-4 h-4" />
-                    Full Route Navigation
+                    Full Route
                   </button>
                 )}
                 {load.origin && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); openGoogleMapsNavigation(load.origin); }}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); openNavigation({ label: load.origin }); }}
                     className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-colors"
                   >
                     <MapPin className="w-4 h-4" />
@@ -178,7 +162,8 @@ export default function Navigation() {
                 )}
                 {load.destination && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); openGoogleMapsNavigation(load.destination); }}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); openNavigation({ label: load.destination }); }}
                     className="flex-1 flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-sm px-4 py-2.5 rounded-xl transition-colors"
                   >
                     <MapPin className="w-4 h-4" />
@@ -187,29 +172,22 @@ export default function Navigation() {
                 )}
               </div>
 
-              {/* Google Maps embed preview for selected load */}
               {isSelected && load.origin && load.destination && (
                 <div className="mt-4 rounded-xl overflow-hidden border border-slate-200">
-                  <iframe
-                    title={`Map for Load #${load.load_number}`}
-                    width="100%"
-                    height="300"
-                    style={{ border: 0 }}
-                    loading="lazy"
-                    allowFullScreen
-                    referrerPolicy="no-referrer-when-downgrade"
-                    src={`https://maps.google.com/maps?q=${encodeURIComponent(load.origin + ' to ' + load.destination)}&output=embed&t=r`}
-                  />
+                  <LoadRoutePreview origin={load.origin} destination={load.destination} />
                   <div className="bg-slate-50 px-3 py-2 flex items-center justify-between">
-                    <span className="text-xs text-slate-400">Map preview · Tap navigation buttons above for turn-by-turn</span>
-                    <a
-                      href={`https://www.google.com/maps/dir/${encodeURIComponent(load.origin)}/${encodeURIComponent(load.destination)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                    >
-                      Open in Maps <ExternalLink className="w-3 h-3" />
-                    </a>
+                    <span className="text-xs text-slate-400">OpenStreetMap preview · no API key</span>
+                    {routeUrl && (
+                      <a
+                        href={routeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Open directions <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
                 </div>
               )}
@@ -218,7 +196,6 @@ export default function Navigation() {
         })}
       </div>
 
-      {/* Live Drivers */}
       {activeDrivers.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-blue-50 flex items-center gap-2">
@@ -230,7 +207,7 @@ export default function Navigation() {
             {activeDrivers.map(d => {
               const loc = `${d.lat?.toFixed(4)}, ${d.lng?.toFixed(4)}`;
               const age = Math.round((Date.now() - new Date(d.timestamp).getTime()) / 60000);
-              const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}&travelmode=driving`;
+              const nav = buildNavigationUrl({ lat: d.lat, lng: d.lng, label: d.user_name });
               return (
                 <div key={d.user_id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
                   <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
@@ -241,7 +218,7 @@ export default function Navigation() {
                     <div className="text-xs text-slate-500">{loc} · {age}m ago</div>
                     {d.speed > 0 && <div className="text-xs text-slate-400">{(d.speed * 2.237).toFixed(0)} mph</div>}
                   </div>
-                  <a href={navUrl} target="_blank" rel="noopener noreferrer"
+                  <a href={nav.href} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0 transition-colors">
                     <NavIcon className="w-3 h-3" /> Nav
                   </a>
@@ -252,10 +229,12 @@ export default function Navigation() {
         </div>
       )}
 
-      {/* Info note */}
       <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
         <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-        <p>Tapping any navigation button opens <strong>Google Maps</strong> with turn-by-turn directions. On mobile, this will launch the Google Maps app if installed.</p>
+        <p>
+          Navigation uses <strong>OpenStreetMap directions</strong> and your phone&apos;s built-in maps app — no paid map API from FleetCo.
+          On mobile, coordinates open your default maps app for turn-by-turn.
+        </p>
       </div>
     </div>
   );

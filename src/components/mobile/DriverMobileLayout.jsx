@@ -3,11 +3,15 @@ import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import {
   LayoutDashboard, Clock, Route, ScanLine, Menu, LogOut, Package,
-  MessageCircle, Navigation, ClipboardCheck, Fuel, AlertTriangle, MapPin,
-  X, ChevronRight, Video, Building2,
+  MessageCircle, Navigation, ClipboardCheck, Fuel, AlertTriangle,
+  X, ChevronRight, Video, Building2, Lock,
 } from 'lucide-react';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
 import CustomerPausedOverlay from '@/components/billing/CustomerPausedOverlay';
+import { DriverDeviceProvider, useDriverDevice } from '@/components/mobile/DriverDeviceProvider';
+import DriverPermissionsGate from '@/components/mobile/DriverPermissionsGate';
+import DriverAppBranding from '@/components/mobile/DriverAppBranding';
+import OfflineSyncProvider from '@/components/mobile/OfflineSyncProvider';
 import { isNativeApp } from '@/lib/platform';
 import { canAccessDriverApp, isDriverCapableUser } from '@/lib/driverAccess';
 
@@ -27,7 +31,7 @@ const MORE_LINKS = [
   { path: '/driver/inspections', label: 'Inspections', icon: ClipboardCheck },
   { path: '/driver/fuel', label: 'Fuel Logs', icon: Fuel },
   { path: '/driver/incidents', label: 'Incidents', icon: AlertTriangle },
-  { path: '/portal/change-password', label: 'Change Password', icon: MapPin },
+  { path: '/driver/change-password', label: 'Change Password', icon: Lock },
 ];
 
 export default function DriverMobileLayout() {
@@ -56,6 +60,22 @@ export default function DriverMobileLayout() {
   if (!user) return <Navigate to="/login?app=driver" replace />;
   if (!canAccessDriverApp(user)) return <Navigate to="/portal" replace />;
 
+  return (
+    <DriverDeviceProvider user={user}>
+      <OfflineSyncProvider user={user}>
+        <DriverMobileShell user={user} moreOpen={moreOpen} setMoreOpen={setMoreOpen} location={location} />
+      </OfflineSyncProvider>
+    </DriverDeviceProvider>
+  );
+}
+
+function DriverMobileShell({ user, moreOpen, setMoreOpen, location }) {
+  const { permissionsReady } = useDriverDevice();
+
+  if (!permissionsReady) {
+    return <DriverPermissionsGate userName={user.full_name} />;
+  }
+
   const tabActive = (tab) => (tab.end ? location.pathname === tab.path : location.pathname.startsWith(tab.path));
 
   return (
@@ -78,6 +98,8 @@ export default function DriverMobileLayout() {
         <CustomerPausedOverlay user={user} billing={user.billing} />
         <Outlet context={{ user }} />
       </main>
+
+      <DriverAppBranding variant="footer" className="mb-16" />
 
       <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-slate-900 border-t border-slate-800 px-2 py-1.5 flex justify-around z-40 safe-area-pb">
         {TABS.map((tab) => {

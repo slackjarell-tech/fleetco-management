@@ -1,3 +1,9 @@
+import {
+  maybeQueueApiFetch,
+  maybeQueueUpload,
+  isDriverOfflineEnabled,
+} from '@/lib/offline/offlineSync';
+
 const TOKEN_KEY = 'fleet_pulse_access_token';
 export const CUSTOMER_CONTEXT_KEY = 'fleetco_view_customer_id';
 
@@ -35,27 +41,35 @@ function setToken(token) {
 }
 
 async function apiFetch(path, options = {}) {
-  const API_ROOT = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
-  const url = `${API_ROOT}/api${path.startsWith('/') ? path : `/${path}`}`;
-  const headers = { 'Content-Type': 'application/json', ...options.headers };
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const doFetch = async (fetchPath = path, fetchOpts = options) => {
+    const API_ROOT = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
+    const url = `${API_ROOT}/api${fetchPath.startsWith('/') ? fetchPath : `/${fetchPath}`}`;
+    const headers = { 'Content-Type': 'application/json', ...fetchOpts.headers };
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
 
-  if (!options.skipCustomerContext) {
-    const customerContext = getViewAsCustomerId();
-    if (customerContext) headers['X-Customer-Context'] = customerContext;
+    if (!fetchOpts.skipCustomerContext) {
+      const customerContext = getViewAsCustomerId();
+      if (customerContext) headers['X-Customer-Context'] = customerContext;
+    }
+
+    const res = await fetch(url, { ...fetchOpts, headers });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const err = new Error(data.error || res.statusText || 'Request failed');
+      err.status = res.status;
+      err.data = data;
+      throw err;
+    }
+    return data;
+  };
+
+  if (!options.skipOfflineQueue && isDriverOfflineEnabled()) {
+    return maybeQueueApiFetch(path, options, () => doFetch());
   }
 
-  const res = await fetch(url, { ...options, headers });
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const err = new Error(data.error || res.statusText || 'Request failed');
-    err.status = res.status;
-    err.data = data;
-    throw err;
-  }
-  return data;
+  return doFetch();
 }
 
 function createEntityApi(entityName) {
@@ -168,6 +182,15 @@ const auth = {
     });
   },
 
+  async registerBroker(payload) {
+    const result = await apiFetch('/auth/register-broker', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (result.access_token) setToken(result.access_token);
+    return result;
+  },
+
   async verifyOtp({ email, otpCode }) {
     const result = await apiFetch('/auth/verify-otp', {
       method: 'POST',
@@ -243,16 +266,23 @@ const functions = {
 const integrations = {
   Core: {
     async UploadFile({ file }) {
-      const form = new FormData();
-      form.append('file', file);
-      const token = getToken();
-      const headers = {};
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const API_ROOT = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
-      const res = await fetch(`${API_ROOT}/api/integrations/upload`, { method: 'POST', headers, body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      return data;
+      const doUpload = async () => {
+        const form = new FormData();
+        form.append('file', file);
+        const token = getToken();
+        const headers = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const API_ROOT = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
+        const res = await fetch(`${API_ROOT}/api/integrations/upload`, { method: 'POST', headers, body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        return data;
+      };
+
+      if (isDriverOfflineEnabled()) {
+        return maybeQueueUpload(file, doUpload);
+      }
+      return doUpload();
     },
 
     async InvokeLLM(params) {
@@ -349,6 +379,9 @@ const billing = {
   },
   syncSession(sessionId) {
     return apiFetch('/billing/sync-session', { method: 'POST', body: JSON.stringify({ sessionId }) });
+  },
+  createBrokerCardSetup() {
+    return apiFetch('/billing/broker-card-setup', { method: 'POST', body: JSON.stringify({}) });
   },
 };
 
@@ -482,3 +515,13 @@ accounting: {
 };
 
 export { getToken, setToken };
+
+/** Replay queued driver writes (used by OfflineSyncProvider). */
+export async function syncDriverOfflineQueue() {
+  const API_ROOT = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
+  const { processOfflineQueue } = await import('@/lib/offline/offlineSync');
+  return processOfflineQueue(
+    (path, opts) => apiFetch(path, { ...opts, skipOfflineQueue: true }),
+    { getToken, apiRoot: API_ROOT }
+  );
+}

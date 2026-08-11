@@ -156,6 +156,13 @@ export function entityBelongsToCustomer(type, item, customerId, scopeIndex) {
     if (session?.user_id && userIds?.has(session.user_id)) return true;
   }
 
+  if (type === 'LoadMessage' && item.load_id) {
+    const load = getEntity('Load', item.load_id);
+    if (!load) return false;
+    if (matchesCustomerField(load, customerId)) return true;
+    if (load.booked_by_customer_id === customerId || load.assigned_customer_id === customerId) return true;
+  }
+
   return false;
 }
 

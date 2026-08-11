@@ -35,4 +35,6 @@ export const LEGAL = {
   company: 'FleetCo Management LLC',
   foundedYear: 2022,
   patentNotice: 'Patent Pending. FleetCo platform and related fleet management systems are proprietary.',
+  driverAppName: 'FleetCo Driver',
+  driverAppNotice: 'FleetCo Driver mobile application — Patent Pending. All rights reserved.',
 };

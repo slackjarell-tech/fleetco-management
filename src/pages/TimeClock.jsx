@@ -83,12 +83,16 @@ export default function TimeClock() {
   } : null;
   useDriverLocation(user, activeShift?.id, !!activeShift && locationGranted, vehicleInfo);
 
-  // Request location permission on mount
+  // Location is granted during first-open ELD setup; verify on mount
   useEffect(() => {
-    if (!locationRequested && 'geolocation' in navigator) {
-      setLocationRequested(true);
-    }
-  }, [locationRequested]);
+    setLocationRequested(true);
+    if (!('geolocation' in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      () => setLocationGranted(true),
+      () => {},
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }, []);
 
   const requestLocationPermission = () => {
     if (!('geolocation' in navigator)) return;
@@ -118,7 +122,7 @@ export default function TimeClock() {
     const today = new Date().toISOString().slice(0, 10);
     const veh = vehicles.find(v => v.id === selectedVehicleId);
     const trailer = vehicles.find(v => v.id === selectedTrailerId);
-    await api.entities.TimeClockEntry.create({
+    const entry = await api.entities.TimeClockEntry.create({
       user_id: user.id,
       user_name: user.full_name,
       entry_type: 'shift',
@@ -130,10 +134,14 @@ export default function TimeClock() {
       trailer_id: selectedTrailerId || null,
       trailer_unit_number: trailer?.unit_number || null,
     });
+    if (entry._offlineQueued) {
+      setEntries((prev) => [entry, ...prev]);
+    } else {
+      await loadData();
+    }
     setNotes('');
     setSelectedVehicleId('');
     setSelectedTrailerId('');
-    await loadData();
     setSavingShift(false);
   };
 
@@ -141,11 +149,15 @@ export default function TimeClock() {
     setSavingShift(true);
     const clockOut = new Date().toISOString();
     const mins = elapsedMinutes(activeShift.clock_in);
-    await api.entities.TimeClockEntry.update(activeShift.id, {
+    const updated = await api.entities.TimeClockEntry.update(activeShift.id, {
       clock_out: clockOut,
       duration_minutes: Math.round(mins),
     });
-    await loadData();
+    if (updated._offlineQueued) {
+      setEntries((prev) => prev.map((e) => (e.id === activeShift.id ? { ...e, clock_out: clockOut, duration_minutes: Math.round(mins), _offlineQueued: true } : e)));
+    } else {
+      await loadData();
+    }
     setSavingShift(false);
   };
 

@@ -8,6 +8,7 @@ import BulkStopUpload from '@/components/delivery/BulkStopUpload';
 import RouteMapView from '@/components/delivery/RouteMapView';
 
 const EMPTY_STOP = {
+  tracking_number: '',
   recipient_name: '',
   recipient_phone: '',
   address: '',
@@ -113,6 +114,8 @@ export default function RouteBuilder() {
         api.entities.DeliveryStop.create({
           route_id: route.id,
           sequence: idx + 1,
+          tracking_number: stop.tracking_number || '',
+          barcode: stop.tracking_number || '',
           recipient_name: stop.recipient_name,
           recipient_phone: stop.recipient_phone,
           address: stop.address,
