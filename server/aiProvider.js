@@ -1,4 +1,21 @@
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+function normalizeEnv(value) {
+  if (!value || typeof value !== 'string') return '';
+  let v = value.trim();
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    v = v.slice(1, -1).trim();
+  }
+  return v;
+}
+
+function groqApiKey() {
+  return normalizeEnv(process.env.GROQ_API_KEY);
+}
+
+function geminiApiKey() {
+  return normalizeEnv(process.env.GEMINI_API_KEY);
+}
 const GEMINI_URL = (model) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
@@ -32,7 +49,7 @@ let healthCache = { at: 0, healthy: null, error: null };
 const HEALTH_TTL_MS = 5 * 60 * 1000;
 
 export function getAiStatus() {
-  if (process.env.GROQ_API_KEY) {
+  if (groqApiKey()) {
     return {
       configured: true,
       provider: 'groq',
@@ -42,7 +59,7 @@ export function getAiStatus() {
       health_checked_at: healthCache.at ? new Date(healthCache.at).toISOString() : null,
     };
   }
-  if (process.env.GEMINI_API_KEY) {
+  if (geminiApiKey()) {
     return {
       configured: true,
       provider: 'gemini',
@@ -105,7 +122,7 @@ async function chatGroq({ messages, tools, model }) {
     const res = await fetch(GROQ_URL, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        Authorization: `Bearer ${groqApiKey()}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
@@ -149,7 +166,7 @@ async function chatGemini({ messages, model }) {
   }
 
   const modelId = model || process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-  const res = await fetch(`${GEMINI_URL(modelId)}?key=${process.env.GEMINI_API_KEY}`, {
+  const res = await fetch(`${GEMINI_URL(modelId)}?key=${geminiApiKey()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents }),
