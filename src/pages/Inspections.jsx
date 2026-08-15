@@ -3,7 +3,7 @@ import { api } from '@/api/apiClient';
 import { Plus, ClipboardCheck, AlertTriangle, CheckCircle2, Clock, Search, Trash2, FileDown } from 'lucide-react';
 import InspectionModal from '@/components/inspections/InspectionModal';
 import { exportDVIRPdf } from '@/components/inspections/ExportDVIRPdf';
-import { isFleetCoAdmin } from '@/lib/roles';
+import { isExecutiveView } from '@/lib/roles';
 
 const STATUS_STYLES = {
   passed: 'bg-green-100 text-green-700',

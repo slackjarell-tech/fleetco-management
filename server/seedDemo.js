@@ -84,6 +84,60 @@ export function ensureDemoDrivers(customerId = null) {
   return { customerId: demoCustomer, drivers: ensured };
 }
 
+/** Personal driver for JaRell's phone testing */
+export const PERSONAL_DRIVER = {
+  email: 'jarrell.driver@fleetco.com',
+  fullName: 'JaRell Slack',
+  employeeNumber: 'DRV-36001',
+  phone: '3609521249',
+  password: process.env.PERSONAL_DRIVER_PASSWORD || 'FleetCo2026!',
+};
+
+export function ensurePersonalDriver(customerId = null) {
+  const demoCustomer =
+    customerId ||
+    listEntities('Customer').find((c) => c.company_name === 'Lone Star Freight LLC')?.id ||
+    listEntities('Customer')[0]?.id ||
+    null;
+
+  const spec = PERSONAL_DRIVER;
+  const hash = bcrypt.hashSync(spec.password, 10);
+  const sidebarModules = defaultSidebarModulesForRole('driver');
+  const existing = getUserRowByEmail(spec.email);
+
+  if (!existing) {
+    createUser({
+      email: spec.email,
+      passwordHash: hash,
+      fullName: spec.fullName,
+      role: 'driver',
+      customerId: demoCustomer,
+      employeeNumber: spec.employeeNumber,
+      sidebarModules,
+      phone: spec.phone,
+    });
+  } else {
+    updateUser(existing.id, {
+      full_name: spec.fullName,
+      role: 'driver',
+      employee_number: spec.employeeNumber,
+      password_hash: hash,
+      sidebar_modules: sidebarModules,
+      phone: spec.phone,
+      status: 'active',
+      ...(demoCustomer && !existing.customer_id ? { customer_id: demoCustomer } : {}),
+    });
+  }
+
+  return {
+    customerId: demoCustomer,
+    driver: findUserByEmail(spec.email),
+    email: spec.email,
+    password: spec.password,
+    loginUrl: 'https://fleetcomanagement.org/driver/login',
+  };
+}
+
 export function getDemoDriverLogins() {
   return DEMO_DRIVERS.map((d, i) => ({
     number: i + 1,
@@ -91,7 +145,7 @@ export function getDemoDriverLogins() {
     email: d.email,
     password: DEMO_DRIVER_PASSWORD,
     driverNumber: d.employeeNumber,
-    loginUrl: 'https://fleetcomanagement.org/login?app=driver',
+    loginUrl: 'https://fleetcomanagement.org/driver/login',
   }));
 }
 
@@ -102,8 +156,9 @@ export function seedDemoData(options = {}) {
 
   if (ensureDrivers) {
     const result = ensureDemoDrivers(options?.customerId);
+    if (options?.ensurePersonalDriver) ensurePersonalDriver(result.customerId);
     if (fillGaps && hasCustomers) seedGapDemoEntities();
-    return { created: true, drivers: result.drivers.length, customerId: result.customerId };
+    return { created: true, drivers: result.drivers.length, customerId: result.customerId, personalDriver: options?.ensurePersonalDriver || false };
   }
 
   if (!hasCustomers) {
@@ -114,8 +169,9 @@ export function seedDemoData(options = {}) {
 
   if (fillGaps) {
     ensureDemoDrivers();
+    if (options?.ensurePersonalDriver) ensurePersonalDriver();
     seedGapDemoEntities();
-    return { created: true };
+    return { created: true, personalDriver: options?.ensurePersonalDriver || false };
   }
 
   return { created: false };
@@ -261,10 +317,13 @@ function seedCoreDemoData() {
 
   const vehicleRecords = vehicles.map((v) => createEntity('Vehicle', v));
 
-  createEntity('FuelStation', { name: 'Pilot Travel Center #412', brand: 'Pilot', address: '1234 I-80 Exit 42', city: 'Omaha', state: 'NE', diesel_price: 3.899, gasoline_price: 3.459, status: 'active' });
-  createEntity('FuelStation', { name: "Love's Travel Stop #301", brand: "Love's", address: '567 Hwy 35', city: 'Des Moines', state: 'IA', diesel_price: 3.849, gasoline_price: 3.419, status: 'active' });
-  createEntity('FuelStation', { name: 'TA Petro Dallas', brand: 'TA', address: '8800 N Stemmons Fwy', city: 'Dallas', state: 'TX', diesel_price: 3.929, gasoline_price: 3.499, status: 'active' });
-  createEntity('FuelStation', { name: 'Buc-ee\'s #47', brand: 'Buc-ee\'s', address: '2800 I-45', city: 'Madisonville', state: 'TX', diesel_price: 3.779, gasoline_price: 3.359, status: 'active' });
+  createEntity('FuelStation', { name: 'Pilot Travel Center #412', brand: 'Pilot', address: '1234 I-80 Exit 42', city: 'Omaha', state: 'NE', diesel_price: 3.899, gasoline_price: 3.459, station_type: 'fuel', status: 'active' });
+  createEntity('FuelStation', { name: "Love's Travel Stop #301", brand: "Love's", address: '567 Hwy 35', city: 'Des Moines', state: 'IA', diesel_price: 3.849, gasoline_price: 3.419, station_type: 'fuel', status: 'active' });
+  createEntity('FuelStation', { name: 'TA Petro Dallas', brand: 'TA', address: '8800 N Stemmons Fwy', city: 'Dallas', state: 'TX', diesel_price: 3.929, gasoline_price: 3.499, station_type: 'fuel', status: 'active' });
+  createEntity('FuelStation', { name: 'Buc-ee\'s #47', brand: 'Buc-ee\'s', address: '2800 I-45', city: 'Madisonville', state: 'TX', diesel_price: 3.779, gasoline_price: 3.359, station_type: 'fuel', status: 'active' });
+  createEntity('FuelStation', { name: 'Electrify America — Dallas', brand: 'Electrify America', address: '1200 Commerce St', city: 'Dallas', state: 'TX', station_type: 'ev_charging', ev_level: 'DC Fast', connector_types: ['CCS', 'CHAdeMO'], status: 'active', lat: 32.7767, lng: -96.7970 });
+  createEntity('FuelStation', { name: 'Tesla Supercharger — Omaha', brand: 'Tesla', address: '200 S 14th St', city: 'Omaha', state: 'NE', station_type: 'ev_charging', ev_level: 'DC Fast', connector_types: ['Tesla'], status: 'active', lat: 41.2565, lng: -95.9345 });
+  createEntity('FuelStation', { name: 'ChargePoint — Des Moines', brand: 'ChargePoint', address: '400 Locust St', city: 'Des Moines', state: 'IA', station_type: 'ev_charging', ev_level: 'Level 2', connector_types: ['J1772'], status: 'active', lat: 41.5868, lng: -93.6250 });
 
   const workOrders = [
     { wo_number: 'WO-240891', title: 'Brake inspection — steer axle', repair_type: 'Brakes', status: 'open', priority: 'high', vehicle_id: vehicleRecords[2].id, complaint: 'Driver reported soft pedal on descent', labor_hours: 2.5, labor_rate: 85, labor_cost: 212.5, parts_total: 340, total_cost: 552.5, opened_date: dateOnly(-2), due_date: dateOnly(3) },

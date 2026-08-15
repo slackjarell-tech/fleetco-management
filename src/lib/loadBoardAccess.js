@@ -77,4 +77,21 @@ export function canRespondToBooking(user, load) {
   return false;
 }
 
-export const PLATFORM_FEE_PERCENT = 3.5;
+/** Poster, carrier, or SLT can view/post load thread messages. */
+export function canAccessLoadThread(user, load) {
+  if (!user || !load) return false;
+  if (isFleetCoAdmin(user.role) || user.role === 'admin' || user.role === 'owner') return true;
+  if (user.customer_id && user.customer_id === load.customer_id) return true;
+  const carrierId = load.booked_by_customer_id || load.assigned_customer_id;
+  if (user.customer_id && carrierId && user.customer_id === carrierId) return true;
+  if (load.booked_by_user_id === user.id) return true;
+  return false;
+}
+
+export {
+  POSTER_FEE_PERCENT,
+  CARRIER_FEE_PERCENT,
+  PLATFORM_FEE_PERCENT,
+  userLoadFeeAmount,
+  userLoadFeePercent,
+} from './loadMarketplaceFinance.js';

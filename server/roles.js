@@ -15,7 +15,7 @@ export function subscriptionAmount(planName, term) {
   return plan.monthly;
 }
 
-export const FLEETCO_INTERNAL_ROLES = ['owner', 'executive', 'fleet_manager', 'fleet_coordinator', 'freight_broker'];
+export const FLEETCO_INTERNAL_ROLES = ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'];
 
 export {
   CUSTOMER_TEAM_ROLES,

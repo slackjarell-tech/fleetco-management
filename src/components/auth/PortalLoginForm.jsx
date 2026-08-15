@@ -8,21 +8,22 @@ import { Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import { isDriverAppContext, isNativeApp } from '@/lib/platform';
 import { canAccessDriverApp } from '@/lib/driverAccess';
 
-export function resolveLoginDestination(result) {
+export function resolveLoginDestination(result, { driverMode = false } = {}) {
   const canDrive = canAccessDriverApp(result?.user);
+  if (driverMode && canDrive) return '/driver';
   if (canDrive && (isNativeApp() || isDriverAppContext())) return '/driver';
   if (canDrive && new URLSearchParams(window.location.search).get('app') === 'driver') return '/driver';
   return '/portal';
 }
 
-export async function completePortalLogin(email, password) {
+export async function completePortalLogin(email, password, options = {}) {
   const normalizedEmail = email.trim().toLowerCase();
   const result = await api.auth.loginViaEmailPassword(normalizedEmail, password);
   if (result.must_change_password) {
-    window.location.href = '/set-password';
+    window.location.href = options.driverMode ? '/set-password?app=driver' : '/set-password';
     return result;
   }
-  window.location.href = resolveLoginDestination(result);
+  window.location.href = resolveLoginDestination(result, options);
   return result;
 }
 
@@ -31,6 +32,7 @@ export default function PortalLoginForm({
   compact = false,
   showForgotLink = true,
   submitLabel = 'Sign In to Portal',
+  driverMode = false,
   onSuccess,
 }) {
   const [email, setEmail] = useState('');
@@ -55,7 +57,7 @@ export default function PortalLoginForm({
     setError('');
     setLoading(true);
     try {
-      const result = await completePortalLogin(email, password);
+      const result = await completePortalLogin(email, password, { driverMode });
       onSuccess?.(result);
     } catch (err) {
       setError(err?.data?.error || err?.message || 'Invalid email or password.');

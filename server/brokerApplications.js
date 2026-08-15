@@ -1,6 +1,7 @@
 import { createEntity, filterEntities, getEntity, updateEntity, nowIso } from './db.js';
 import { sendEmail } from './email.js';
 import { getInquiryInbox } from './inquiryEmails.js';
+import { requireLoadBoardFeeAcknowledgment } from './loadBoardFeeAcknowledgment.js';
 
 export async function submitBrokerApplication(body) {
   const {
@@ -18,6 +19,7 @@ export async function submitBrokerApplication(body) {
   if (!company_name || !contact_name || !email) {
     throw new Error('Company name, contact name, and email are required');
   }
+  requireLoadBoardFeeAcknowledgment(body);
 
   const app = createEntity('BrokerApplication', {
     company_name,
@@ -30,6 +32,8 @@ export async function submitBrokerApplication(body) {
     equipment_types: equipment_types || '',
     message: message || '',
     status: 'pending',
+    load_board_fee_acknowledged: true,
+    load_board_fee_acknowledged_at: nowIso(),
   });
 
   const inbox = getInquiryInbox();

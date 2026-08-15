@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/api/apiClient';
-import { Plus, Search, Edit, Trash2, MapPin, Calendar, Package, Bell, Navigation, Scale, FileText, Handshake, Check, X, DollarSign } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, MapPin, Calendar, Package, Bell, Navigation, Scale, FileText, Handshake, Check, X, DollarSign, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,8 +11,11 @@ import { isFleetCoAdmin, filterByCustomerId } from '@/lib/roles';
 import { isPureDriverUser, isDriverCapableUser } from '@/lib/driverAccess';
 import {
   canPostLoad, canDispatchLoad, isCustomerLoadPoster, canBrowseMarketplace,
-  canBookMarketplaceLoad, canRespondToBooking, PLATFORM_FEE_PERCENT,
+  canBookMarketplaceLoad, canRespondToBooking, canAccessLoadThread,
+  userLoadFeeAmount, userLoadFeePercent,
 } from '@/lib/loadBoardAccess';
+import LoadThreadPanel from '@/components/loadboard/LoadThreadPanel';
+import LoadBoardFeeGate from '@/components/loadboard/LoadBoardFeeGate';
 import { downloadRateConfirmationPdf } from '@/lib/accounting/rateConfirmationPdf';
 import { equipmentLabel } from '@/lib/equipmentTypes';
 import { canDownloadBol, hasBol, bolFileUrl, bolDownloadFilename } from '@/lib/loadBol';
@@ -40,10 +43,22 @@ export default function LoadBoard() {
   const [scaleLoad, setScaleLoad] = useState(null);
   const [boardTab, setBoardTab] = useState('my');
   const [marketplaceLoads, setMarketplaceLoads] = useState([]);
+  const [threadLoad, setThreadLoad] = useState(null);
+  const [feeAcknowledged, setFeeAcknowledged] = useState(null);
 
   useEffect(() => {
     api.auth.me().then(async (u) => {
       setUser(u);
+      if (u && !isFleetCoAdmin(u.role) && (canPostLoad(u) || canBrowseMarketplace(u))) {
+        try {
+          const res = await api.functions.invoke('getLoadBoardFeeAcknowledgment', {});
+          setFeeAcknowledged(!!res.acknowledged);
+        } catch {
+          setFeeAcknowledged(false);
+        }
+      } else {
+        setFeeAcknowledged(true);
+      }
       await fetchData(u);
     });
   }, []);
@@ -121,7 +136,7 @@ export default function LoadBoard() {
   const handleCompleteWithFee = async (load) => {
     const res = await api.functions.invoke('completeLoadWithFee', { loadId: load.id });
     await fetchData(user);
-    alert(`Load delivered. Platform fee: $${res.platformFee?.toFixed(2) || '0'} (${PLATFORM_FEE_PERCENT}%)`);
+    alert(`Load delivered. Your platform fee: $${(res.financials?.poster_fee_amount || res.financials?.carrier_fee_amount || res.platformFee)?.toFixed(2) || '0'}`);
   };
 
   const handlePayPlatformFee = async (load) => {
@@ -200,9 +215,13 @@ export default function LoadBoard() {
               {load.miles && <span>{load.miles} mi</span>}
               {load.weight && <span>{load.weight}</span>}
               {!marketplace && canDispatch && load.assigned_driver_id && <span>Driver: {getDriverName(load.assigned_driver_id)}</span>}
-              {load.platform_fee_status === 'pending' && load.platform_fee_amount && (
-                <span className="text-amber-700 font-medium">Fee due: ${load.platform_fee_amount} ({PLATFORM_FEE_PERCENT}%)</span>
-              )}
+              {load.platform_fee_status === 'pending' && user && (() => {
+                const feeAmt = userLoadFeeAmount(user, load);
+                const feePct = userLoadFeePercent(user, load);
+                return feeAmt > 0 && (
+                  <span className="text-amber-700 font-medium">Your fee due: ${feeAmt} ({feePct}%)</span>
+                );
+              })()}
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -233,6 +252,11 @@ export default function LoadBoard() {
                   <a href={bolFileUrl(load)} download={bolDownloadFilename(load)} target="_blank" rel="noopener noreferrer">
                     <FileText className="w-4 h-4 text-blue-600" />
                   </a>
+                </Button>
+              )}
+              {canAccessLoadThread(user, load) && (load.booking_status === 'pending' || load.booking_status === 'accepted' || load.booked_by_customer_id) && (
+                <Button size="icon" variant="ghost" title="Messages" onClick={() => setThreadLoad(load)}>
+                  <MessageCircle className="w-4 h-4 text-purple-600" />
                 </Button>
               )}
               {!marketplace && canPost && (
@@ -270,11 +294,17 @@ export default function LoadBoard() {
     </Card>
   );
 
-  if (loading) {
+  if (loading || feeAcknowledged === null) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
       </div>
+    );
+  }
+
+  if (feeAcknowledged === false) {
+    return (
+      <LoadBoardFeeGate onAcknowledged={() => setFeeAcknowledged(true)} />
     );
   }
 
@@ -358,6 +388,9 @@ export default function LoadBoard() {
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditLoad(null); }}
         />
+      )}
+      {threadLoad && (
+        <LoadThreadPanel load={threadLoad} onClose={() => setThreadLoad(null)} />
       )}
     </div>
   );

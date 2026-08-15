@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
-import { Users, DollarSign, TrendingUp, FileText, Fuel, Wrench, BarChart2, Crown } from 'lucide-react';
+import { Users, DollarSign, TrendingUp, FileText, Fuel, Wrench, BarChart2, Crown, Package } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
 import ValuationTracker from '@/components/executive/ValuationTracker';
 import { isExecutiveView } from '@/lib/roles';
@@ -125,6 +125,8 @@ export default function ExecutiveDashboard() {
 
   // Load revenue
   const loadRevenue = loads.filter(l => l.status === 'delivered').reduce((s, l) => s + (l.rate || 0), 0);
+  const marketplaceFees = loads.reduce((s, l) => s + (Number(l.fleetco_fee_amount ?? l.platform_fee_amount) || 0), 0);
+  const marketplaceLoads = loads.filter((l) => l.marketplace_visible !== false || l.booked_by_customer_id || l.booking_status);
 
   // Role breakdown
   const roleCounts = ['admin', 'employee', 'tech', 'driver', 'customer'].map(r => ({
@@ -153,6 +155,23 @@ export default function ExecutiveDashboard() {
         <StatCard icon={DollarSign} label="Total Revenue (Paid)" value={fmt(totalRevenue)} sub={`${fmt(pendingRevenue)} pending`} color="green" />
         <StatCard icon={TrendingUp} label="Load Revenue" value={fmt(loadRevenue)} sub={`${loads.filter(l => l.status === 'delivered').length} loads delivered`} color="amber" />
         <StatCard icon={Wrench} label="Maintenance Cost" value={fmt(totalMaintCost)} sub={`${fmt(totalFuelSpend)} fuel spend`} color="red" />
+      </div>
+
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+          <h2 className="text-white font-bold text-sm flex items-center gap-2">
+            <Package className="w-4 h-4 text-amber-400" /> Load marketplace
+          </h2>
+          <Link
+            to="/portal/load-marketplace"
+            className="text-xs font-semibold text-amber-400 hover:text-amber-300"
+          >
+            View posters, carriers &amp; payouts →
+          </Link>
+        </div>
+        <p className="text-slate-400 text-sm mb-3">
+          {marketplaceLoads.length} marketplace loads · FleetCo platform fees collected: ${marketplaceFees.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+        </p>
       </div>
 
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">

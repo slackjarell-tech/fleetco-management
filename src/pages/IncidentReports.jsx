@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/api/apiClient';
 import { AlertTriangle, Plus, Search, X, Car, User, MapPin, ShieldAlert, DollarSign, FileText } from 'lucide-react';
 import { isPlatformAdmin } from '@/lib/roles';
-import { filterDriverRoster } from '@/lib/driverAccess';
+import { filterDriverRoster, isPureDriverUser } from '@/lib/driverAccess';
 
 const SEVERITY_COLORS = {
   minor: 'bg-yellow-100 text-yellow-700',
@@ -49,7 +49,9 @@ export default function IncidentReports() {
         api.entities.User.list(),
       ]);
       let filteredInc = inc;
-      if (u?.customer_id) {
+      if (isPureDriverUser(u)) {
+        filteredInc = inc.filter((i) => i.driver_id === u.id);
+      } else if (u?.customer_id) {
         const customerVehicleIds = vs.filter(v => v.assigned_customer_id === u.customer_id).map(v => v.id);
         filteredInc = inc.filter(i => customerVehicleIds.includes(i.vehicle_id));
       }
@@ -72,7 +74,17 @@ export default function IncidentReports() {
     return matchSearch && matchStatus;
   }), [incidents, search, filterStatus]);
 
-  const openNew = () => { setEditing(null); setForm(EMPTY_FORM); setShowModal(true); };
+  const openNew = () => {
+    setEditing(null);
+    const base = { ...EMPTY_FORM };
+    if (isPureDriverUser(user)) {
+      base.driver_id = user.id;
+      base.driver_name = user.full_name;
+      base.incident_date = new Date().toISOString().split('T')[0];
+    }
+    setForm(base);
+    setShowModal(true);
+  };
   const openEdit = (inc) => { setEditing(inc); setForm({ ...EMPTY_FORM, ...inc }); setShowModal(true); };
 
   const handleSave = async () => {
@@ -107,6 +119,8 @@ export default function IncidentReports() {
   );
 
   const canEdit = isPlatformAdmin(user?.role);
+  const canCreate = canEdit || isPureDriverUser(user);
+  const isDriverReporter = isPureDriverUser(user);
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5">
@@ -120,7 +134,7 @@ export default function IncidentReports() {
             </h1>
             <p className="text-slate-300 text-xs mt-1">Log accidents, near-misses, roadside inspections, and CSA violations</p>
           </div>
-          {canEdit && (
+          {canCreate && (
             <button onClick={openNew}
               className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-black px-4 py-2.5 rounded-xl text-sm">
               <Plus className="w-4 h-4" /> New Incident
@@ -244,13 +258,17 @@ export default function IncidentReports() {
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-600 block mb-1">Driver *</label>
-                  <select value={form.driver_id} onChange={e => {
-                    const d = drivers.find(u => u.id === e.target.value);
-                    setForm(p => ({ ...p, driver_id: e.target.value, driver_name: d?.full_name || '' }));
-                  }} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400">
-                    <option value="">Select Driver</option>
-                    {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-                  </select>
+                  {isDriverReporter ? (
+                    <input value={form.driver_name} readOnly className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50" />
+                  ) : (
+                    <select value={form.driver_id} onChange={e => {
+                      const d = drivers.find(u => u.id === e.target.value);
+                      setForm(p => ({ ...p, driver_id: e.target.value, driver_name: d?.full_name || '' }));
+                    }} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400">
+                      <option value="">Select Driver</option>
+                      {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-600 block mb-1">Vehicle *</label>

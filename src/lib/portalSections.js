@@ -2,6 +2,7 @@
 export const PATH_TO_SECTION = {
   '/portal': 'Dashboard',
   '/portal/executive': 'Dashboard',
+  '/portal/load-marketplace': 'Dashboard',
   '/portal/fleetco-payroll': 'Dashboard',
   '/portal/customer-insights': 'Dashboard',
   '/portal/loads': 'Operations',
@@ -59,6 +60,7 @@ export function sectionForPath(pathname) {
 
 export const INTERNAL_ONLY_PATHS = new Set([
   '/portal/executive',
+  '/portal/load-marketplace',
   '/portal/fleetco-payroll',
   '/portal/customer-insights',
   '/portal/domain-emails',

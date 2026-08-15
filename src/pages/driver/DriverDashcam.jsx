@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useDriverDevice } from '@/components/mobile/DriverDeviceProvider';
+import { useWakeLock } from '@/hooks/useWakeLock';
 import {
   Video, Camera, ChevronDown, ChevronUp, Battery, MapPin, AlertTriangle,
-  Square, Play, Image as ImageIcon, Mic, Wind,
+  Square, Play, Image as ImageIcon, Mic, Wind, Pause, Sun,
 } from 'lucide-react';
 
 const MODES = [
@@ -87,7 +88,15 @@ export default function DriverDashcam() {
   const [capturing, setCapturing] = useState(false);
   const [pendingFrames, setPendingFrames] = useState(0);
   const [guideOpen, setGuideOpen] = useState(true);
+  const [pausedByBackground, setPausedByBackground] = useState(false);
   const timerRef = useRef(null);
+  const sessionRef = useRef(null);
+
+  const { supported: wakeLockSupported } = useWakeLock(recording && !pausedByBackground);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,6 +116,35 @@ export default function DriverDashcam() {
 
   const isDualMode = mode === 'dual_monitoring';
   const isTimelapse = mode === 'view_ahead' || isDualMode;
+
+  const startTimelapseTimer = (activeSession) => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => captureFrame(activeSession), intervalSec * 1000);
+  };
+
+  const pauseForBackground = () => {
+    if (!timerRef.current) return;
+    clearInterval(timerRef.current);
+    timerRef.current = null;
+    setPausedByBackground(true);
+  };
+
+  const resumeFromBackground = () => {
+    const activeSession = sessionRef.current;
+    if (!activeSession || !isTimelapse) return;
+    setPausedByBackground(false);
+    startTimelapseTimer(activeSession);
+    captureFrame(activeSession);
+  };
+
+  useEffect(() => {
+    if (!recording || !isTimelapse) return;
+    const onVisChange = () => {
+      if (document.visibilityState === 'hidden') pauseForBackground();
+    };
+    document.addEventListener('visibilitychange', onVisChange);
+    return () => document.removeEventListener('visibilitychange', onVisChange);
+  }, [recording, isTimelapse]);
 
   const captureFrame = async (activeSession) => {
     if (!activeSession) return;
@@ -185,7 +223,8 @@ export default function DriverDashcam() {
       setMessage(result.message);
 
       if (isTimelapse) {
-        timerRef.current = setInterval(() => captureFrame(result.session), intervalSec * 1000);
+        setPausedByBackground(false);
+        startTimelapseTimer(result.session);
         captureFrame(result.session);
       }
     } catch (err) {
@@ -260,6 +299,11 @@ export default function DriverDashcam() {
         <span className="inline-flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
           <AlertTriangle className="w-3 h-3" /> Check local mount laws
         </span>
+        {wakeLockSupported && (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold bg-indigo-50 text-indigo-800 px-2.5 py-1 rounded-full">
+            <Sun className="w-3 h-3" /> Screen stays on while recording
+          </span>
+        )}
       </div>
 
       {!recording && (
@@ -325,6 +369,26 @@ export default function DriverDashcam() {
 
       {recording && (
         <div className="space-y-4">
+          {pausedByBackground && (
+            <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3">
+              <div className="flex items-start gap-2 text-amber-900 text-sm">
+                <Pause className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold">Recording paused in background</div>
+                  <p className="text-xs mt-1 text-amber-800">
+                    Keep FleetCo Driver open and in front while driving. Tap resume when you&apos;re back.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={resumeFromBackground}
+                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-2.5 rounded-xl text-sm"
+              >
+                Resume time-lapse
+              </button>
+            </div>
+          )}
           {cameraActive && (
             <div className={`grid gap-2 ${isDualMode ? 'grid-cols-2' : 'grid-cols-1'}`}>
               <div className="rounded-xl overflow-hidden border border-slate-200 bg-black">
@@ -364,10 +428,12 @@ export default function DriverDashcam() {
             </div>
           )}
 
-          <div className="bg-red-600 text-white rounded-xl p-4 flex items-center gap-3">
-            <span className="w-3 h-3 bg-white rounded-full animate-pulse" />
+          <div className={`bg-red-600 text-white rounded-xl p-4 flex items-center gap-3 ${pausedByBackground ? 'opacity-60' : ''}`}>
+            <span className={`w-3 h-3 bg-white rounded-full ${pausedByBackground ? '' : 'animate-pulse'}`} />
             <div className="flex-1">
-              <div className="font-black text-sm">REC — {MODES.find((m) => m.id === mode)?.label}</div>
+              <div className="font-black text-sm">
+                {pausedByBackground ? 'PAUSED' : 'REC'} — {MODES.find((m) => m.id === mode)?.label}
+              </div>
               <div className="text-xs text-red-100">{frameCount} frame{frameCount !== 1 ? 's' : ''} captured</div>
             </div>
             {isTimelapse && (

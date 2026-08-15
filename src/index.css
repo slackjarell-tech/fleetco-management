@@ -99,3 +99,8 @@
     background: white !important;
   }
 }
+
+/* iPhone home indicator + notched Android nav bar */
+.safe-area-pb {
+  padding-bottom: max(0.375rem, env(safe-area-inset-bottom, 0px));
+}

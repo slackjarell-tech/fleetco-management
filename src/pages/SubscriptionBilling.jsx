@@ -5,6 +5,8 @@ import { CreditCard, Loader2, CheckCircle2, ExternalLink, AlertTriangle } from '
 import { Button } from '@/components/ui/button';
 import { SUBSCRIPTION_PLANS, subscriptionAmount, formatPrice } from '@/lib/subscriptions';
 import { isCustomerPortalUser } from '@/lib/customerRoles';
+import { isFreightBroker } from '@/lib/loadBoardAccess';
+import { LOAD_BOARD_TRANSACTION_FEE_PERCENT } from '@/lib/loadBoardFeeDisclosure';
 import { formatDueDate } from '@/lib/billing';
 
 export default function SubscriptionBilling() {
@@ -36,6 +38,17 @@ export default function SubscriptionBilling() {
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
+    const welcome = searchParams.get('welcome');
+    if (welcome === 'broker') {
+      setMessage('Welcome! Add a credit card on file below for load board transaction fees, then start posting loads.');
+    }
+    const card = searchParams.get('card');
+    if (card === 'success') {
+      setMessage('Payment method saved. You can post and manage loads on the load board.');
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     const checkout = searchParams.get('checkout');
     const sessionId = searchParams.get('session_id');
     if (checkout === 'success' && sessionId) {
@@ -54,6 +67,19 @@ export default function SubscriptionBilling() {
     }
   }, [searchParams]);
 
+  const addBrokerCard = async () => {
+    setBusy('card');
+    setError('');
+    try {
+      const { url } = await api.billing.createBrokerCardSetup();
+      if (url) window.location.href = url;
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
   const startCheckout = async (planName) => {
     setBusy(planName);
     setError('');
@@ -61,6 +87,7 @@ export default function SubscriptionBilling() {
       const result = await api.billing.createCheckoutSession({
         planName,
         billingTerm,
+        load_board_fee_acknowledged: true,
       });
       if (result?.url) {
         window.location.href = result.url;
@@ -104,7 +131,7 @@ export default function SubscriptionBilling() {
     );
   }
 
-  if (!isCustomerPortalUser(user)) {
+  if (!isCustomerPortalUser(user) && !isFreightBroker(user)) {
     return (
       <div className="p-8 max-w-lg mx-auto text-center text-slate-600">
         <p>Subscription self-service is for customer portal accounts.</p>
@@ -115,6 +142,61 @@ export default function SubscriptionBilling() {
 
   const c = billing?.customer;
   const stripeOn = billing?.stripe?.configured;
+  const isBroker = isFreightBroker(user) || c?.is_broker_account;
+
+  if (isBroker) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <CreditCard className="w-7 h-7 text-amber-500" />
+            Load board billing
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">
+            No monthly subscription. Keep a credit card on file — FleetCo charges {LOAD_BOARD_TRANSACTION_FEE_PERCENT}% when your loads deliver.
+          </p>
+        </div>
+
+        {message && (
+          <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-sm">
+            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+            {message}
+          </div>
+        )}
+        {error && (
+          <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-sm">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+            {error}
+          </div>
+        )}
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+          <div className="font-bold text-slate-900">{c?.company_name || user.customer_name}</div>
+          <div className="text-sm text-slate-600">
+            Plan: <strong>Load Board only</strong> · <strong>$0/mo</strong>
+          </div>
+          <div className="text-sm text-slate-600">
+            Transaction fee: <strong>{LOAD_BOARD_TRANSACTION_FEE_PERCENT}%</strong> of load value when freight moves
+          </div>
+          {stripeOn && (
+            <Button type="button" className="mt-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold" disabled={busy === 'card'} onClick={addBrokerCard}>
+              {busy === 'card' ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CreditCard className="w-4 h-4 mr-2" />}
+              {c?.stripe_customer_id ? 'Update card on file' : 'Add card on file'}
+            </Button>
+          )}
+          {!stripeOn && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Online card setup is not enabled yet. Contact FleetCo to register your payment method.
+            </p>
+          )}
+        </div>
+
+        <Link to="/portal/loads" className="inline-flex text-amber-600 font-bold text-sm hover:underline">
+          Go to Load Board →
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">

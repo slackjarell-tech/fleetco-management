@@ -9,6 +9,7 @@ import {
 } from './db.js';
 import { computeNextDueDate } from './billing.js';
 import { subscriptionAmount as calcSubscriptionAmount, SUBSCRIPTION_PLANS } from './roles.js';
+import { isBrokerAccount } from './brokerAccounts.js';
 
 let stripeClient = null;
 
@@ -68,6 +69,7 @@ async function ensureStripeCustomer(customerRecord) {
 export function activateCustomerSubscription(customerId, { plan, term, stripeSubscriptionId, stripeCustomerId, amount }) {
   const customer = getEntity('Customer', customerId);
   if (!customer) return null;
+  if (isBrokerAccount(customer)) return customer;
 
   const ts = nowIso();
   const subscriptionPlan = plan || customer.subscription_plan || 'Starter';
@@ -144,6 +146,7 @@ export async function createStripeCheckoutSession({
   user,
   customerId,
   email,
+  loadBoardFeeAcknowledged,
 }) {
   const stripe = getStripe();
   if (!stripe) return null;
@@ -176,12 +179,14 @@ export async function createStripeCheckoutSession({
       plan_name: plan,
       billing_term: term,
       user_id: user?.id || '',
+      load_board_fee_acknowledged: loadBoardFeeAcknowledged ? 'true' : '',
     },
     subscription_data: {
       metadata: {
         customer_id: fleetCustomerId,
         plan_name: plan,
         billing_term: term,
+        load_board_fee_acknowledged: loadBoardFeeAcknowledged ? 'true' : '',
       },
     },
   };
@@ -342,6 +347,8 @@ export async function getCustomerBillingOverview(user) {
       last_payment_at: customer.last_payment_at,
       stripe_customer_id: customer.stripe_customer_id ? 'connected' : null,
       stripe_subscription_id: customer.stripe_subscription_id ? 'active' : null,
+      is_broker_account: isBrokerAccount(customer),
+      billing_model: customer.billing_model || null,
     },
     stripe,
   };
@@ -377,6 +384,11 @@ export async function syncCheckoutSession(sessionId, user) {
     amount: calcSubscriptionAmount(plan, term),
   });
 
+  if (session.metadata?.load_board_fee_acknowledged === 'true') {
+    const { recordLoadBoardFeeAcknowledgmentOnCustomer } = await import('./loadBoardFeeAcknowledgment.js');
+    recordLoadBoardFeeAcknowledgmentOnCustomer(customer.id, { source: 'stripe_checkout' });
+  }
+
   return { success: true, customerId: customer.id };
 }
 
@@ -402,6 +414,10 @@ export async function handleStripeWebhook(rawBody, signature) {
         stripeCustomerId: session.customer,
         amount: calcSubscriptionAmount(plan, term),
       });
+      if (session.metadata?.load_board_fee_acknowledged === 'true') {
+        const { recordLoadBoardFeeAcknowledgmentOnCustomer } = await import('./loadBoardFeeAcknowledgment.js');
+        recordLoadBoardFeeAcknowledgmentOnCustomer(customer.id, { source: 'stripe_webhook' });
+      }
     }
   }
 
@@ -450,6 +466,9 @@ export async function createCheckoutWithFallback(body, user) {
   const planName = body.planName || body.plan || 'Starter';
   const billingTerm = body.billingTerm === 'yearly' ? 'yearly' : 'monthly';
 
+  const { requireLoadBoardFeeAcknowledgment } = await import('./loadBoardFeeAcknowledgment.js');
+  requireLoadBoardFeeAcknowledgment(body);
+
   try {
     const stripeResult = await createStripeCheckoutSession({
       planName,
@@ -458,6 +477,7 @@ export async function createCheckoutWithFallback(body, user) {
       user,
       customerId: body.customerId,
       email: body.email,
+      loadBoardFeeAcknowledged: !!body.load_board_fee_acknowledged,
     });
     if (stripeResult?.url) {
       return { ...stripeResult, message: 'Redirecting to secure Stripe checkout' };
@@ -472,4 +492,36 @@ export async function createCheckoutWithFallback(body, user) {
     message: 'Stripe not configured — complete registration; FleetCo will activate billing manually',
     provider: 'register_fallback',
   };
+}
+
+export async function createBrokerCardSetupSession(user) {
+  if (!user?.customer_id || user.role !== 'freight_broker') {
+    throw new Error('Freight broker account required');
+  }
+  const stripe = getStripe();
+  if (!stripe) throw new Error('Stripe is not configured on the server');
+
+  const customer = getEntity('Customer', user.customer_id);
+  if (!customer) throw new Error('Customer not found');
+
+  const stripeCustomerId = await ensureStripeCustomer(customer);
+  const origin = appOrigin();
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'setup',
+    customer: stripeCustomerId,
+    payment_method_types: ['card'],
+    success_url: `${origin}/portal/billing?card=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/portal/billing?card=cancel`,
+    metadata: {
+      customer_id: customer.id,
+      setup_type: 'broker_load_board',
+    },
+  });
+
+  updateEntity('Customer', customer.id, {
+    broker_card_setup_session_id: session.id,
+  });
+
+  return { success: true, url: session.url, sessionId: session.id };
 }

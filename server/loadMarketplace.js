@@ -7,13 +7,14 @@ import {
   nowIso,
 } from './db.js';
 import { isFleetCoInternal } from './roles.js';
+import { isDriverCapableUser } from './driverAccess.js';
+import { computeLoadFinancials, PLATFORM_FEE_PERCENT, POSTER_FEE_PERCENT, CARRIER_FEE_PERCENT } from './loadMarketplaceFinance.js';
 
 function isAdminRole(role) {
   return isFleetCoInternal(role) || role === 'admin' || role === 'owner';
 }
-import { isDriverCapableUser } from './driverAccess.js';
 
-export const PLATFORM_FEE_PERCENT = 3.5;
+export { PLATFORM_FEE_PERCENT, POSTER_FEE_PERCENT, CARRIER_FEE_PERCENT };
 
 export function canBrowseMarketplace(user) {
   if (!user) return false;
@@ -105,6 +106,7 @@ export function respondToLoadBooking(user, { loadId, action, assignedDriverId, a
 
   const driverId = assignedDriverId || load.booked_driver_id || null;
   const vehicleId = assignedVehicleId || load.booked_vehicle_id || null;
+  const fin = computeLoadFinancials(load);
 
   const updated = updateEntity('Load', loadId, {
     booking_status: 'accepted',
@@ -112,9 +114,18 @@ export function respondToLoadBooking(user, { loadId, action, assignedDriverId, a
     assigned_driver_id: driverId,
     assigned_vehicle_id: vehicleId,
     assigned_customer_id: load.booked_by_customer_id || null,
+    accepted_at: nowIso(),
     platform_fee_percent: PLATFORM_FEE_PERCENT,
     platform_fee_status: 'pending',
-    platform_fee_amount: load.rate ? Math.round(load.rate * PLATFORM_FEE_PERCENT) / 100 : null,
+    platform_fee_amount: fin.fleetco_fee_amount,
+    fleetco_fee_amount: fin.fleetco_fee_amount,
+    poster_fee_amount: fin.poster_fee_amount,
+    carrier_fee_amount: fin.carrier_fee_amount,
+    poster_fee_percent: fin.poster_fee_percent,
+    carrier_fee_percent: fin.carrier_fee_percent,
+    load_value: fin.load_value,
+    poster_payout_amount: fin.poster_payout_amount,
+    carrier_payout_amount: fin.carrier_payout_amount,
   });
   return { success: true, load: updated, action: 'accepted' };
 }
@@ -127,15 +138,22 @@ export function completeLoadWithFee(user, loadId) {
     || (user.customer_id && (load.customer_id === user.customer_id || load.booked_by_customer_id === user.customer_id));
   if (!canComplete) throw new Error('Not authorized');
 
-  const rate = Number(load.rate) || 0;
-  const feeAmount = rate ? Math.round(rate * PLATFORM_FEE_PERCENT) / 100 : 0;
+  const fin = computeLoadFinancials(load);
 
   const updated = updateEntity('Load', loadId, {
     status: 'delivered',
     platform_fee_percent: PLATFORM_FEE_PERCENT,
-    platform_fee_amount: feeAmount,
-    platform_fee_status: feeAmount > 0 ? 'pending' : 'waived',
+    platform_fee_amount: fin.fleetco_fee_amount,
+    fleetco_fee_amount: fin.fleetco_fee_amount,
+    poster_fee_amount: fin.poster_fee_amount,
+    carrier_fee_amount: fin.carrier_fee_amount,
+    poster_fee_percent: fin.poster_fee_percent,
+    carrier_fee_percent: fin.carrier_fee_percent,
+    load_value: fin.load_value,
+    poster_payout_amount: fin.poster_payout_amount,
+    carrier_payout_amount: fin.carrier_payout_amount,
+    platform_fee_status: fin.fleetco_fee_amount > 0 ? 'pending' : 'waived',
     delivered_at: nowIso(),
   });
-  return { success: true, load: updated, platformFee: feeAmount };
+  return { success: true, load: updated, platformFee: fin.fleetco_fee_amount, financials: fin };
 }

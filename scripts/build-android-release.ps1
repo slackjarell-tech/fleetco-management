@@ -11,6 +11,7 @@ $Props = Join-Path $Android "keystore.properties"
 $Base = Join-Path $env:LOCALAPPDATA "fleetco-android"
 $env:JAVA_HOME = Join-Path $Base "jdk-21"
 $env:ANDROID_HOME = Join-Path $Base "android-sdk"
+$env:GRADLE_USER_HOME = Join-Path $Base "gradle"
 $env:PATH = "$env:JAVA_HOME\bin;$env:ANDROID_HOME\cmdline-tools\latest\bin;$env:ANDROID_HOME\platform-tools;$env:PATH"
 
 # Web build + sync

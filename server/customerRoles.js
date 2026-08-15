@@ -44,6 +44,7 @@ export const DEFAULT_SIDEBAR_BY_CUSTOMER_ROLE = {
   customer_parts_manager: ['Dashboard', 'Maintenance', 'Fleet', 'Other'],
   driver: ['Dashboard', 'Operations', 'Other'],
   user: ALL_NAV_MODULES,
+  freight_broker: ['Operations', 'Other'],
 };
 
 export function normalizeCustomerRole(role) {
@@ -82,6 +83,7 @@ export function canAssignCustomerRole(actorRole, targetRole) {
 }
 
 export function defaultSidebarModulesForRole(role) {
+  if (role === 'freight_broker') return DEFAULT_SIDEBAR_BY_CUSTOMER_ROLE.freight_broker;
   const key = normalizeCustomerRole(role);
   return DEFAULT_SIDEBAR_BY_CUSTOMER_ROLE[key] || DEFAULT_SIDEBAR_BY_CUSTOMER_ROLE.customer_fleet_coordinator;
 }

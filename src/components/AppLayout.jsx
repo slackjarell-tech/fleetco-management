@@ -37,6 +37,7 @@ const NAV_GROUPS = [
     items: [
       { label: 'Admin Dashboard', icon: LayoutDashboard, path: '/portal' },
       { label: 'Executive View', icon: Crown, path: '/portal/executive' },
+      { label: 'Load Marketplace', icon: Package, path: '/portal/load-marketplace', sltOnly: true },
       { label: 'FleetCo Payroll', icon: DollarSign, path: '/portal/fleetco-payroll' },
       { label: 'Customer Insights', icon: BarChart2, path: '/portal/customer-insights', internalOnly: true },
     ]
@@ -46,6 +47,7 @@ const NAV_GROUPS = [
     icon: Package,
     items: [
       { label: 'Load Board', icon: Package, path: '/portal/loads' },
+      { label: 'Payment Method', icon: CreditCard, path: '/portal/billing', brokerBilling: true },
       { label: 'PD Command Tower', icon: Map, path: '/portal/pd-command', advancedOnly: true },
       { label: 'Route Builder', icon: Route, path: '/portal/route-builder', advancedOnly: true },
       { label: 'Route Dashboard', icon: Route, path: '/portal/route-dashboard', advancedOnly: true },
@@ -326,6 +328,8 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
               if (item.path === '/portal/fleetco-payroll' && !['owner', 'executive', 'fleet_manager'].includes(user?.role)) return false;
               if (item.ownerOnly && user?.role !== 'owner') return false;
               if (item.customerBilling && !user?.customer_id) return false;
+              if (item.customerBilling && user?.role === 'freight_broker') return false;
+              if (item.brokerBilling && user?.role !== 'freight_broker') return false;
               if (item.advancedOnly && isCustomerPortalUser(user) && !isInternal) return false;
 
               if (isViewingAsCustomer) {

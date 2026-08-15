@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Package, Fuel, CheckCircle, Clock, TrendingUp, Route, ScanLine,
-  Video, ClipboardCheck, Navigation, Truck, MapPin,
+  Package, Fuel, Clock, TrendingUp, Route, ScanLine,
+  Video, ClipboardCheck, Navigation, Truck, MapPin, CreditCard, Wrench, Zap,
 } from 'lucide-react';
 
 const QUICK_ACTIONS = [
@@ -11,7 +11,10 @@ const QUICK_ACTIONS = [
   { path: '/driver/scan', label: 'Scan', desc: 'Packages & manifests', icon: ScanLine, color: 'text-blue-400', bg: 'bg-blue-900/30' },
   { path: '/driver/dashcam', label: 'Dashcam', desc: 'ELD & road video', icon: Video, color: 'text-purple-400', bg: 'bg-purple-900/30' },
   { path: '/driver/navigation', label: 'Navigate', desc: 'Turn-by-turn', icon: Navigation, color: 'text-cyan-400', bg: 'bg-cyan-900/30' },
-  { path: '/driver/hos', label: 'HOS Logs', desc: 'Hours of service', icon: ClipboardCheck, color: 'text-orange-400', bg: 'bg-orange-900/30' },
+  { path: '/driver/fuel-stations', label: 'Fuel & EV', desc: 'Stations nearby', icon: Zap, color: 'text-yellow-400', bg: 'bg-yellow-900/30' },
+  { path: '/driver/fuel', label: 'Fuel Logs', desc: 'Receipts & cards', icon: Fuel, color: 'text-orange-400', bg: 'bg-orange-900/30' },
+  { path: '/driver/workorders', label: 'Shop', desc: 'Photos & invoices', icon: Wrench, color: 'text-rose-400', bg: 'bg-rose-900/30' },
+  { path: '/driver/hos', label: 'HOS Logs', desc: 'Hours of service', icon: ClipboardCheck, color: 'text-indigo-400', bg: 'bg-indigo-900/30' },
 ];
 
 export default function DriverDashboard({ user, data, delivery }) {

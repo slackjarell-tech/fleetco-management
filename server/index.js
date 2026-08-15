@@ -182,6 +182,17 @@ app.post('/api/auth/register', (req, res) => {
   res.json({ success: true, message: 'Registration successful. Check server console for OTP in dev mode.' });
 });
 
+app.post('/api/auth/register-broker', async (req, res) => {
+  try {
+    const { registerFreightBroker } = await import('./brokerRegistration.js');
+    const result = await registerFreightBroker(req.body);
+    const token = signToken(result.user.id);
+    res.status(201).json({ ...result, access_token: token });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/auth/verify-otp', (req, res) => {
   const { email, otpCode } = req.body;
   const row = db.getOtp(email);
@@ -215,6 +226,10 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
       user.system_paused = !!customer.system_paused;
       user.customer_name = customer.company_name;
       user.notification_prefs = getCustomerNotificationPrefs(customer);
+      user.driver_dual_camera_enabled = !!customer.driver_dual_camera_enabled;
+      user.max_stops_per_route = Number(customer.max_stops_per_route) || 200;
+      user.require_pod_signature = !!customer.require_pod_signature;
+      user.allow_virtual_pod = customer.allow_virtual_pod !== false;
     }
   }
   res.json(user);
@@ -641,6 +656,15 @@ app.post('/api/billing/sync-session', requireAuth, async (req, res) => {
   }
 });
 
+app.post('/api/billing/broker-card-setup', requireAuth, async (req, res) => {
+  try {
+    const { createBrokerCardSetupSession } = await import('./stripeBilling.js');
+    res.json(await createBrokerCardSetupSession(req.user));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ─── Entities ───────────────────────────────────────────────────────────────
 
 app.get('/api/customer-view/options', requireAuth, (req, res) => {
@@ -696,7 +720,7 @@ app.get('/api/customer-analytics/summary', requireAuth, (req, res) => {
 
 const ENTITY_NAMES = [
   'Customer', 'DriverLocation', 'DiagnosticCode', 'FuelLog', 'DeliveryRoute',
-  'DeliveryStop', 'HOSLog', 'FuelStation', 'Inquiry', 'Incident', 'Inspection',
+  'DeliveryStop', 'HOSLog', 'FuelStation', 'FuelCard', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
   'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
@@ -704,7 +728,7 @@ const ENTITY_NAMES = [
   'MarketingConversation', 'MarketingAutopilotRun',
   'CustomerFundingAccount', 'PayeeBankAccount', 'PayrollDisbursement', 'PayrollDisbursementBatch',
   'EmployeeTaxProfile',
-  'BrokerApplication', 'TrialRequest',
+  'BrokerApplication', 'TrialRequest', 'LoadMessage',
 ];
 
 function filterUsersForActor(actor, users) {

@@ -15,6 +15,7 @@ export default function FuelAudits() {
   const [logs, setLogs] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [users, setUsers] = useState([]);
+  const [fuelCards, setFuelCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [vehicleFilter, setVehicleFilter] = useState('all');
@@ -32,10 +33,11 @@ export default function FuelAudits() {
 
   const fetchData = async (u) => {
     setLoading(true);
-    const [ls, vs, us] = await Promise.all([
+    const [ls, vs, us, cards] = await Promise.all([
       api.entities.FuelLog.list('-date', 500),
       api.entities.Vehicle.list(),
       api.entities.User.list(),
+      isPureDriverUser(u) ? api.entities.FuelCard.filter({ driver_id: u.id }) : Promise.resolve([]),
     ]);
     let filtered = ls;
     if (isPureDriverUser(u)) filtered = filtered.filter(l => l.driver_id === u.id);
@@ -46,6 +48,7 @@ export default function FuelAudits() {
     setLogs(filtered);
     setVehicles(vs);
     setUsers(us);
+    setFuelCards(cards);
     setLoading(false);
   };
 
@@ -268,6 +271,7 @@ export default function FuelAudits() {
           vehicles={vehicles}
           users={users}
           currentUser={user}
+          fuelCards={fuelCards}
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditLog(null); }}
         />

@@ -1,4 +1,6 @@
 /** Subscription billing — due dates, reminders, pause eligibility */
+import { isBrokerAccount, brokerBillingSnapshot } from './brokerAccounts.js';
+
 export const REMINDER_THRESHOLDS = [7, 3, 1, 0];
 
 export function computeNextDueDate(fromIso, term = 'monthly') {
@@ -23,6 +25,7 @@ export function daysUntilDue(dueIso) {
 
 export function getBillingSnapshot(customer) {
   if (!customer) return null;
+  if (isBrokerAccount(customer)) return brokerBillingSnapshot(customer);
 
   const dueAt = customer.next_payment_due_at || customer.payment_collected_at || null;
   const days = dueAt != null ? daysUntilDue(dueAt) : null;

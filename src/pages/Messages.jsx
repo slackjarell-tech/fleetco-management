@@ -4,6 +4,7 @@ import { MessageCircle, Send, ChevronLeft, User, Building2, UserCheck } from 'lu
 import PortalPageShell from '@/components/layout/PortalPageShell';
 import { filterDriverRoster, isPureDriverUser, isDriverCapableUser } from '@/lib/driverAccess';
 import { isCustomerPortalUser } from '@/lib/customerRoles';
+import { isFleetCoAdmin } from '@/lib/roles';
 
 export default function Messages() {
   const [user, setUser] = useState(null);
@@ -17,6 +18,8 @@ export default function Messages() {
 
   // Customer messaging state
   const [customerRecord, setCustomerRecord] = useState(null);
+  const [selectedTeamContact, setSelectedTeamContact] = useState(null);
+  const [teamContacts, setTeamContacts] = useState([]);
   const [accountReps, setAccountReps] = useState([]);
 
   useEffect(() => {
@@ -28,6 +31,34 @@ export default function Messages() {
 
       if (isPureDriverUser(u)) {
         setSelectedDriver(u);
+        if (u.customer_id) {
+          const customers = await api.entities.Customer.filter({});
+          const myCustomer = customers.find((c) => c.id === u.customer_id);
+          const contacts = [];
+          const addContact = (person, title) => {
+            if (person && person.id !== u.id) contacts.push({ ...person, title });
+          };
+          if (myCustomer) {
+            addContact(allUsers.find((m) => m.id === myCustomer.assigned_manager_id), 'Fleet Manager');
+            addContact(allUsers.find((m) => m.id === myCustomer.assigned_coordinator_id), 'Fleet Coordinator');
+          }
+          allUsers
+            .filter((m) => m.customer_id === u.customer_id && isCustomerPortalUser(m) && m.id !== u.id)
+            .forEach((m) => {
+              if (!contacts.some((c) => c.id === m.id)) {
+                contacts.push({ ...m, title: m.role?.replace(/_/g, ' ') || 'Team' });
+              }
+            });
+          allUsers
+            .filter((m) => isFleetCoAdmin(m.role) && m.id !== u.id)
+            .slice(0, 3)
+            .forEach((m) => {
+              if (!contacts.some((c) => c.id === m.id)) {
+                contacts.push({ ...m, title: 'FleetCo Support' });
+              }
+            });
+          setTeamContacts(contacts);
+        }
       }
 
       // If current user is a customer, load their customer record
@@ -56,10 +87,18 @@ export default function Messages() {
     init();
   }, []);
 
+  const conversationId = () => {
+    if (!selectedDriver || !user) return null;
+    if (isPureDriverUser(user) && selectedTeamContact) {
+      return `driver_${user.id}_team_${selectedTeamContact.id}`;
+    }
+    return `driver_${selectedDriver.id}`;
+  };
+
   // Load messages for selected driver conversation
   useEffect(() => {
-    if (!selectedDriver || !user) return;
-    const convId = `driver_${selectedDriver.id}`;
+    const convId = conversationId();
+    if (!convId) return;
     const unsubscribe = api.entities.Message.subscribe((event) => {
       if (event.data?.conversation_id === convId || event.type === 'delete') {
         loadMessages(convId);
@@ -67,7 +106,7 @@ export default function Messages() {
     });
     loadMessages(convId);
     return () => unsubscribe();
-  }, [selectedDriver, user]);
+  }, [selectedDriver, selectedTeamContact, user]);
 
   // Load customer conversation messages
   useEffect(() => {
@@ -101,13 +140,15 @@ export default function Messages() {
     e.preventDefault();
     if (!text.trim() || !selectedDriver || sending) return;
     setSending(true);
-    const convId = `driver_${selectedDriver.id}`;
+    const convId = conversationId();
+    if (!convId) return;
     await api.entities.Message.create({
       conversation_id: convId,
       sender_id: user.id,
       sender_name: user.full_name,
       sender_role: user.role,
       recipient_driver_id: selectedDriver.id,
+      recipient_user_id: selectedTeamContact?.id || undefined,
       text: text.trim(),
       read: false,
     });
@@ -282,14 +323,38 @@ export default function Messages() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Driver header for drivers */}
         {isDriver && (
-          <div className="px-5 py-4 border-b border-slate-200 bg-white flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center">
-              <MessageCircle className="w-5 h-5 text-amber-600" />
+          <div className="px-4 py-3 border-b border-slate-200 bg-white space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center">
+                <MessageCircle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <div className="font-black text-slate-900 text-sm">My Messages</div>
+                <div className="text-xs text-slate-500">Message your fleet team</div>
+              </div>
             </div>
-            <div>
-              <div className="font-black text-slate-900 text-sm">My Messages</div>
-              <div className="text-xs text-slate-500">Communications from your team</div>
-            </div>
+            {teamContacts.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTeamContact(null)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border ${!selectedTeamContact ? 'bg-amber-500 text-slate-900 border-amber-500' : 'bg-slate-50 text-slate-600 border-slate-200'}`}
+                >
+                  All team
+                </button>
+                {teamContacts.map((contact) => (
+                  <button
+                    key={contact.id}
+                    type="button"
+                    onClick={() => setSelectedTeamContact(contact)}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border flex items-center gap-1 ${selectedTeamContact?.id === contact.id ? 'bg-amber-500 text-slate-900 border-amber-500' : 'bg-slate-50 text-slate-600 border-slate-200'}`}
+                  >
+                    <UserCheck className="w-3 h-3" />
+                    {contact.full_name?.split(' ')[0]} · {contact.title}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Mail, Lock, Loader2 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
+import LoadBoardFeeAcknowledgment from "@/components/loadboard/LoadBoardFeeAcknowledgment";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+  const [feeAcknowledged, setFeeAcknowledged] = useState(false);
 
   const params = new URLSearchParams(window.location.search);
   const plan = params.get('plan');
@@ -45,6 +47,10 @@ export default function Register() {
       setError("Passwords do not match");
       return;
     }
+    if (!feeAcknowledged) {
+      setError("Please agree to the load board platform fee and credit card on file terms");
+      return;
+    }
     setLoading(true);
     try {
       await api.auth.register({ email, password });
@@ -63,6 +69,14 @@ export default function Register() {
       const result = await api.auth.verifyOtp({ email, otpCode });
       if (result?.access_token) {
         api.auth.setToken(result.access_token);
+      }
+      try {
+        await api.functions.invoke('acknowledgeLoadBoardFee', {
+          load_board_fee_acknowledged: true,
+          source: 'register',
+        });
+      } catch {
+        /* user may not exist in functions context yet on first verify */
       }
       window.location.href = "/portal";
     } catch (err) {
@@ -197,10 +211,16 @@ export default function Register() {
           </div>
         </div>
 
+        <LoadBoardFeeAcknowledgment
+          variant="dark"
+          checked={feeAcknowledged}
+          onChange={setFeeAcknowledged}
+        />
+
         <Button
           type="submit"
           className="w-full h-11 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-sm mt-2"
-          disabled={loading}
+          disabled={loading || !feeAcknowledged}
         >
           {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating account...</> : "Create Account"}
         </Button>

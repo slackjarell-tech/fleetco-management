@@ -137,6 +137,11 @@ export function entityBelongsToCustomer(type, item, customerId, scopeIndex) {
     return true;
   }
 
+  if (type === 'FuelCard') {
+    if (matchesCustomerField(item, customerId)) return true;
+    if (item.driver_id && userIds?.has(item.driver_id)) return true;
+  }
+
   if (type === 'PayrollRecord') {
     if (item.driver_id && userIds?.has(item.driver_id)) return true;
     if (item.employee_user_id && userIds?.has(item.employee_user_id)) return true;

@@ -4,7 +4,7 @@ import { api } from '@/api/apiClient';
 import {
   LayoutDashboard, Clock, Route, ScanLine, Menu, LogOut, Package,
   MessageCircle, Navigation, ClipboardCheck, Fuel, AlertTriangle,
-  X, ChevronRight, Video, Building2, Lock,
+  X, ChevronRight, Video, Building2, Lock, MapPin, CreditCard, Wrench,
 } from 'lucide-react';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
 import CustomerPausedOverlay from '@/components/billing/CustomerPausedOverlay';
@@ -30,6 +30,10 @@ const MORE_LINKS = [
   { path: '/driver/hos', label: 'HOS Logs', icon: ClipboardCheck },
   { path: '/driver/inspections', label: 'Inspections', icon: ClipboardCheck },
   { path: '/driver/fuel', label: 'Fuel Logs', icon: Fuel },
+  { path: '/driver/fuel-stations', label: 'Fuel & EV Map', icon: MapPin },
+  { path: '/driver/fuel-cards', label: 'Fuel Cards', icon: CreditCard },
+  { path: '/driver/workorders', label: 'Shop Reports', icon: Wrench },
+  { path: '/driver/pretrip', label: 'Pre-Trip', icon: ClipboardCheck },
   { path: '/driver/incidents', label: 'Incidents', icon: AlertTriangle },
   { path: '/driver/change-password', label: 'Change Password', icon: Lock },
 ];
@@ -57,7 +61,7 @@ export default function DriverMobileLayout() {
     );
   }
 
-  if (!user) return <Navigate to="/login?app=driver" replace />;
+  if (!user) return <Navigate to="/driver/login" replace />;
   if (!canAccessDriverApp(user)) return <Navigate to="/portal" replace />;
 
   return (

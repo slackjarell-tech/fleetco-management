@@ -4,10 +4,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { X } from 'lucide-react';
+import { X, Camera } from 'lucide-react';
+import CameraCapture from '@/components/driver/CameraCapture';
 import { filterDriverRoster, isDriverCapableUser } from '@/lib/driverAccess';
 
-export default function FuelLogModal({ log, vehicles, users, currentUser, onSave, onClose }) {
+export default function FuelLogModal({ log, vehicles, users, currentUser, fuelCards = [], onSave, onClose }) {
   const isAdmin = currentUser?.role === 'admin';
   const drivers = filterDriverRoster(users);
 
@@ -22,6 +23,8 @@ export default function FuelLogModal({ log, vehicles, users, currentUser, onSave
     location: log?.location || '',
     fuel_type: log?.fuel_type || 'diesel',
     notes: log?.notes || '',
+    receipt_photo_url: log?.receipt_photo_url || '',
+    fuel_card_id: log?.fuel_card_id || '',
   });
 
   const set = (k, v) => {
@@ -108,6 +111,28 @@ export default function FuelLogModal({ log, vehicles, users, currentUser, onSave
             <div className="col-span-2">
               <Label>Location</Label>
               <Input value={form.location} onChange={e => set('location', e.target.value)} className="mt-1" placeholder="City, ST or station name" />
+            </div>
+            {fuelCards.length > 0 && (
+              <div className="col-span-2">
+                <Label>Fuel card</Label>
+                <Select value={form.fuel_card_id || ''} onValueChange={v => set('fuel_card_id', v)}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Optional" /></SelectTrigger>
+                  <SelectContent>
+                    {fuelCards.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.label || c.network} ****{c.last_four}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <div>
+            <Label className="flex items-center gap-1"><Camera className="w-3.5 h-3.5" /> Receipt photo</Label>
+            <div className="mt-2">
+              <CameraCapture label="Scan receipt" onCapture={(url) => set('receipt_photo_url', url)} />
+              {form.receipt_photo_url && (
+                <img src={form.receipt_photo_url} alt="Receipt" className="mt-2 rounded-lg max-h-36 object-cover border border-slate-200" />
+              )}
             </div>
           </div>
           <div>

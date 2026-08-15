@@ -11,6 +11,7 @@ import {
   putBlob,
   putQueueItem,
 } from '@/lib/offline/offlineDb';
+import { scheduleBackgroundSync } from '@/lib/driverBackground';
 
 const MAX_RETRIES = 8;
 const WRITE_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
@@ -43,6 +44,7 @@ function notify() {
   listeners.forEach((cb) => {
     try { cb(getQueueSnapshot()); } catch { /* ignore */ }
   });
+  scheduleBackgroundSync();
 }
 
 export function subscribeOfflineQueue(cb) {

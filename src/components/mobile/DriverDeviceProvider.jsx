@@ -9,6 +9,7 @@ import {
   takePhoto,
   watchPosition,
 } from '@/lib/nativeBridge';
+import { onAppVisible } from '@/lib/driverBackground';
 import {
   hasCompletedPermissionSetup,
   markPermissionSetupComplete,
@@ -148,6 +149,11 @@ export function DriverDeviceProvider({ user, children }) {
     setPosition(pos);
     return pos;
   }, []);
+
+  useEffect(() => {
+    if (!permissionsReady) return;
+    return onAppVisible(() => { refreshPosition().catch(() => {}); });
+  }, [permissionsReady, refreshPosition]);
 
   const value = {
     permissionsReady,

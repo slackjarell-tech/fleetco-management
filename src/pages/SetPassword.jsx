@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import AuthLayout from '@/components/AuthLayout';
 import ChangePasswordForm from '@/components/auth/ChangePasswordForm';
@@ -8,6 +8,8 @@ import { canAccessDriverApp } from '@/lib/driverAccess';
 
 export default function SetPassword() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const driverFlow = searchParams.get('app') === 'driver';
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [done, setDone] = useState(false);
@@ -15,24 +17,25 @@ export default function SetPassword() {
   useEffect(() => {
     api.auth.me().then((u) => {
       if (!u) {
-        navigate('/login');
+        navigate(driverFlow ? '/driver/login' : '/login');
         return;
       }
       if (!u.must_change_password) {
-        window.location.href = '/portal';
+        window.location.href = driverFlow && canAccessDriverApp(u) ? '/driver' : '/portal';
         return;
       }
       setUser(u);
       setLoading(false);
-    }).catch(() => navigate('/login'));
-  }, [navigate]);
+    }).catch(() => navigate(driverFlow ? '/driver/login' : '/login'));
+  }, [navigate, driverFlow]);
 
   const handleSuccess = async () => {
     setDone(true);
-    let destination = '/portal';
+    let destination = driverFlow ? '/driver' : '/portal';
     try {
       const me = await api.auth.me();
-      if (canAccessDriverApp(me)) destination = '/driver';
+      if (canAccessDriverApp(me) && (driverFlow || !me.customer_id)) destination = '/driver';
+      else if (!canAccessDriverApp(me)) destination = '/portal';
     } catch (_) {}
     setTimeout(() => { window.location.href = destination; }, 2000);
   };

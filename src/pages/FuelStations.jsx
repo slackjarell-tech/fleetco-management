@@ -33,10 +33,11 @@ const fuelIcon = (price) => {
   });
 };
 
-export default function FuelStations() {
+export default function FuelStations({ driverMode = false }) {
   const [view, setView] = useState("map");
   const [stations, setStations] = useState([]);
   const [search, setSearch] = useState("");
+  const [stationFilter, setStationFilter] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingStation, setEditingStation] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -79,13 +80,18 @@ export default function FuelStations() {
     return () => unsubscribe();
   }, [loadStations]);
 
-  const filtered = stations.filter(s =>
-    s.status === "active" &&
-    (!search || s.name?.toLowerCase().includes(search.toLowerCase()) ||
-     s.city?.toLowerCase().includes(search.toLowerCase()) ||
-     s.state?.toLowerCase().includes(search.toLowerCase()) ||
-     s.brand?.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filtered = stations.filter(s => {
+    if (s.status !== "active") return false;
+    const type = s.station_type || "fuel";
+    if (stationFilter === "fuel" && type !== "fuel") return false;
+    if (stationFilter === "ev" && type !== "ev_charging") return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return s.name?.toLowerCase().includes(q)
+      || s.city?.toLowerCase().includes(q)
+      || s.state?.toLowerCase().includes(q)
+      || s.brand?.toLowerCase().includes(q);
+  });
 
   const handleAdd = () => {
     setEditingStation(null);
@@ -124,9 +130,9 @@ export default function FuelStations() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Fuel Stations</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{driverMode ? 'Fuel & Charging' : 'Fuel Stations'}</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Live fuel pricing across all station locations
+            {driverMode ? 'Nearby diesel, gas, and EV charging' : 'Live fuel pricing across all station locations'}
             {activeDrivers.length > 0 && (
               <span className="inline-flex items-center gap-1 ml-3 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
                 <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
@@ -149,17 +155,38 @@ export default function FuelStations() {
             >
               <List className="w-4 h-4 inline mr-1" /> List
             </button>
-            <button
-              onClick={() => setView("predictions")}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "predictions" ? "bg-white shadow text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
-            >
-              <TrendingUp className="w-4 h-4 inline mr-1" /> Predictions
-            </button>
+            {!driverMode && (
+              <button
+                onClick={() => setView("predictions")}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "predictions" ? "bg-white shadow text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+              >
+                <TrendingUp className="w-4 h-4 inline mr-1" /> Predictions
+              </button>
+            )}
           </div>
-          <Button onClick={handleAdd} className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold">
-            <Plus className="w-4 h-4 mr-1" /> Add Station
-          </Button>
+          {!driverMode && (
+            <Button onClick={handleAdd} className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold">
+              <Plus className="w-4 h-4 mr-1" /> Add Station
+            </Button>
+          )}
         </div>
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
+        {[
+          { id: 'all', label: 'All' },
+          { id: 'fuel', label: 'Fuel' },
+          { id: 'ev', label: 'EV Charging' },
+        ].map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setStationFilter(id)}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold border ${stationFilter === id ? 'bg-amber-500 text-slate-900 border-amber-500' : 'bg-white text-slate-600 border-slate-200'}`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Search */}
@@ -317,20 +344,24 @@ export default function FuelStations() {
       {filtered.length === 0 && (
         <div className="text-center py-16 text-slate-400">
           <AlertCircle className="w-12 h-12 mx-auto mb-3" />
-          <p className="text-lg font-medium">No fuel stations found</p>
-          <p className="text-sm mt-1">Add your first station or adjust your search</p>
-          <Button variant="outline" className="mt-4" onClick={handleAdd}>
-            <Plus className="w-4 h-4 mr-1" /> Add Station
-          </Button>
+          <p className="text-lg font-medium">No stations found</p>
+          <p className="text-sm mt-1">{driverMode ? 'Try another filter or search' : 'Add your first station or adjust your search'}</p>
+          {!driverMode && (
+            <Button variant="outline" className="mt-4" onClick={handleAdd}>
+              <Plus className="w-4 h-4 mr-1" /> Add Station
+            </Button>
+          )}
         </div>
       )}
 
-      <FuelStationModal
-        open={modalOpen}
-        onClose={() => { setModalOpen(false); setEditingStation(null); }}
-        station={editingStation}
-        currentUser={user}
-      />
+      {!driverMode && (
+        <FuelStationModal
+          open={modalOpen}
+          onClose={() => { setModalOpen(false); setEditingStation(null); }}
+          station={editingStation}
+          currentUser={user}
+        />
+      )}
     </div>
   );
 }

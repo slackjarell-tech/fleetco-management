@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { CloudOff, CloudUpload, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { CloudOff, CloudUpload, RefreshCw, CheckCircle2, AlertTriangle, Smartphone } from 'lucide-react';
 import {
   enableDriverOfflineSync,
   disableDriverOfflineSync,
@@ -9,12 +9,20 @@ import {
   retryFailedQueueItems,
 } from '@/lib/offline/offlineSync';
 import { syncDriverOfflineQueue } from '@/api/apiClient';
+import {
+  initDriverBackgroundSupport,
+  subscribeServiceWorkerSync,
+  onAppVisible,
+  isBackgroundSyncSupported,
+} from '@/lib/driverBackground';
 
 export default function OfflineSyncProvider({ user, children }) {
   const [online, setOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [counts, setCounts] = useState({ pending: 0, failed: 0, total: 0 });
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(null);
+  const [resumed, setResumed] = useState(false);
+  const resumeTimerRef = useRef(null);
 
   const refreshCounts = useCallback(async () => {
     try {
@@ -36,10 +44,20 @@ export default function OfflineSyncProvider({ user, children }) {
     }
   }, [syncing, refreshCounts]);
 
+  const flashResumed = useCallback(() => {
+    setResumed(true);
+    if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = setTimeout(() => setResumed(false), 5000);
+  }, []);
+
   useEffect(() => {
     if (user?.id) enableDriverOfflineSync(user.id);
     return () => disableDriverOfflineSync();
   }, [user?.id]);
+
+  useEffect(() => {
+    initDriverBackgroundSupport();
+  }, []);
 
   useEffect(() => {
     const onOnline = () => {
@@ -56,6 +74,19 @@ export default function OfflineSyncProvider({ user, children }) {
   }, [runSync]);
 
   useEffect(() => {
+    const unsubVis = onAppVisible(() => {
+      flashResumed();
+      runSync();
+    });
+    const unsubSw = subscribeServiceWorkerSync(() => runSync());
+    return () => {
+      unsubVis();
+      unsubSw();
+      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    };
+  }, [runSync, flashResumed]);
+
+  useEffect(() => {
     const unsub = subscribeOfflineQueue(() => { refreshCounts(); });
     refreshCounts();
     const interval = setInterval(refreshCounts, 4000);
@@ -66,7 +97,7 @@ export default function OfflineSyncProvider({ user, children }) {
     if (online && counts.pending > 0 && !syncing) runSync();
   }, [online, counts.pending, syncing, runSync]);
 
-  const showBanner = !online || counts.pending > 0 || counts.failed > 0 || syncing;
+  const showBanner = !online || counts.pending > 0 || counts.failed > 0 || syncing || resumed;
 
   return (
     <>
@@ -79,14 +110,16 @@ export default function OfflineSyncProvider({ user, children }) {
                 ? 'bg-red-950 text-red-100 border-red-800'
                 : syncing
                   ? 'bg-blue-950 text-blue-100 border-blue-800'
-                  : 'bg-slate-800 text-slate-200 border-slate-700'
+                  : resumed
+                    ? 'bg-emerald-950 text-emerald-100 border-emerald-800'
+                    : 'bg-slate-800 text-slate-200 border-slate-700'
           }`}
         >
           {!online ? (
             <>
               <CloudOff className="w-4 h-4 flex-shrink-0" />
               <span className="flex-1">
-                Offline — activity is saved on this device
+                Offline — saved on this device
                 {counts.pending > 0 ? ` (${counts.pending} waiting to upload)` : ''}
               </span>
             </>
@@ -107,16 +140,29 @@ export default function OfflineSyncProvider({ user, children }) {
                 Retry
               </button>
             </>
+          ) : resumed ? (
+            <>
+              <Smartphone className="w-4 h-4 flex-shrink-0" />
+              <span className="flex-1">
+                Welcome back
+                {counts.pending > 0 ? ` — uploading ${counts.pending} saved item${counts.pending !== 1 ? 's' : ''}` : ' — all caught up'}
+              </span>
+            </>
           ) : (
             <>
               <CloudUpload className="w-4 h-4 flex-shrink-0" />
               <span className="flex-1">{counts.pending} saved — uploading now…</span>
             </>
           )}
-          {online && !syncing && counts.pending === 0 && counts.failed === 0 && lastSync && (
+          {online && !syncing && counts.pending === 0 && counts.failed === 0 && lastSync && !resumed && (
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           )}
         </div>
+      )}
+      {!isBackgroundSyncSupported() && online && counts.pending === 0 && !syncing && (
+        <p className="sr-only" aria-live="polite">
+          Background sync unavailable on this browser — open the app to upload saved work.
+        </p>
       )}
       {children}
     </>
