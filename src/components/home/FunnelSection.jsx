@@ -6,7 +6,7 @@ const FUNNELS = [
   {
     icon: Monitor,
     title: 'Fleet Software',
-    desc: 'Dispatch, drivers, maintenance, fuel, payroll, and compliance — one portal from $299/mo.',
+    desc: 'Dispatch, drivers, maintenance, fuel, payroll, and compliance — one portal from $35/unit/mo.',
     cta: 'Explore for Fleets',
     to: '/for-fleets',
     accent: 'bg-white border-slate-200 text-slate-900',

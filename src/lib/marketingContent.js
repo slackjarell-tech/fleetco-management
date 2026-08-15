@@ -141,7 +141,7 @@ export const PRICING_FAQ = [
   },
   {
     q: 'Can I switch plans as my fleet grows?',
-    a: 'Yes. Move from Starter (1–5 vehicles) to Growth (6–15) or contact us for Enterprise (16+) anytime. We prorate billing changes through Stripe.',
+    a: 'Yes. Billing is per unit at $35/unit/month. Add or remove units anytime — we prorate through Stripe. Pay yearly and save 5%.',
   },
   {
     q: 'Is there a free trial?',

@@ -11,7 +11,7 @@ const DEFAULTS = {
   hero_title_line1: 'Run your fleet.',
   hero_title_highlight: 'One platform.',
   hero_description:
-    'FleetCo Management gives owner-operators and small carriers dispatch, maintenance, fuel, payroll, compliance, and a driver app — in one portal from $299/mo. No spreadsheets. No juggling five apps.',
+    'FleetCo Management gives owner-operators and small carriers dispatch, maintenance, fuel, payroll, compliance, and a driver app — in one portal from $35/unit/mo. No spreadsheets. No juggling five apps.',
 };
 
 export default function HeroSection() {
@@ -109,7 +109,7 @@ export default function HeroSection() {
               className="inline-flex items-center gap-2 text-sm font-bold text-amber-300 hover:text-amber-200 border border-amber-500/40 hover:border-amber-400/60 bg-amber-500/10 hover:bg-amber-500/15 px-4 py-2 rounded-lg transition-colors"
             >
               <Package className="w-4 h-4" />
-              Freight Brokers — Post Loads Free, 3.5% When It Moves
+              Freight Brokers — Post Loads Free, 3.5% When It Moves · Carriers from $35/unit/mo
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

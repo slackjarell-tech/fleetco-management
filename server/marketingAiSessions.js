@@ -45,7 +45,7 @@ function parseMessages(raw) {
   }
 }
 
-const WELCOME = 'Hi — I\'m the FleetCo assistant. I can explain our fleet portal, pricing ($299–$599/mo), and help you request a demo or get started. What size fleet are you running?';
+const WELCOME = 'Hi — I\'m the FleetCo assistant. I can explain our fleet portal, pricing ($35/unit/mo, 5% off annual), and help you request a demo or get started. What size fleet are you running?';
 
 export function createPublicMarketingConversation(guestId) {
   pruneOldConversations();

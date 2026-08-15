@@ -13,7 +13,7 @@ export default function PricingPage() {
     <div className="min-h-screen bg-white">
       <PageMeta
         title="Pricing"
-        description="FleetCo Management plans from $299/mo for owner-operators and small fleets. Full portal access and driver app included."
+        description="FleetCo Management — $35/unit/mo for owner-operators and small fleets. Full portal and driver app. Save 5% with annual billing."
         path="/pricing"
       />
       <NavBar />

@@ -18,8 +18,7 @@ export const BRAND = {
   tagline: 'Move freight. We handle the rest.',
   ownersLine: 'FleetCo Management LLC',
   pricing: [
-    { name: 'Starter', price: '$299/mo', fleetSize: '1–5 vehicles', detail: 'Full portal · driver app · fuel & maintenance · monthly reports' },
-    { name: 'Growth', price: '$599/mo', fleetSize: '6–15 vehicles', detail: 'Everything in Starter · payroll · load board · priority support', highlighted: true },
+    { name: 'Per Unit', price: '$35/unit/mo', fleetSize: 'Any fleet size', detail: 'Full portal · driver app · fuel & maintenance · pay only for units you run' },
     { name: 'Enterprise', price: 'Custom pricing', priceSub: 'Quote on request', fleetSize: '16+ vehicles', detail: 'Tailored scope · telematics · custom integrations · dedicated account team', contactOnly: true },
   ],
 };

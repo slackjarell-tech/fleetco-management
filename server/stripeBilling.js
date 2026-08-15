@@ -8,7 +8,7 @@ import {
   updateEntity,
 } from './db.js';
 import { computeNextDueDate } from './billing.js';
-import { subscriptionAmount as calcSubscriptionAmount, SUBSCRIPTION_PLANS } from './roles.js';
+import { subscriptionAmount as calcSubscriptionAmount, subscriptionAmountForCustomer, SUBSCRIPTION_PLANS, DEFAULT_SUBSCRIPTION_PLAN, unitCountFromCustomer } from './roles.js';
 import { isBrokerAccount } from './brokerAccounts.js';
 
 let stripeClient = null;
@@ -29,19 +29,25 @@ export function getStripeConfigStatus() {
   };
 }
 
-/** Resolve Stripe Price ID from env or marketing defaults */
+/** Resolve Stripe Price ID — per-unit prices; quantity set at checkout. */
 export function resolveStripePriceId(planName, billingTerm = 'monthly') {
-  const plan = (planName || 'Starter').replace(/\s+/g, '');
   const term = billingTerm === 'yearly' ? 'yearly' : 'monthly';
-  const envKey = `STRIPE_PRICE_${plan.toUpperCase()}_${term.toUpperCase()}`;
-  const fromEnv = (process.env[envKey] || '').trim();
+  const perUnitEnv = `STRIPE_PRICE_PERUNIT_${term.toUpperCase()}`;
+  const fromPerUnit = (process.env[perUnitEnv] || '').trim();
+  if (fromPerUnit) return fromPerUnit;
+
+  const plan = (planName || DEFAULT_SUBSCRIPTION_PLAN).replace(/\s+/g, '');
+  const legacyEnv = `STRIPE_PRICE_${plan.toUpperCase()}_${term.toUpperCase()}`;
+  const fromEnv = (process.env[legacyEnv] || '').trim();
   if (fromEnv) return fromEnv;
 
   const defaults = {
+    'PerUnit-monthly': 'price_1TeONARdSUUW62RaxuR5Q5RA',
     'Starter-monthly': 'price_1TeONARdSUUW62RaxuR5Q5RA',
     'Growth-monthly': 'price_1TeONARdSUUW62RaCIqcHhVB',
   };
-  return defaults[`${plan}-${term}`] || null;
+  const key = (plan === 'PerUnit' || plan === 'Per' || planName === 'Per Unit') ? `PerUnit-${term}` : `${plan}-${term}`;
+  return defaults[key] || defaults[`PerUnit-${term}`] || defaults['Starter-monthly'] || null;
 }
 
 function appOrigin() {
@@ -72,13 +78,14 @@ export function activateCustomerSubscription(customerId, { plan, term, stripeSub
   if (isBrokerAccount(customer)) return customer;
 
   const ts = nowIso();
-  const subscriptionPlan = plan || customer.subscription_plan || 'Starter';
+  const subscriptionPlan = plan || customer.subscription_plan || DEFAULT_SUBSCRIPTION_PLAN;
   const subscriptionTerm = term || customer.subscription_term || 'monthly';
   const subscriptionAmountValue =
     amount ??
-    calcSubscriptionAmount(subscriptionPlan, subscriptionTerm) ??
+    subscriptionAmountForCustomer({ ...customer, subscription_plan: subscriptionPlan, subscription_term: subscriptionTerm }, subscriptionTerm) ??
+    calcSubscriptionAmount(subscriptionPlan, subscriptionTerm, unitCountFromCustomer(customer)) ??
     customer.subscription_amount ??
-    SUBSCRIPTION_PLANS[subscriptionPlan]?.monthly;
+    SUBSCRIPTION_PLANS[subscriptionPlan]?.perUnitMonthly;
 
   const nextDue = computeNextDueDate(ts, subscriptionTerm);
 
@@ -147,29 +154,35 @@ export async function createStripeCheckoutSession({
   customerId,
   email,
   loadBoardFeeAcknowledged,
+  unitCount,
+  fleetSize,
 }) {
   const stripe = getStripe();
   if (!stripe) return null;
 
   const term = billingTerm === 'yearly' ? 'yearly' : 'monthly';
-  const plan = planName || 'Starter';
+  const plan = planName || DEFAULT_SUBSCRIPTION_PLAN;
   const price = priceId || resolveStripePriceId(plan, term);
   if (!price) {
-    throw new Error(`Stripe price not configured for ${plan} (${term}). Set STRIPE_PRICE_${plan.toUpperCase()}_${term.toUpperCase()} in environment.`);
+    throw new Error(`Stripe price not configured for ${plan} (${term}). Set STRIPE_PRICE_PERUNIT_${term.toUpperCase()} in environment.`);
   }
 
   const origin = appOrigin();
   let stripeCustomerId = null;
   let fleetCustomerId = customerId || user?.customer_id || '';
+  let units = Math.max(1, Number(unitCount || fleetSize) || 1);
 
   if (fleetCustomerId) {
     const record = getEntity('Customer', fleetCustomerId);
-    if (record) stripeCustomerId = await ensureStripeCustomer(record);
+    if (record) {
+      stripeCustomerId = await ensureStripeCustomer(record);
+      if (!unitCount && !fleetSize) units = unitCountFromCustomer(record);
+    }
   }
 
   const sessionParams = {
     mode: 'subscription',
-    line_items: [{ price, quantity: 1 }],
+    line_items: [{ price, quantity: units }],
     success_url: `${origin}/portal/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/#pricing`,
     allow_promotion_codes: true,
@@ -178,6 +191,7 @@ export async function createStripeCheckoutSession({
       customer_id: fleetCustomerId,
       plan_name: plan,
       billing_term: term,
+      unit_count: String(units),
       user_id: user?.id || '',
       load_board_fee_acknowledged: loadBoardFeeAcknowledged ? 'true' : '',
     },
@@ -186,6 +200,7 @@ export async function createStripeCheckoutSession({
         customer_id: fleetCustomerId,
         plan_name: plan,
         billing_term: term,
+        unit_count: String(units),
         load_board_fee_acknowledged: loadBoardFeeAcknowledged ? 'true' : '',
       },
     },
@@ -378,8 +393,9 @@ export async function syncCheckoutSession(sessionId, user) {
     return { success: false, error: 'No customer record linked to this payment yet. Contact FleetCo support with your receipt email.' };
   }
 
-  const plan = session.metadata?.plan_name || customer.subscription_plan || 'Starter';
+  const plan = session.metadata?.plan_name || customer.subscription_plan || DEFAULT_SUBSCRIPTION_PLAN;
   const term = session.metadata?.billing_term || customer.subscription_term || 'monthly';
+  const units = Math.max(1, Number(session.metadata?.unit_count) || unitCountFromCustomer(customer));
   const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
 
   activateCustomerSubscription(customer.id, {
@@ -387,7 +403,7 @@ export async function syncCheckoutSession(sessionId, user) {
     term,
     stripeSubscriptionId: subId,
     stripeCustomerId: typeof session.customer === 'string' ? session.customer : session.customer?.id,
-    amount: calcSubscriptionAmount(plan, term),
+    amount: calcSubscriptionAmount(plan, term, units),
   });
 
   if (session.metadata?.load_board_fee_acknowledged === 'true') {
@@ -487,8 +503,9 @@ export async function handleStripeWebhook(rawBody, signature) {
 }
 
 export async function createCheckoutWithFallback(body, user) {
-  const planName = body.planName || body.plan || 'Starter';
+  const planName = body.planName || body.plan || DEFAULT_SUBSCRIPTION_PLAN;
   const billingTerm = body.billingTerm === 'yearly' ? 'yearly' : 'monthly';
+  const unitCount = Math.max(1, Number(body.unitCount || body.fleet_size || body.units) || 1);
 
   const { requireLoadBoardFeeAcknowledgment } = await import('./loadBoardFeeAcknowledgment.js');
   requireLoadBoardFeeAcknowledgment(body);
@@ -502,6 +519,8 @@ export async function createCheckoutWithFallback(body, user) {
       customerId: body.customerId,
       email: body.email,
       loadBoardFeeAcknowledged: !!body.load_board_fee_acknowledged,
+      unitCount,
+      fleetSize: body.fleet_size,
     });
     if (stripeResult?.url) {
       return { ...stripeResult, message: 'Redirecting to secure Stripe checkout' };

@@ -6,7 +6,7 @@ export default function PricingRoiCalculator() {
   const [fuelSavings, setFuelSavings] = useState(75);
   const [downtimeHours, setDowntimeHours] = useState(4);
 
-  const planCost = trucks <= 5 ? 299 : trucks <= 15 ? 599 : 999;
+  const planCost = trucks * 35;
   const monthlySavings = trucks * fuelSavings + downtimeHours * 85;
   const net = monthlySavings - planCost;
 

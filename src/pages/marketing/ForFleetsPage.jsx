@@ -11,7 +11,7 @@ export default function ForFleetsPage() {
   return (
     <MarketingShell
       title="Fleet Software for Small Carriers"
-      description="FleetCo portal for owner-operators and small fleets — dispatch, drivers, maintenance, fuel, payroll, YMS, and compliance from $299/mo."
+      description="FleetCo portal for owner-operators and small fleets — dispatch, drivers, maintenance, fuel, payroll, YMS, and compliance from $35/unit/mo."
       path="/for-fleets"
     >
       <MarketingHero

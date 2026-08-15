@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { SUBSCRIPTION_PLANS, subscriptionAmount, formatPrice, yearlyMonthlyEquivalent } from '@/lib/subscriptions';
+import {
+  DEFAULT_SUBSCRIPTION_PLAN,
+  PRICE_PER_UNIT_MONTHLY,
+  YEARLY_DISCOUNT_PERCENT,
+  subscriptionAmount,
+  formatPrice,
+  yearlyMonthlyEquivalent,
+  monthlyTotalForUnits,
+  unitCountFromCustomer,
+} from '@/lib/subscriptions';
 import { NOTIFICATION_OPTIONS, DEFAULT_NOTIFICATION_PREFS } from '@/lib/notificationPreferences';
 
 export default function CustomerModal({ customer, fleetManagers, fleetCoordinators, onSave, onClose }) {
@@ -8,10 +17,9 @@ export default function CustomerModal({ customer, fleetManagers, fleetCoordinato
   const [form, setForm] = useState(customer || {
     company_name: '', contact_name: '', email: '', phone: '',
     address: '', city: '', state: '', zip: '',
-    mc_number: '', dot_number: '', fleet_size: '',
+    mc_number: '', dot_number: '', fleet_size: '1',
     status: 'prospect', assigned_manager_id: '', assigned_coordinator_id: '', notes: ''
   });
-  const [subscriptionPlan, setSubscriptionPlan] = useState('Starter');
   const [subscriptionTerm, setSubscriptionTerm] = useState('monthly');
   const [paymentCollected, setPaymentCollected] = useState(false);
   const [createLogin, setCreateLogin] = useState(true);
@@ -25,8 +33,9 @@ export default function CustomerModal({ customer, fleetManagers, fleetCoordinato
 
   const set = (f, v) => setForm(prev => ({ ...prev, [f]: v }));
 
-  const amount = subscriptionAmount(subscriptionPlan, subscriptionTerm);
-  const monthlyPlan = SUBSCRIPTION_PLANS[subscriptionPlan];
+  const units = unitCountFromCustomer(form);
+  const monthlyBase = monthlyTotalForUnits(units);
+  const amount = subscriptionAmount(DEFAULT_SUBSCRIPTION_PLAN, subscriptionTerm, units);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,7 +46,7 @@ export default function CustomerModal({ customer, fleetManagers, fleetCoordinato
     setCreating(true);
     const loginData = createLogin && !isEditing ? { tempPassword, notification_prefs: notificationPrefs } : null;
     const subscriptionData = !isEditing ? {
-      subscription_plan: subscriptionPlan,
+      subscription_plan: DEFAULT_SUBSCRIPTION_PLAN,
       subscription_term: subscriptionTerm,
       payment_collected: paymentCollected,
     } : null;
@@ -63,32 +72,25 @@ export default function CustomerModal({ customer, fleetManagers, fleetCoordinato
           {!isEditing && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-4">
               <h3 className="text-xs font-bold text-amber-800 uppercase tracking-wide">Subscription & Payment</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Plan *</label>
-                  <select value={subscriptionPlan} onChange={e => setSubscriptionPlan(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
-                    {Object.entries(SUBSCRIPTION_PLANS).map(([key, plan]) => (
-                      <option key={key} value={key}>{plan.label} — {formatPrice(plan.monthly)}/mo</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Billing Term *</label>
-                  <select value={subscriptionTerm} onChange={e => setSubscriptionTerm(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
-                    <option value="monthly">Monthly — {formatPrice(monthlyPlan.monthly)}/mo</option>
-                    <option value="yearly">
-                      Yearly — {formatPrice(amount)}/yr ({formatPrice(yearlyMonthlyEquivalent(monthlyPlan.monthly))}/mo, 10% off)
-                    </option>
-                  </select>
-                </div>
+              <p className="text-sm text-slate-700">
+                {formatPrice(PRICE_PER_UNIT_MONTHLY)}/unit/mo · {YEARLY_DISCOUNT_PERCENT}% off when billed annually
+              </p>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Billing Term *</label>
+                <select value={subscriptionTerm} onChange={e => setSubscriptionTerm(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
+                  <option value="monthly">Monthly — {formatPrice(monthlyBase)}/mo ({units} units)</option>
+                  <option value="yearly">
+                    Yearly — {formatPrice(amount)}/yr ({formatPrice(yearlyMonthlyEquivalent(monthlyBase))}/mo, {YEARLY_DISCOUNT_PERCENT}% off)
+                  </option>
+                </select>
               </div>
               <div className="flex items-center justify-between bg-white rounded-lg px-4 py-3 border border-amber-100">
                 <div>
                   <div className="text-sm font-bold text-slate-900">Amount due</div>
                   <div className="text-xs text-slate-500">
-                    {subscriptionTerm === 'yearly' ? 'Billed annually (10% savings vs monthly)' : 'Billed monthly'}
+                    {units} unit{units !== 1 ? 's' : ''} × {formatPrice(PRICE_PER_UNIT_MONTHLY)}/mo
+                    {subscriptionTerm === 'yearly' ? ` · ${YEARLY_DISCOUNT_PERCENT}% annual discount` : ''}
                   </div>
                 </div>
                 <div className="text-2xl font-black text-amber-600">

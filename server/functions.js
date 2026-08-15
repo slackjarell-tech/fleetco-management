@@ -28,6 +28,8 @@ import {
   isFleetCoInternal,
   subscriptionAmount,
   SUBSCRIPTION_PLANS,
+  DEFAULT_SUBSCRIPTION_PLAN,
+  unitCountFromCustomer,
   FLEETCO_EMAIL_DOMAIN,
   canManageDomainEmails,
   canGrantEmployeeEmailAccess,
@@ -753,14 +755,15 @@ async function provisionCustomer(body, user) {
   if (!payment_collected) {
     throw new Error('Payment must be collected before activating a customer account');
   }
-  if (!SUBSCRIPTION_PLANS[subscription_plan]) {
-    throw new Error('Valid subscription plan required (Starter or Growth)');
+  if (!SUBSCRIPTION_PLANS[subscription_plan] && subscription_plan !== DEFAULT_SUBSCRIPTION_PLAN) {
+    throw new Error('Valid subscription plan required (Per Unit)');
   }
   if (!['monthly', 'yearly'].includes(subscription_term)) {
     throw new Error('Subscription term must be monthly or yearly');
   }
 
-  const amount = subscriptionAmount(subscription_plan, subscription_term);
+  const units = unitCountFromCustomer(customerData);
+  const amount = subscriptionAmount(subscription_plan || DEFAULT_SUBSCRIPTION_PLAN, subscription_term, units);
   const ts = nowIso();
   const nextDue = computeNextDueDate(ts, subscription_term);
   const notificationPrefs = normalizeNotificationPrefs(body.notification_prefs);
@@ -768,7 +771,7 @@ async function provisionCustomer(body, user) {
   const customer = createEntity('Customer', stampCustomerNumber({
     ...customerData,
     status: 'active',
-    subscription_plan,
+    subscription_plan: subscription_plan || DEFAULT_SUBSCRIPTION_PLAN,
     subscription_term,
     subscription_amount: amount,
     payment_collected_at: ts,

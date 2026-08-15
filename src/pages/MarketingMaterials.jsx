@@ -160,8 +160,7 @@ export default function MarketingMaterials() {
                 <h3 className="font-black text-xs text-slate-900 mb-3 uppercase tracking-wide">Service Plans</h3>
                 <div className="space-y-3">
                   {[
-                    { name: 'Starter', price: '$299/mo', features: ['Up to 10 vehicles', 'Fuel tracking', 'Basic maintenance', 'Load board', 'Driver management'] },
-                    { name: 'Growth', price: '$599/mo', features: ['Up to 50 vehicles', 'Advanced analytics', 'IFTA reporting', 'Vendor contracts', 'Parts inventory', 'DVIR inspections'] },
+                    { name: 'Per Unit', price: '$35/unit/mo', features: ['Full portal', 'Driver app', 'Fuel & maintenance', 'Load board', 'Payroll & compliance'] },
                     { name: 'Enterprise', price: 'Custom pricing', priceSub: 'Quote on request', features: ['Unlimited vehicles', 'Full platform access', 'Custom integrations', 'Dedicated support', 'Multi-customer portal', 'Executive dashboard'] },
                   ].map(({ name, price, features }) => (
                     <div key={name} className="border border-slate-200 rounded-lg p-2.5">

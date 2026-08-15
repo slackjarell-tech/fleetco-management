@@ -43,7 +43,7 @@ const PILLARS = [
     icon: DollarSign,
     title: 'Revenue Model',
     color: 'bg-purple-500',
-    text: 'Recurring SaaS subscriptions scaled by fleet size ($299–$999/mo), supplemented by onboarding services, premium analytics add-ons, and a future marketplace for parts sourcing and vendor contracts — creating multiple compounding revenue streams.',
+    text: 'Recurring SaaS subscriptions at $35/unit/mo (5% off annual), supplemented by onboarding services, premium analytics add-ons, and a future marketplace for parts sourcing and vendor contracts — creating multiple compounding revenue streams.',
   },
 ];
 

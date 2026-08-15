@@ -176,7 +176,7 @@ async function main() {
   // 9 Business model
   slide = sectionSlide(pptx, 'BUSINESS MODEL', 'Recurring SaaS + Service Revenue', null, true);
   bulletBlock(slide, [
-    `SaaS: Starter $299/mo (1–5 units) · Growth $599/mo (6–15) · Enterprise custom (16+)`,
+    `SaaS: $35/unit/mo · 5% off annual billing · Enterprise custom (50+ units)`,
     'Managed fleet services and onboarding fees (high-touch customers)',
     'FSI-affiliated territories: recurring PM contracts + break-fix labor and parts',
     '~68% gross margin SaaS · ~42% gross margin field service (model assumptions)',

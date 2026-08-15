@@ -22,7 +22,7 @@ export default function OwnerOperatorSoftwarePage() {
           <li><strong>Load board</strong> — post or book freight with equipment matching</li>
           <li><strong>Electronic BOL</strong> — download PDFs to your phone</li>
           <li><strong>Maintenance & fuel</strong> — PM schedules and fuel audit in one place</li>
-          <li><strong>From $299/mo</strong> — full platform, no per-module nickel-and-diming</li>
+          <li><strong>$35/unit/mo</strong> — full platform, pay only for units you run</li>
         </ul>
         <div className="flex flex-wrap gap-3 mt-8 not-prose">
           <Link to="/start-trial" className="bg-amber-500 text-slate-900 font-bold px-6 py-3 rounded-lg text-sm">Start trial</Link>

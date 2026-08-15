@@ -10,7 +10,7 @@ const advantages = [
   'Yard management with live trailer placement maps',
   'Executive dashboards, scorecards, and exportable reports',
   'FleetCo AI assistant built into the portal',
-  'Transparent pricing from $299/mo — no enterprise sales call required',
+  'Transparent pricing — $35/unit/mo, 5% off annual billing',
 ];
 
 export default function AboutSection() {

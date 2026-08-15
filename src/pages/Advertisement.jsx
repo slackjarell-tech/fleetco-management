@@ -457,8 +457,7 @@ function BrochureTab() {
       doc.line(panelW * 2 + m, 17, panelW * 2 + m + 35, 17);
 
       const plans = [
-        { name: 'Starter', price: '$299/mo', features: ['Up to 10 vehicles', 'Fuel tracking', 'Basic maintenance', 'Load board', 'Driver management'], border: false },
-        { name: 'Growth', price: '$599/mo', features: ['Up to 50 vehicles', 'Advanced analytics', 'IFTA reporting', 'Vendor contracts', 'Parts inventory', 'DVIR inspections'], highlight: true },
+        { name: 'Per Unit', price: '$35/unit/mo', features: ['Full portal', 'Driver app', 'All modules included', 'Load board', '5% off annual'], border: false },
         { name: 'Enterprise', price: '$999/mo', features: ['Unlimited vehicles', 'Full platform access', 'Custom integrations', 'Dedicated support', 'Multi-customer portal'], dark: true },
       ];
       let py = 24;
@@ -629,8 +628,7 @@ function BrochureTab() {
           <h4 className="font-black text-xs text-slate-400 uppercase tracking-widest mb-3">Service Plans</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {[
-              { name: 'Starter', price: '$299/mo', features: 'Up to 10 vehicles | Fuel tracking | Maintenance | Load board | Driver mgmt', color: 'border-slate-200' },
-              { name: 'Growth', price: '$599/mo', features: 'Up to 50 vehicles | Advanced analytics | IFTA | Vendors | Parts | DVIRs', color: 'border-amber-300 bg-amber-50' },
+              { name: 'Per Unit', price: '$35/unit/mo', features: 'Full portal | Driver app | All modules | Load board | 5% off annual', color: 'border-amber-300 bg-amber-50' },
               { name: 'Enterprise', price: '$999/mo', features: 'Unlimited vehicles | Full platform | Custom integrations | Dedicated support', color: 'border-slate-800 bg-slate-900 text-white' },
             ].map(({ name, price, features, color }) => (
               <div key={name} className={`rounded-xl p-4 border-2 ${color}`}>
@@ -767,8 +765,7 @@ function BrochureTab() {
             <h3 className="font-black text-xs text-slate-900 mb-4 uppercase tracking-widest">Service Plans</h3>
             <div className="space-y-4">
               {[
-                { name: 'Starter', price: '$299/mo', features: ['Up to 10 vehicles', 'Fuel tracking', 'Basic maintenance', 'Load board', 'Driver management'] },
-                { name: 'Growth', price: '$599/mo', features: ['Up to 50 vehicles', 'Advanced analytics', 'IFTA reporting', 'Vendor contracts', 'Parts inventory', 'DVIR inspections'] },
+                { name: 'Per Unit', price: '$35/unit/mo', features: ['Full portal', 'Driver app', 'All modules', 'Load board', '5% off annual billing'] },
                 { name: 'Enterprise', price: '$999/mo', features: ['Unlimited vehicles', 'Full platform access', 'Custom integrations', 'Dedicated support', 'Multi-customer portal', 'Executive dashboard'] },
               ].map(({ name, price, features }) => (
                 <div key={name} className="border border-slate-200 rounded-lg p-3">

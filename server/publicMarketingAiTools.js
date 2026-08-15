@@ -1,5 +1,5 @@
 import { createEntity, nowIso } from './db.js';
-import { SUBSCRIPTION_PLANS } from './roles.js';
+import { PRICE_PER_UNIT_MONTHLY, YEARLY_DISCOUNT_PERCENT, SUBSCRIPTION_PLANS } from './roles.js';
 import { onNewLead } from './marketingAutopilot.js';
 import { defaultCalendarUrl } from './sltMarketing.js';
 
@@ -10,7 +10,7 @@ export const PUBLIC_MARKETING_TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'get_fleetco_pricing',
-      description: 'Return FleetCo subscription plans, fleet limits, and monthly pricing for owner-operators and small fleets.',
+      description: 'Return FleetCo per-unit subscription pricing ($35/unit/mo, 5% off annual).',
       parameters: { type: 'object', properties: {} },
     },
   },
@@ -61,7 +61,7 @@ const FEATURE_BLOCKS = {
   fleet: 'Fleet units, work orders, maintenance, yard management, fleet map, TCO and P&L.',
   payroll: 'Driver payroll, time clock, direct deposit export, HR tax profiles for US states.',
   compliance: 'ELD/HOS, IFTA, inspections, pre-trip, incident reports, compliance tracker.',
-  billing: 'Self-service subscription billing via Stripe; Starter $299/mo (up to 5 units), Growth $599/mo (up to 15).',
+  billing: `Self-service subscription billing via Stripe; $${PRICE_PER_UNIT_MONTHLY}/unit/mo (${YEARLY_DISCOUNT_PERCENT}% off when billed annually).`,
   drivers: 'Driver app (Android), scorecards, messaging, route and load tools.',
   default: 'All-in-one owner-operator and small-fleet portal: operations, fleet, payroll, compliance, and finance in one place.',
 };
@@ -75,12 +75,12 @@ export async function executePublicMarketingTool(_guest, name, args) {
     case 'get_fleetco_pricing':
       return {
         success: true,
-        plans: Object.entries(SUBSCRIPTION_PLANS).map(([plan, cfg]) => ({
-          plan,
-          monthly_usd: cfg.monthly,
-          max_fleet_units: cfg.fleetMax,
-          yearly_note: 'Yearly billing available with discount at checkout',
-        })),
+        pricing_model: 'per_unit',
+        price_per_unit_monthly_usd: PRICE_PER_UNIT_MONTHLY,
+        yearly_discount_percent: YEARLY_DISCOUNT_PERCENT,
+        example_5_units_monthly: PRICE_PER_UNIT_MONTHLY * 5,
+        plans: Object.keys(SUBSCRIPTION_PLANS).filter((p) => p === 'Per Unit'),
+        yearly_note: `${YEARLY_DISCOUNT_PERCENT}% discount when billed annually`,
         signup: 'https://fleetcomanagement.org/register',
         billing_page: 'https://fleetcomanagement.org/portal/billing',
       };

@@ -24,8 +24,8 @@ function buildSystemPrompt(user, agentName) {
 You are NOT a generic chatbot. You represent FleetCo Management LLC (Dallas, TX): fleet portal, driver app, payroll, compliance, and subscription SaaS.
 
 Pricing (always accurate):
-- Starter: $299/month, up to 5 fleet units
-- Growth: $599/month, up to 15 fleet units
+- Per Unit: $35/unit/month — full portal for every truck, trailer, or power unit
+- Yearly billing: 5% discount vs paying monthly × 12
 - Yearly billing available at register/checkout
 
 Use tools for facts — never invent pricing or features:

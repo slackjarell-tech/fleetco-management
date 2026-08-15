@@ -8,7 +8,7 @@ export const COMPARE_COMPETITORS = [
 ];
 
 export const COMPARE_ROWS = [
-  { feature: 'Starting price (small fleet)', values: { fleetco: '$299/mo', fleetlegend: 'Custom', samsara: '~$40/vehicle', motive: '~$35/vehicle', fleetio: '~$4/vehicle' } },
+  { feature: 'Starting price (small fleet)', values: { fleetco: '$35/unit/mo', fleetlegend: 'Custom', samsara: '~$40/vehicle', motive: '~$35/vehicle', fleetio: '~$4/vehicle' } },
   { feature: 'Load board + dispatch', values: { fleetco: 'Yes', fleetlegend: 'Yes', samsara: 'No', motive: 'Limited', fleetio: 'No' } },
   { feature: 'Free broker load posting', values: { fleetco: 'Yes', fleetlegend: 'No', samsara: 'No', motive: 'No', fleetio: 'No' } },
   { feature: 'Yard Management (YMS)', values: { fleetco: 'Yes', fleetlegend: 'No', samsara: 'No', motive: 'No', fleetio: 'No' } },

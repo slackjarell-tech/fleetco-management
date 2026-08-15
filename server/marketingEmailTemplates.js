@@ -55,7 +55,7 @@ function welcomeEmail(lead) {
     '',
     'Thank you for your interest in FleetCo Management.',
     '',
-    'We help owner-operators and small fleets run operations, compliance, payroll, and driver tools in one portal — starting at $299/month for up to 5 units.',
+    'We help owner-operators and small fleets run operations, compliance, payroll, and driver tools in one portal — $35/unit/month (5% off when billed annually).',
     '',
     `Schedule a quick demo: ${cal}`,
     `Or explore pricing: ${APP_URL}/pricing`,
@@ -66,7 +66,7 @@ function welcomeEmail(lead) {
   const html = wrapHtml(`
     <p>Hi ${firstName(lead)},</p>
     <p>Thank you for reaching out to <strong>FleetCo Management</strong>.</p>
-    <p>We help owner-operators and small fleets manage operations, DOT compliance, payroll, and a mobile driver app — from <strong>$299/month</strong> (up to 5 units).</p>
+    <p>We help owner-operators and small fleets manage operations, DOT compliance, payroll, and a mobile driver app — <strong>$35/unit/month</strong> (5% off annual billing).</p>
     <p style="margin:24px 0">
       <a href="${cal}" style="display:inline-block;background:#f59e0b;color:#0f172a;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:8px">Book a free demo</a>
     </p>
@@ -85,7 +85,7 @@ function valueEmail(lead) {
     '• Work orders, maintenance, and yard management',
     '• Driver payroll, time clock, and tax profiles',
     '• IFTA, inspections, HOS, and incident tracking',
-    '• Subscription billing — Starter $299/mo, Growth $599/mo',
+    '• Subscription billing — $35/unit/mo, 5% off yearly',
     '',
     `Questions? Reply to this email or book a call: ${cal}`,
     '',
@@ -101,7 +101,7 @@ function valueEmail(lead) {
       <li>IFTA, inspections, HOS & compliance tracker</li>
       <li>Mobile driver app — routes, fuel, dashcam, messaging</li>
     </ul>
-    <p><strong>Starter $299/mo</strong> (5 units) · <strong>Growth $599/mo</strong> (15 units)</p>
+    <p><strong>$35/unit/month</strong> · save 5% with annual billing</p>
     <p><a href="${cal}">Schedule a 15-minute walkthrough</a></p>
   `);
 

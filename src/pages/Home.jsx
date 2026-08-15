@@ -34,7 +34,7 @@ export default function Home() {
     <div className="min-h-screen bg-white font-body">
       <PageMeta
         title="Fleet Software & Load Board for Carriers"
-        description="FleetCo Management — all-in-one fleet portal and load board for owner-operators and small carriers. Dispatch, drivers, maintenance, fuel, payroll, and compliance from $299/mo."
+        description="FleetCo Management — all-in-one fleet portal and load board for owner-operators and small carriers. $35/unit/mo."
       />
       <NavBar />
       {paymentStatus?.type === 'success' && (

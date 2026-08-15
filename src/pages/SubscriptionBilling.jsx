@@ -3,7 +3,15 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { CreditCard, Loader2, CheckCircle2, ExternalLink, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SUBSCRIPTION_PLANS, subscriptionAmount, formatPrice } from '@/lib/subscriptions';
+import {
+  DEFAULT_SUBSCRIPTION_PLAN,
+  PRICE_PER_UNIT_MONTHLY,
+  YEARLY_DISCOUNT_PERCENT,
+  subscriptionAmount,
+  formatPrice,
+  pricingSummary,
+  unitCountFromCustomer,
+} from '@/lib/subscriptions';
 import { isCustomerPortalUser } from '@/lib/customerRoles';
 import { isFreightBroker } from '@/lib/loadBoardAccess';
 import { LOAD_BOARD_TRANSACTION_FEE_PERCENT } from '@/lib/loadBoardFeeDisclosure';
@@ -94,13 +102,16 @@ export default function SubscriptionBilling() {
     }
   };
 
-  const startCheckout = async (planName) => {
-    setBusy(planName);
+  const startCheckout = async () => {
+    setBusy('checkout');
     setError('');
+    const customer = billing?.customer;
+    const units = unitCountFromCustomer(customer || { fleet_size: 1 });
     try {
       const result = await api.billing.createCheckoutSession({
-        planName,
+        planName: DEFAULT_SUBSCRIPTION_PLAN,
         billingTerm,
+        unitCount: units,
         load_board_fee_acknowledged: true,
       });
       if (result?.url) {
@@ -318,31 +329,42 @@ export default function SubscriptionBilling() {
                     billingTerm === term ? 'bg-amber-500 text-slate-900' : 'text-slate-600'
                   }`}
                 >
-                  {term === 'yearly' ? 'Yearly (save 10%)' : 'Monthly'}
+                  {term === 'yearly' ? `Yearly (save ${YEARLY_DISCOUNT_PERCENT}%)` : 'Monthly'}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            {Object.keys(SUBSCRIPTION_PLANS).map((planName) => (
-              <div key={planName} className="border border-slate-200 rounded-2xl p-5 bg-white">
-                <h2 className="font-black text-lg">{planName}</h2>
-                <p className="text-2xl font-black text-amber-600 mt-2">
-                  {formatPrice(subscriptionAmount(planName, billingTerm))}
+          {(() => {
+            const units = unitCountFromCustomer(c || { fleet_size: 1 });
+            const summary = pricingSummary(units, billingTerm);
+            return (
+              <div className="border border-slate-200 rounded-2xl p-5 bg-white space-y-4">
+                <div>
+                  <h2 className="font-black text-lg">Per-unit subscription</h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {formatPrice(PRICE_PER_UNIT_MONTHLY)}/unit/mo · {units} unit{units !== 1 ? 's' : ''} on your account
+                  </p>
+                </div>
+                <p className="text-2xl font-black text-amber-600">
+                  {formatPrice(summary.amountDue)}
                   <span className="text-sm font-bold text-slate-400">/{billingTerm === 'yearly' ? 'yr' : 'mo'}</span>
                 </p>
-                <p className="text-xs text-slate-500 mt-1">Up to {SUBSCRIPTION_PLANS[planName].fleetMax} vehicles</p>
+                {billingTerm === 'yearly' && (
+                  <p className="text-xs text-slate-500">
+                    Equivalent to {formatPrice(summary.yearlyMonthlyEquivalent)}/mo · {YEARLY_DISCOUNT_PERCENT}% annual discount
+                  </p>
+                )}
                 <Button
-                  className="w-full mt-4 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold"
+                  className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold"
                   disabled={!!busy}
-                  onClick={() => startCheckout(planName)}
+                  onClick={startCheckout}
                 >
-                  {busy === planName ? <Loader2 className="w-4 h-4 animate-spin" /> : `Subscribe — ${planName}`}
+                  {busy === 'checkout' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Subscribe with Stripe'}
                 </Button>
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </>
       )}
 

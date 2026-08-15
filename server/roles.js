@@ -1,18 +1,41 @@
-/** Subscription plans — shared with frontend via duplicate constants (no cross-import in server) */
+/** Per-unit subscription pricing — shared with frontend via duplicate constants (no cross-import in server) */
+export const PRICE_PER_UNIT_MONTHLY = 35;
+export const YEARLY_DISCOUNT_PERCENT = 5;
+export const DEFAULT_SUBSCRIPTION_PLAN = 'Per Unit';
+
 export const SUBSCRIPTION_PLANS = {
-  Starter: { monthly: 299, fleetMax: 5 },
-  Growth: { monthly: 599, fleetMax: 15 },
+  'Per Unit': { perUnitMonthly: PRICE_PER_UNIT_MONTHLY },
+  Starter: { perUnitMonthly: PRICE_PER_UNIT_MONTHLY },
+  Growth: { perUnitMonthly: PRICE_PER_UNIT_MONTHLY },
 };
 
-export function yearlyTotal(monthlyPrice) {
-  return Math.round(monthlyPrice * 12 * 0.9);
+export function unitCountFromCustomer(customerOrUnits) {
+  if (typeof customerOrUnits === 'number') return Math.max(1, Math.round(customerOrUnits));
+  const n = Number(customerOrUnits?.fleet_size);
+  return Math.max(1, Number.isFinite(n) && n > 0 ? Math.round(n) : 1);
 }
 
-export function subscriptionAmount(planName, term) {
-  const plan = SUBSCRIPTION_PLANS[planName];
-  if (!plan) return null;
-  if (term === 'yearly') return yearlyTotal(plan.monthly);
-  return plan.monthly;
+export function monthlyTotalForUnits(unitCount) {
+  const units = Math.max(1, Math.round(Number(unitCount) || 1));
+  return Math.round(units * PRICE_PER_UNIT_MONTHLY * 100) / 100;
+}
+
+export function yearlyTotal(monthlyTotal) {
+  const monthly = Number(monthlyTotal) || 0;
+  return Math.round(monthly * 12 * (1 - YEARLY_DISCOUNT_PERCENT / 100) * 100) / 100;
+}
+
+export function subscriptionAmount(planName, term, unitCount = 1) {
+  if (!SUBSCRIPTION_PLANS[planName] && planName !== DEFAULT_SUBSCRIPTION_PLAN) return null;
+  const monthly = monthlyTotalForUnits(unitCount);
+  if (term === 'yearly') return yearlyTotal(monthly);
+  return monthly;
+}
+
+export function subscriptionAmountForCustomer(customer, term) {
+  const plan = customer?.subscription_plan || DEFAULT_SUBSCRIPTION_PLAN;
+  const billingTerm = term || customer?.subscription_term || 'monthly';
+  return subscriptionAmount(plan, billingTerm, unitCountFromCustomer(customer));
 }
 
 export const FLEETCO_INTERNAL_ROLES = ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'];

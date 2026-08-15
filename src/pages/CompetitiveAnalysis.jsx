@@ -117,9 +117,9 @@ const COMPETITORS = [
 ];
 
 const FLEETCO_PLANS = [
-  { name: 'Starter', price: '$299', vehicles: 'Up to 10', ppm: '~$30/vehicle' },
-  { name: 'Growth', price: '$599', vehicles: 'Up to 50', ppm: '~$12/vehicle' },
-  { name: 'Enterprise', price: '$999', vehicles: 'Unlimited', ppm: '~$10/vehicle at 100' },
+  { name: 'Per Unit', price: '$35/unit/mo', vehicles: 'Any size', ppm: '$35/unit' },
+  { name: 'Annual', price: '5% off', vehicles: 'Billed yearly', ppm: '$33.25/unit/mo equiv.' },
+  { name: 'Enterprise', price: 'Custom', vehicles: '50+ units', ppm: 'Volume pricing' },
 ];
 
 const STATUS_ICONS = {
@@ -235,7 +235,7 @@ export default function CompetitiveAnalysis() {
                 <tr className="bg-amber-50">
                   <td className="px-5 py-3.5 font-black text-slate-900">FleetCo Management ⭐</td>
                   <td className="px-5 py-3.5 text-slate-600">All-in-One Operations</td>
-                  <td className="px-5 py-3.5 font-bold text-amber-600">$299-$999/mo flat</td>
+                  <td className="px-5 py-3.5 font-bold text-amber-600">$35/unit/mo</td>
                   <td className="px-5 py-3.5 text-slate-600">5-100+ trucks</td>
                   <td className="px-5 py-3.5"><span className="text-green-600 font-bold">No</span></td>
                 </tr>
@@ -442,7 +442,7 @@ export default function CompetitiveAnalysis() {
               <tbody className="divide-y divide-slate-100">
                 <tr className="bg-amber-50">
                   <td className="px-5 py-3.5 font-black text-slate-900">FleetCo (Growth) ⭐</td>
-                  <td className="px-5 py-3.5 font-bold text-amber-600">$599/mo flat</td>
+                  <td className="px-5 py-3.5 font-bold text-amber-600">Scales with fleet</td>
                   <td className="px-5 py-3.5 font-bold">$7,188</td>
                   <td className="px-5 py-3.5 text-green-600 font-bold">$0</td>
                   <td className="px-5 py-3.5 font-black text-green-600">$7,188</td>
