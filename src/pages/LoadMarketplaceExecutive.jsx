@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { isSLT } from '@/lib/roles';
 import { formatUsd, PLATFORM_FEE_PERCENT, POSTER_FEE_PERCENT, CARRIER_FEE_PERCENT } from '@/lib/loadMarketplaceFinance';
+import { paymentTermsLabel, paymentStatusLabel, formatPaymentDueDate } from '@/lib/loadCarrierPayments';
 import LoadThreadPanel from '@/components/loadboard/LoadThreadPanel';
 import {
-  Crown, DollarSign, Package, TrendingUp, MessageCircle, ArrowLeft, Loader2,
+  Crown, DollarSign, Package, TrendingUp, MessageCircle, ArrowLeft, Loader2, AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -88,6 +89,7 @@ export default function LoadMarketplaceExecutive() {
     if (filter === 'accepted') return l.booking_status === 'accepted' || ['assigned', 'in_transit'].includes(l.status);
     if (filter === 'delivered') return l.status === 'delivered';
     if (filter === 'pending') return l.booking_status === 'pending';
+    if (filter === 'payment_issues') return ['overdue', 'disputed'].includes(l.carrier_payment_status);
     return true;
   });
 
@@ -109,15 +111,16 @@ export default function LoadMarketplaceExecutive() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           <StatCard icon={DollarSign} label="Total Load Value" value={formatUsd(totals.load_value)} sub={`${loads.length} marketplace loads`} color="blue" />
           <StatCard icon={TrendingUp} label="FleetCo Platform Fees" value={formatUsd(totals.fleetco_fee)} sub={`${POSTER_FEE_PERCENT}% poster + ${CARRIER_FEE_PERCENT}% carrier`} color="amber" />
           <StatCard icon={Package} label="Poster Fees" value={formatUsd(totals.poster_fee)} sub={`${POSTER_FEE_PERCENT}% of load value`} color="green" />
           <StatCard icon={Package} label="Carrier Fees" value={formatUsd(totals.carrier_fee)} sub={`${CARRIER_FEE_PERCENT}% of load value`} color="purple" />
+          <StatCard icon={AlertTriangle} label="Payment Issues" value={totals.payment_issues || 0} sub={`${totals.overdue_payments || 0} overdue · SLT alerts`} color="amber" />
         </div>
 
         <div className="flex flex-wrap gap-2 mb-4">
-          {['all', 'pending', 'accepted', 'delivered'].map((f) => (
+          {['all', 'pending', 'accepted', 'delivered', 'payment_issues'].map((f) => (
             <Button
               key={f}
               size="sm"
@@ -125,7 +128,7 @@ export default function LoadMarketplaceExecutive() {
               className={filter === f ? 'bg-amber-500 text-slate-900 font-bold' : 'border-slate-600 text-slate-300'}
               onClick={() => setFilter(f)}
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              {f === 'payment_issues' ? 'Payment issues' : f.charAt(0).toUpperCase() + f.slice(1)}
             </Button>
           ))}
         </div>
@@ -144,13 +147,16 @@ export default function LoadMarketplaceExecutive() {
                   <th className="py-3 px-4 font-medium text-right">Poster {POSTER_FEE_PERCENT}%</th>
                   <th className="py-3 px-4 font-medium text-right">Carrier {CARRIER_FEE_PERCENT}%</th>
                   <th className="py-3 px-4 font-medium text-right">Carrier Net</th>
+                  <th className="py-3 px-4 font-medium">Pay Terms</th>
+                  <th className="py-3 px-4 font-medium">Pay Due</th>
+                  <th className="py-3 px-4 font-medium">Pay Status</th>
                   <th className="py-3 px-4 font-medium text-right">FleetCo {PLATFORM_FEE_PERCENT}%</th>
                   <th className="py-3 px-4 font-medium text-center">Comms</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
                 {filtered.length === 0 && (
-                  <tr><td colSpan={11} className="py-8 text-center text-slate-500">No loads match this filter</td></tr>
+                  <tr><td colSpan={14} className="py-8 text-center text-slate-500">No loads match this filter</td></tr>
                 )}
                 {filtered.map((load) => (
                   <tr key={load.id} className="text-slate-200 hover:bg-slate-700/30">
@@ -172,6 +178,11 @@ export default function LoadMarketplaceExecutive() {
                     <td className="py-3 px-4 text-right text-green-400">{formatUsd(load.poster_fee_amount)}</td>
                     <td className="py-3 px-4 text-right text-blue-400">{formatUsd(load.carrier_fee_amount)}</td>
                     <td className="py-3 px-4 text-right text-slate-300">{formatUsd(load.carrier_payout_amount)}</td>
+                    <td className="py-3 px-4 text-slate-300">{paymentTermsLabel(load.carrier_payment_terms)}</td>
+                    <td className="py-3 px-4 text-slate-400">{formatPaymentDueDate(load.carrier_payment_due_at)}</td>
+                    <td className={`py-3 px-4 capitalize ${load.carrier_payment_status === 'overdue' || load.carrier_payment_status === 'disputed' ? 'text-red-400 font-medium' : 'text-slate-400'}`}>
+                      {paymentStatusLabel(load.carrier_payment_status)}
+                    </td>
                     <td className="py-3 px-4 text-right text-amber-400 font-bold">{formatUsd(load.fleetco_fee_amount || load.platform_fee_amount)}</td>
                     <td className="py-3 px-4 text-center">
                       <Button size="sm" variant="ghost" className="text-slate-300 hover:text-amber-400" onClick={() => setThreadLoad(load)}>
@@ -187,7 +198,8 @@ export default function LoadMarketplaceExecutive() {
         </div>
 
         <p className="text-xs text-slate-500 mt-4">
-          Posters/brokers pay {POSTER_FEE_PERCENT}% and carriers pay {CARRIER_FEE_PERCENT}% of total load value to FleetCo ({PLATFORM_FEE_PERCENT}% combined). Carrier net is load value minus their {CARRIER_FEE_PERCENT}% fee.
+          Brokers choose Net 7 or Net 15 when posting loads. If carriers are not paid by the due date, FleetCo SLT is notified automatically.
+          Posters pay {POSTER_FEE_PERCENT}% and carriers pay {CARRIER_FEE_PERCENT}% platform fees to FleetCo ({PLATFORM_FEE_PERCENT}% combined).
         </p>
       </div>
 

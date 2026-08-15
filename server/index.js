@@ -43,6 +43,7 @@ import {
   canManageDatastore,
 } from './roles.js';
 import { bulkCreateEntities } from './bulkImport.js';
+import { prepareLoadForCreate, validateLoadForUpdate } from './loadCarrierPayments.js';
 import { stampCustomerNumber, generateNextDriverNumber } from './entityNumbers.js';
 import { isDriverCapableUser } from './driverAccess.js';
 import { buildCustomerAnalytics, buildAllCustomersAnalytics, trackPortalVisit } from './customerAnalytics.js';
@@ -887,6 +888,13 @@ app.post('/api/entities/:type', requireAuth, (req, res) => {
   if (type === 'Customer') {
     payload = stampCustomerNumber(payload);
   }
+  if (type === 'Load') {
+    try {
+      payload = prepareLoadForCreate(payload, req.user);
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  }
   const item = createEntity(type, payload);
   res.status(201).json(item);
 });
@@ -916,7 +924,15 @@ app.patch('/api/entities/:type/:id', requireAuth, (req, res) => {
   } catch (err) {
     return res.status(err.status || 403).json({ error: err.message });
   }
-  const item = updateEntity(type, id, req.body);
+  let patch = req.body;
+  if (type === 'Load') {
+    try {
+      patch = validateLoadForUpdate(existing, req.body, req.user);
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  }
+  const item = updateEntity(type, id, patch);
   if (!item) return res.status(404).json({ error: 'Not found' });
   res.json(item);
 });
@@ -1110,6 +1126,9 @@ async function startServer() {
     import('./marketingAutopilot.js').then(({ startMarketingAutopilotScheduler }) => {
       startMarketingAutopilotScheduler();
     }).catch((err) => console.warn('[marketing-autopilot] scheduler not started', err.message));
+    import('./loadCarrierPayments.js').then(({ startCarrierPaymentScheduler }) => {
+      startCarrierPaymentScheduler();
+    }).catch((err) => console.warn('[carrier-payments] scheduler not started', err.message));
   });
 }
 

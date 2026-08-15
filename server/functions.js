@@ -294,6 +294,34 @@ export async function invokeFunction(name, body, user) {
       const { getExecutiveLoadMarketplace } = await import('./loadMarketplaceExecutive.js');
       return getExecutiveLoadMarketplace(user);
     }
+    case 'markCarrierPaymentSent': {
+      const { markCarrierPaymentSent } = await import('./loadCarrierPayments.js');
+      return markCarrierPaymentSent(user, body);
+    }
+    case 'confirmCarrierPaymentReceived': {
+      const { confirmCarrierPaymentReceived } = await import('./loadCarrierPayments.js');
+      return confirmCarrierPaymentReceived(user, body);
+    }
+    case 'reportCarrierPaymentMissing': {
+      const { reportCarrierPaymentMissing } = await import('./loadCarrierPayments.js');
+      return reportCarrierPaymentMissing(user, body);
+    }
+    case 'resolveCarrierPaymentDispute': {
+      const { resolveCarrierPaymentDispute } = await import('./loadCarrierPayments.js');
+      return resolveCarrierPaymentDispute(user, body);
+    }
+    case 'getBrokerPaymentCompliance': {
+      const { getBrokerPaymentCompliance } = await import('./stripeCarrierPayouts.js');
+      return getBrokerPaymentCompliance(user);
+    }
+    case 'createCarrierConnectOnboarding': {
+      const { createCarrierConnectOnboarding } = await import('./stripeCarrierPayouts.js');
+      return createCarrierConnectOnboarding(user);
+    }
+    case 'getCarrierConnectStatus': {
+      const { getCarrierConnectStatus } = await import('./stripeCarrierPayouts.js');
+      return getCarrierConnectStatus(user);
+    }
     case 'listLoadMessages': {
       const { listLoadMessages } = await import('./loadMarketplaceExecutive.js');
       return listLoadMessages(user, body);

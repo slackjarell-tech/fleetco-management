@@ -18,6 +18,7 @@ export default function SubscriptionBilling() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [billingTerm, setBillingTerm] = useState('monthly');
+  const [connectStatus, setConnectStatus] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -27,6 +28,14 @@ export default function SubscriptionBilling() {
       if (u?.customer_id) {
         const data = await api.billing.getStatus();
         setBilling(data);
+        if (!isFreightBroker(u)) {
+          try {
+            const cs = await api.functions.invoke('getCarrierConnectStatus', {});
+            setConnectStatus(cs);
+          } catch {
+            setConnectStatus(null);
+          }
+        }
       }
     } catch (err) {
       setError(err.message);
@@ -44,7 +53,12 @@ export default function SubscriptionBilling() {
     }
     const card = searchParams.get('card');
     if (card === 'success') {
-      setMessage('Payment method saved. You can post and manage loads on the load board.');
+      setMessage('Payment method saved. Carrier haul pay will auto-charge on delivery when Stripe Connect is enabled.');
+    }
+    const connect = searchParams.get('connect');
+    if (connect === 'success') {
+      setMessage('Payout account connected. You can receive broker payments directly when loads deliver.');
+      load();
     }
   }, [searchParams]);
 
@@ -153,7 +167,7 @@ export default function SubscriptionBilling() {
             Load board billing
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            No monthly subscription. Keep a credit card on file — FleetCo charges {LOAD_BOARD_TRANSACTION_FEE_PERCENT}% when your loads deliver.
+            No monthly subscription. Keep a credit card on file — FleetCo auto-charges carrier haul pay on delivery (Net 7/15 terms) when Stripe Connect is enabled, plus {LOAD_BOARD_TRANSACTION_FEE_PERCENT}% platform fees.
           </p>
         </div>
 
@@ -244,6 +258,42 @@ export default function SubscriptionBilling() {
             <Button type="button" variant="outline" className="mt-3" disabled={busy === 'portal'} onClick={openPortal}>
               {busy === 'portal' ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ExternalLink className="w-4 h-4 mr-2" />}
               Manage payment method & invoices
+            </Button>
+          )}
+        </div>
+      )}
+
+      {connectStatus?.enabled && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+          <div className="font-bold text-slate-900">Carrier payout account (Stripe Connect)</div>
+          <p className="text-sm text-slate-600">
+            Connect a bank account to receive broker haul pay automatically when loads deliver on the load board.
+          </p>
+          {connectStatus.onboarded ? (
+            <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+              <CheckCircle2 className="w-4 h-4" />
+              Payout account connected
+            </div>
+          ) : (
+            <Button
+              type="button"
+              className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold"
+              disabled={busy === 'connect'}
+              onClick={async () => {
+                setBusy('connect');
+                setError('');
+                try {
+                  const res = await api.functions.invoke('createCarrierConnectOnboarding', {});
+                  if (res.url) window.location.href = res.url;
+                } catch (err) {
+                  setError(err.message);
+                } finally {
+                  setBusy('');
+                }
+              }}
+            >
+              {busy === 'connect' ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ExternalLink className="w-4 h-4 mr-2" />}
+              Connect payout account
             </Button>
           )}
         </div>

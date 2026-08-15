@@ -6,6 +6,7 @@ import {
 } from './db.js';
 import { isFleetCoInternal } from './roles.js';
 import { computeLoadFinancials } from './loadMarketplaceFinance.js';
+import { paymentTermsLabel } from './loadCarrierPayments.js';
 
 function isAdminRole(role) {
   return isFleetCoInternal(role) || role === 'admin' || role === 'owner';
@@ -98,6 +99,7 @@ export function getExecutiveLoadMarketplace(user) {
     return {
       ...load,
       ...fin,
+      carrier_payment_terms_label: paymentTermsLabel(load.carrier_payment_terms),
       poster_company: customerLabel(customers, load.customer_id),
       carrier_company: customerLabel(customers, load.booked_by_customer_id || load.assigned_customer_id),
       poster_contact: userLabel(users, load.posted_by_user_id),
@@ -119,9 +121,11 @@ export function getExecutiveLoadMarketplace(user) {
         acc.accepted_count += 1;
       }
       if (l.status === 'delivered') acc.delivered_count += 1;
+      if (['overdue', 'disputed'].includes(l.carrier_payment_status)) acc.payment_issues += 1;
+      if (l.carrier_payment_status === 'overdue') acc.overdue_payments += 1;
       return acc;
     },
-    { load_value: 0, fleetco_fee: 0, poster_fee: 0, carrier_fee: 0, carrier_payout: 0, accepted_count: 0, delivered_count: 0 },
+    { load_value: 0, fleetco_fee: 0, poster_fee: 0, carrier_fee: 0, carrier_payout: 0, accepted_count: 0, delivered_count: 0, payment_issues: 0, overdue_payments: 0 },
   );
 
   return {

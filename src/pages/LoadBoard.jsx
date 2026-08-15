@@ -12,13 +12,17 @@ import { isPureDriverUser, isDriverCapableUser } from '@/lib/driverAccess';
 import {
   canPostLoad, canDispatchLoad, isCustomerLoadPoster, canBrowseMarketplace,
   canBookMarketplaceLoad, canRespondToBooking, canAccessLoadThread,
-  userLoadFeeAmount, userLoadFeePercent,
+  userLoadFeeAmount, userLoadFeePercent, isFreightBroker,
 } from '@/lib/loadBoardAccess';
 import LoadThreadPanel from '@/components/loadboard/LoadThreadPanel';
 import LoadBoardFeeGate from '@/components/loadboard/LoadBoardFeeGate';
 import { downloadRateConfirmationPdf } from '@/lib/accounting/rateConfirmationPdf';
 import { equipmentLabel } from '@/lib/equipmentTypes';
 import { canDownloadBol, hasBol, bolFileUrl, bolDownloadFilename } from '@/lib/loadBol';
+import {
+  paymentTermsLabel, paymentStatusLabel, PAYMENT_STATUS_COLORS,
+  formatPaymentDueDate, canMarkCarrierPaymentSent, canConfirmCarrierPayment,
+} from '@/lib/loadCarrierPayments';
 
 const STATUS_COLORS = {
   available: 'bg-green-100 text-green-700',
@@ -45,10 +49,19 @@ export default function LoadBoard() {
   const [marketplaceLoads, setMarketplaceLoads] = useState([]);
   const [threadLoad, setThreadLoad] = useState(null);
   const [feeAcknowledged, setFeeAcknowledged] = useState(null);
+  const [brokerCompliance, setBrokerCompliance] = useState(null);
 
   useEffect(() => {
     api.auth.me().then(async (u) => {
       setUser(u);
+      if (u && isFreightBroker(u)) {
+        try {
+          const compliance = await api.functions.invoke('getBrokerPaymentCompliance', {});
+          setBrokerCompliance(compliance);
+        } catch {
+          setBrokerCompliance(null);
+        }
+      }
       if (u && !isFleetCoAdmin(u.role) && (canPostLoad(u) || canBrowseMarketplace(u))) {
         try {
           const res = await api.functions.invoke('getLoadBoardFeeAcknowledgment', {});
@@ -146,8 +159,28 @@ export default function LoadBoard() {
     await fetchData(user);
   };
 
+  const handleMarkPaymentSent = async (load) => {
+    const notes = window.prompt('Optional note (check #, ACH ref, etc.):') || '';
+    await api.functions.invoke('markCarrierPaymentSent', { loadId: load.id, notes });
+    await fetchData(user);
+  };
+
+  const handleConfirmPayment = async (load) => {
+    if (!confirm('Confirm you received carrier payment for this load?')) return;
+    await api.functions.invoke('confirmCarrierPaymentReceived', { loadId: load.id });
+    await fetchData(user);
+  };
+
+  const handleReportMissingPayment = async (load) => {
+    const notes = window.prompt('Describe what is missing (required for SLT):') || '';
+    if (!notes.trim()) return;
+    await api.functions.invoke('reportCarrierPaymentMissing', { loadId: load.id, notes });
+    alert('FleetCo SLT has been notified to help resolve this payment.');
+    await fetchData(user);
+  };
+
   const isAdmin = isFleetCoAdmin(user?.role) || user?.role === 'admin';
-  const canPost = canPostLoad(user);
+  const canPost = canPostLoad(user) && (brokerCompliance?.canPostLoads !== false);
   const canDispatch = canDispatchLoad(user);
   const customerPoster = isCustomerLoadPoster(user);
   const canWeigh = isAdmin || isDriverCapableUser(user);
@@ -204,6 +237,16 @@ export default function LoadBoard() {
                   <FileText className="w-3 h-3" /> BOL
                 </span>
               )}
+              {load.carrier_payment_terms && (
+                <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-medium">
+                  {paymentTermsLabel(load.carrier_payment_terms)}
+                </span>
+              )}
+              {load.carrier_payment_status && load.carrier_payment_status !== 'awaiting_delivery' && (
+                <span className={`text-xs px-2 py-0.5 rounded font-medium ${PAYMENT_STATUS_COLORS[load.carrier_payment_status] || 'bg-slate-100 text-slate-600'}`}>
+                  {paymentStatusLabel(load.carrier_payment_status)}
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap gap-4 text-sm text-slate-600">
               <span className="flex items-center gap-1">
@@ -222,6 +265,9 @@ export default function LoadBoard() {
                   <span className="text-amber-700 font-medium">Your fee due: ${feeAmt} ({feePct}%)</span>
                 );
               })()}
+              {load.carrier_payment_due_at && load.carrier_payment_status !== 'paid' && (
+                <span className="text-slate-600">Payment due: {formatPaymentDueDate(load.carrier_payment_due_at)}</span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -269,11 +315,26 @@ export default function LoadBoard() {
                   <Scale className="w-4 h-4 text-slate-400" />
                 </Button>
               )}
-              {!marketplace && load.status === 'in_transit' && (canDispatch || canPost) && (
+              {!marketplace && (load.status === 'in_transit' || (load.status === 'assigned' && load.carrier_payment_terms)) && (canDispatch || canPost) && (
                 <Button size="sm" variant="outline" onClick={() => handleCompleteWithFee(load)}>Complete</Button>
               )}
               {!marketplace && load.platform_fee_status === 'pending' && (
                 <Button size="sm" variant="outline" onClick={() => handlePayPlatformFee(load)}>Pay fee</Button>
+              )}
+              {!marketplace && canMarkCarrierPaymentSent(user, load) && (
+                <Button size="sm" variant="outline" className="border-emerald-300 text-emerald-800" onClick={() => handleMarkPaymentSent(load)}>
+                  Mark paid
+                </Button>
+              )}
+              {!marketplace && canConfirmCarrierPayment(user, load) && (
+                <>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleConfirmPayment(load)}>
+                    Confirm payment
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => handleReportMissingPayment(load)}>
+                    Not paid
+                  </Button>
+                </>
               )}
               {!marketplace && (canDispatch || (canPost && load.customer_id === user?.customer_id)) && (
                 <>
@@ -323,6 +384,16 @@ export default function LoadBoard() {
           </Button>
         )}
       </div>
+
+      {brokerCompliance?.canPostLoads === false && (
+        <div className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-sm">
+          <Package className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold">Load posting paused</p>
+            <p>{brokerCompliance.blockedReason} ({brokerCompliance.overdueCount} open issue{brokerCompliance.overdueCount === 1 ? '' : 's'})</p>
+          </div>
+        </div>
+      )}
 
       {canMarketplace && (
         <div className="flex gap-2 mb-4">

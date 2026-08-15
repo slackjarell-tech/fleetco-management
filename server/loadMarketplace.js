@@ -9,6 +9,7 @@ import {
 import { isFleetCoInternal } from './roles.js';
 import { isDriverCapableUser } from './driverAccess.js';
 import { computeLoadFinancials, PLATFORM_FEE_PERCENT, POSTER_FEE_PERCENT, CARRIER_FEE_PERCENT } from './loadMarketplaceFinance.js';
+import { initCarrierPaymentOnDelivery } from './loadCarrierPayments.js';
 
 function isAdminRole(role) {
   return isFleetCoInternal(role) || role === 'admin' || role === 'owner';
@@ -130,7 +131,7 @@ export function respondToLoadBooking(user, { loadId, action, assignedDriverId, a
   return { success: true, load: updated, action: 'accepted' };
 }
 
-export function completeLoadWithFee(user, loadId) {
+export async function completeLoadWithFee(user, loadId) {
   if (!user) throw new Error('Unauthorized');
   const load = getEntity('Load', loadId);
   if (!load) throw new Error('Load not found');
@@ -139,6 +140,9 @@ export function completeLoadWithFee(user, loadId) {
   if (!canComplete) throw new Error('Not authorized');
 
   const fin = computeLoadFinancials(load);
+
+  const deliveredAt = nowIso();
+  const paymentPatch = initCarrierPaymentOnDelivery(load, deliveredAt);
 
   const updated = updateEntity('Load', loadId, {
     status: 'delivered',
@@ -153,7 +157,25 @@ export function completeLoadWithFee(user, loadId) {
     poster_payout_amount: fin.poster_payout_amount,
     carrier_payout_amount: fin.carrier_payout_amount,
     platform_fee_status: fin.fleetco_fee_amount > 0 ? 'pending' : 'waived',
-    delivered_at: nowIso(),
+    delivered_at: deliveredAt,
+    ...paymentPatch,
   });
-  return { success: true, load: updated, platformFee: fin.fleetco_fee_amount, financials: fin };
+
+  let payoutResult = null;
+  if (paymentPatch.carrier_payment_status === 'pending') {
+    try {
+      const { attemptCarrierPayoutOnDelivery } = await import('./stripeCarrierPayouts.js');
+      payoutResult = await attemptCarrierPayoutOnDelivery(getEntity('Load', loadId) || updated);
+    } catch (err) {
+      console.warn('[carrier-payout] auto-pay failed', loadId, err.message);
+    }
+  }
+
+  return {
+    success: true,
+    load: getEntity('Load', loadId) || updated,
+    platformFee: fin.fleetco_fee_amount,
+    financials: fin,
+    carrierPayout: payoutResult,
+  };
 }

@@ -358,7 +358,13 @@ export async function syncCheckoutSession(sessionId, user) {
   const stripe = getStripe();
   if (!stripe || !sessionId) return { success: false, skipped: true };
 
-  const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['subscription'] });
+  const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['subscription', 'setup_intent'] });
+
+  if (session.mode === 'setup' && session.metadata?.setup_type === 'broker_load_board') {
+    const { syncBrokerCardFromSetupSession } = await import('./stripeCarrierPayouts.js');
+    return syncBrokerCardFromSetupSession(session);
+  }
+
   if (session.payment_status !== 'paid' && session.status !== 'complete') {
     return { success: false, error: 'Checkout not completed yet' };
   }
@@ -403,6 +409,16 @@ export async function handleStripeWebhook(rawBody, signature) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
+
+    const { handleCarrierPayoutStripeEvent } = await import('./stripeCarrierPayouts.js');
+    const payoutHandled = await handleCarrierPayoutStripeEvent(event);
+    if (payoutHandled.handled && session.mode === 'setup') {
+      return { received: true, type: event.type, payout: payoutHandled };
+    }
+    if (payoutHandled.handled && session.metadata?.fee_type === 'load_platform_fee') {
+      return { received: true, type: event.type, payout: payoutHandled };
+    }
+
     const customer = await resolveCustomerFromStripeObject(session);
     if (customer) {
       const plan = session.metadata?.plan_name || customer.subscription_plan;
@@ -456,6 +472,14 @@ export async function handleStripeWebhook(rawBody, signature) {
         subscription_status: 'cancelled',
         payment_status: 'cancelled',
       });
+    }
+  }
+
+  if (event.type === 'payment_intent.succeeded' || event.type === 'payment_intent.payment_failed') {
+    const { handleCarrierPayoutStripeEvent } = await import('./stripeCarrierPayouts.js');
+    const payoutHandled = await handleCarrierPayoutStripeEvent(event);
+    if (payoutHandled.handled) {
+      return { received: true, type: event.type, payout: payoutHandled };
     }
   }
 

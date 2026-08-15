@@ -7,9 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { X } from 'lucide-react';
 import { filterDriverRoster } from '@/lib/driverAccess';
 import { EQUIPMENT_CATEGORIES, EQUIPMENT_ACCESSORIES } from '@/lib/equipmentTypes';
-import { canDispatchLoad, isCustomerLoadPoster } from '@/lib/loadBoardAccess';
+import { canDispatchLoad, isCustomerLoadPoster, isFreightBroker } from '@/lib/loadBoardAccess';
 import { canUploadBol } from '@/lib/loadBol';
 import LoadBolUpload from '@/components/loadboard/LoadBolUpload';
+import { CARRIER_PAYMENT_TERMS, loadRequiresCarrierPaymentTerms } from '@/lib/loadCarrierPayments';
 
 const CUSTOMER_STATUSES = ['available', 'cancelled'];
 const DISPATCH_STATUSES = ['available', 'assigned', 'in_transit', 'delivered', 'cancelled'];
@@ -22,6 +23,7 @@ function generateLoadNumber() {
 export default function LoadModal({ load, vehicles, users, customers = [], currentUser, onSave, onClose }) {
   const drivers = filterDriverRoster(users);
   const customerPoster = isCustomerLoadPoster(currentUser);
+  const brokerPoster = isFreightBroker(currentUser);
   const showDispatch = canDispatchLoad(currentUser) && !customerPoster;
   const showBolUpload = canUploadBol(currentUser);
 
@@ -57,6 +59,7 @@ export default function LoadModal({ load, vehicles, users, customers = [], curre
     bol_uploaded_at: load?.bol_uploaded_at || '',
     bol_uploaded_by: load?.bol_uploaded_by || '',
     notes: load?.notes || '',
+    carrier_payment_terms: load?.carrier_payment_terms || '',
   });
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
@@ -83,6 +86,10 @@ export default function LoadModal({ load, vehicles, users, customers = [], curre
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (loadRequiresCarrierPaymentTerms(currentUser) && !form.carrier_payment_terms) {
+      alert('Select carrier payment terms — Net 7 or Net 15 — before posting this load.');
+      return;
+    }
     const origin = form.origin || (form.origin_city && form.origin_state ? `${form.origin_city}, ${form.origin_state}` : '');
     const destination = form.destination || (form.destination_city && form.destination_state ? `${form.destination_city}, ${form.destination_state}` : '');
     onSave({
@@ -115,6 +122,9 @@ export default function LoadModal({ load, vehicles, users, customers = [], curre
             </h2>
             {customerPoster && (
               <p className="text-xs text-slate-500 mt-0.5">Your load will appear on the load board for carriers to view.</p>
+            )}
+            {brokerPoster && (
+              <p className="text-xs text-amber-700 mt-0.5 font-medium">Brokers must set carrier payment terms (Net 7 or Net 15) when posting freight.</p>
             )}
           </div>
           <Button size="icon" variant="ghost" onClick={onClose}><X className="w-5 h-5" /></Button>
@@ -205,6 +215,22 @@ export default function LoadModal({ load, vehicles, users, customers = [], curre
               <Label>Rate ($)</Label>
               <Input type="number" value={form.rate} onChange={(e) => set('rate', e.target.value)} className="mt-1" placeholder="0.00" />
             </div>
+            {brokerPoster && (
+              <div className="col-span-2">
+                <Label>Carrier payment terms *</Label>
+                <Select value={form.carrier_payment_terms} onValueChange={(v) => set('carrier_payment_terms', v)} required>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select Net 7 or Net 15" /></SelectTrigger>
+                  <SelectContent>
+                    {CARRIER_PAYMENT_TERMS.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.label} — {t.description}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-slate-500 mt-1">
+                  FleetCo SLT is notified if the carrier does not receive payment by the agreed due date.
+                </p>
+              </div>
+            )}
             <div>
               <Label>Miles</Label>
               <Input type="number" value={form.miles} onChange={(e) => set('miles', e.target.value)} className="mt-1" />
