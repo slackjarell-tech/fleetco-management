@@ -105,6 +105,11 @@ export function entityBelongsToCustomer(type, item, customerId, scopeIndex) {
     return true;
   }
 
+  if (type === 'JobApplication' && item.job_posting_id) {
+    const posting = getEntity('JobPosting', item.job_posting_id);
+    if (posting && matchesCustomerField(posting, customerId)) return true;
+  }
+
   const { vehicleIds, userIds } = scopeIndex || buildScopeIndex(customerId);
 
   if (item.vehicle_id && vehicleIds?.has(item.vehicle_id)) {
@@ -217,6 +222,8 @@ export function stampEntityForCreate(type, data, ctx) {
     'PaymentReminder',
     'DeliveryRoute',
     'PortalActivity',
+    'JobPosting',
+    'JobApplication',
   ]);
 
   if (type === 'Vehicle' && !next.customer_id && !next.assigned_customer_id) {

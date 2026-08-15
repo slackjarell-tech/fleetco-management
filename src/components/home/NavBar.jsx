@@ -6,6 +6,7 @@ import FleetcoLogo from '@/components/home/FleetcoLogo';
 const NAV_LINKS = [
   { label: 'For Fleets', to: '/for-fleets' },
   { label: 'Load Board', to: '/load-board' },
+  { label: 'Jobs', to: '/jobs' },
   { label: 'For Brokers', to: '/for-brokers' },
   { label: 'Features', to: '/features' },
   { label: 'Compare', to: '/compare' },

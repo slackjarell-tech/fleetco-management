@@ -28,6 +28,7 @@ export const PATH_TO_SECTION = {
   '/portal/vehicle-lookup': 'Maintenance',
   '/portal/vendors': 'Maintenance',
   '/portal/drivers': 'Drivers & Payroll',
+  '/portal/hiring': 'Drivers & Payroll',
   '/portal/scorecard': 'Drivers & Payroll',
   '/portal/driver-payroll': 'Drivers & Payroll',
   '/portal/payroll': 'Drivers & Payroll',

@@ -58,6 +58,7 @@ import {
   readCustomerContextHeader,
   isInternalRole,
 } from './entityScope.js';
+import { registerJobBoardRoutes } from './jobBoard.js';
 import {
   buildFullBackup,
   buildCredentialsManifest,
@@ -513,6 +514,8 @@ app.post('/api/agents/conversations/:id/messages', requireAuth, async (req, res)
   }
 });
 
+registerJobBoardRoutes(app, requireAuth);
+
 app.get('/api/slt-marketing/dashboard', requireAuth, async (req, res) => {
   try {
     const { getMarketingDashboard } = await import('./sltMarketing.js');
@@ -803,6 +806,7 @@ const ENTITY_NAMES = [
   'CustomerFundingAccount', 'PayeeBankAccount', 'PayrollDisbursement', 'PayrollDisbursementBatch',
   'EmployeeTaxProfile',
   'BrokerApplication', 'TrialRequest', 'LoadMessage', 'LoadMarketplaceEvent',
+  'JobPosting', 'JobApplication',
 ];
 
 const IMMUTABLE_ENTITY_TYPES = new Set(['LoadMessage', 'LoadMarketplaceEvent']);
@@ -1218,6 +1222,9 @@ async function startServer() {
     import('./marketingAutopilot.js').then(({ startMarketingAutopilotScheduler }) => {
       startMarketingAutopilotScheduler();
     }).catch((err) => console.warn('[marketing-autopilot] scheduler not started', err.message));
+    import('./jobApplicantAutopilot.js').then(({ startJobApplicantAutopilotScheduler }) => {
+      startJobApplicantAutopilotScheduler();
+    }).catch((err) => console.warn('[job-applicant-autopilot] scheduler not started', err.message));
     import('./loadCarrierPayments.js').then(({ startCarrierPaymentScheduler }) => {
       startCarrierPaymentScheduler();
     }).catch((err) => console.warn('[carrier-payments] scheduler not started', err.message));

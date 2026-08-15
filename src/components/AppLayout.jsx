@@ -7,7 +7,7 @@ import {
   Archive, Calendar, Cpu, Store, Bot, Crown, MessageCircle, Navigation, TrendingUp,
   Map, Route, DollarSign, Globe, Clock, ShieldCheck, AlertTriangle, Award, Lightbulb,
   MapPin, Megaphone, Zap, Mail, ScanLine, Video, Upload, Warehouse, Search,
-  ChevronDown, KeyRound, Bell, Database, Calculator, Smartphone, CreditCard,
+  ChevronDown, KeyRound, Bell, Database, Calculator, Smartphone, CreditCard, Briefcase,
 } from 'lucide-react';
 import { DRIVER_APP } from '@/lib/platform';
 import { Button } from '@/components/ui/button';
@@ -88,6 +88,7 @@ const NAV_GROUPS = [
     icon: Users,
     items: [
       { label: 'Drivers', icon: UserCheck, path: '/portal/drivers' },
+      { label: 'Hiring Hub', icon: Briefcase, path: '/portal/hiring', hrOnly: true },
       { label: 'Driver Scorecards', icon: Award, path: '/portal/scorecard' },
       { label: 'Driver Payroll', icon: DollarSign, path: '/portal/driver-payroll' },
       { label: 'Payroll', icon: DollarSign, path: '/portal/payroll' },
@@ -325,6 +326,7 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
             const visibleItems = group.items.filter(item => {
               if (item.internalOnly && !isInternal) return false;
               if (item.sltOnly && !['owner', 'executive', 'fleet_manager'].includes(user?.role)) return false;
+              if (item.hrOnly && !isInternal && !canManageCustomerTeam(user?.role)) return false;
               if (item.path === '/portal/fleetco-payroll' && !['owner', 'executive', 'fleet_manager'].includes(user?.role)) return false;
               if (item.ownerOnly && user?.role !== 'owner') return false;
               if (item.customerBilling && !user?.customer_id) return false;

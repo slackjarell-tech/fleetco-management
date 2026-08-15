@@ -77,6 +77,9 @@ import FleetCoPayroll from './pages/FleetCoPayroll';
 import SltMarketingHub from './pages/SltMarketingHub';
 import SltBillingHub from './pages/SltBillingHub';
 import EldPortal from './pages/EldPortal';
+import JobsBoardPublic from './pages/JobsBoardPublic';
+import JobDetailPublic from './pages/JobDetailPublic';
+import HiringHub from './pages/HiringHub';
 import RouteDashboard from './pages/RouteDashboard';
 import DomainEmails from './pages/DomainEmails';
 import DataBackup from './pages/DataBackup';
@@ -211,6 +214,7 @@ const AuthenticatedApp = () => {
           <Route path="competitive-analysis" element={<CompetitiveAnalysis />} />
           <Route path="revan" element={<Revan />} />
           <Route path="slt-marketing" element={<SltMarketingHub />} />
+          <Route path="hiring" element={<HiringHub />} />
           <Route path="broker-applications" element={<BrokerApplications />} />
           <Route path="slt-billing" element={<SltBillingHub />} />
           <Route path="eld" element={<EldPortal />} />
@@ -236,6 +240,8 @@ const AuthenticatedApp = () => {
       <Route path="/compare" element={<ComparePage />} />
       <Route path="/start-trial" element={<StartTrialPage />} />
       <Route path="/owner-operator-software" element={<OwnerOperatorSoftwarePage />} />
+      <Route path="/jobs" element={<JobsBoardPublic />} />
+      <Route path="/jobs/:slug" element={<JobDetailPublic />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/overview" element={<InvestorOverview />} />

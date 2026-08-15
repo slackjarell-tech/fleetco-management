@@ -148,6 +148,7 @@ const ENTITY_NAMES = [
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
   'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
+  'JobPosting', 'JobApplication',
 ];
 
 const entities = {};
@@ -447,7 +448,67 @@ const sltBilling = {
   },
 };
 
-export const api = { auth, entities, functions, integrations, agents, marketingAi, billing, payroll, sltMarketing, sltBilling, reports: {
+async function publicFetch(path, options = {}) {
+  const API_ROOT = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
+  const url = `${API_ROOT}/api${path.startsWith('/') ? path : `/${path}`}`;
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  const res = await fetch(url, { ...options, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || res.statusText || 'Request failed');
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+const jobBoard = {
+  getMeta() {
+    return publicFetch('/public/jobs/meta');
+  },
+  listPublic(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set('q', params.q);
+    if (params.category) qs.set('category', params.category);
+    if (params.company) qs.set('company', params.company);
+    const query = qs.toString();
+    return publicFetch(`/public/jobs${query ? `?${query}` : ''}`);
+  },
+  getPublic(slug) {
+    return publicFetch(`/public/jobs/${encodeURIComponent(slug)}`);
+  },
+  apply(slug, payload) {
+    return publicFetch(`/public/jobs/${encodeURIComponent(slug)}/apply`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  getDashboard() {
+    return apiFetch('/job-board/dashboard');
+  },
+  listPostings() {
+    return apiFetch('/job-board/postings');
+  },
+  createPosting(data) {
+    return apiFetch('/job-board/postings', { method: 'POST', body: JSON.stringify(data) });
+  },
+  updatePosting(id, data) {
+    return apiFetch(`/job-board/postings/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+  listApplications(jobPostingId) {
+    const qs = jobPostingId ? `?job_posting_id=${encodeURIComponent(jobPostingId)}` : '';
+    return apiFetch(`/job-board/applications${qs}`);
+  },
+  updateApplication(id, data) {
+    return apiFetch(`/job-board/applications/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+  hireApplicant(id, data = {}) {
+    return apiFetch(`/job-board/applications/${id}/hire`, { method: 'POST', body: JSON.stringify(data) });
+  },
+};
+
+export const api = { auth, entities, functions, integrations, agents, marketingAi, billing, payroll, sltMarketing, sltBilling, jobBoard, reports: {
   listEntity(entityName, sort, limit) {
     const params = new URLSearchParams();
     if (sort) params.set('sort', sort);
