@@ -11,7 +11,8 @@ import {
   updateEntity,
 } from './db.js';
 import { sendEmail } from './email.js';
-import { getAiStatus, simpleLLM } from './aiAgent.js';
+import { getAiStatus } from './aiProvider.js';
+import { simpleLLM } from './aiAgent.js';
 import { sendInquiryNotificationEmail } from './inquiryEmails.js';
 import { NURTURE_SEQUENCE } from './marketingEmailTemplates.js';
 import {
