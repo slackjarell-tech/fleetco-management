@@ -73,19 +73,49 @@ export function canBookMarketplaceLoad(user, load) {
 export function canRespondToBooking(user, load) {
   if (!user || !load) return false;
   if (isFleetCoAdmin(user.role) || LOAD_DISPATCH_ROLES.includes(user.role)) return true;
+  if (load.posted_by_user_id && load.posted_by_user_id === user.id) return true;
   if (load.customer_id && user.customer_id === load.customer_id) return true;
   return false;
 }
 
-/** Poster, carrier, or SLT can view/post load thread messages. */
+function isLoadPoster(user, load) {
+  if (!user || !load) return false;
+  if (load.posted_by_user_id && load.posted_by_user_id === user.id) return true;
+  if (load.customer_id && user.customer_id && load.customer_id === user.customer_id) return true;
+  return false;
+}
+
+function isLoadCarrier(user, load) {
+  if (!user || !load) return false;
+  const carrierId = load.booked_by_customer_id || load.assigned_customer_id;
+  if (carrierId && user.customer_id && carrierId === user.customer_id) return true;
+  if (load.booked_by_user_id === user.id) return true;
+  return false;
+}
+
+/** Poster, carrier, interested fleet customers (pre-book), brokers, and SLT. */
 export function canAccessLoadThread(user, load) {
   if (!user || !load) return false;
   if (isFleetCoAdmin(user.role) || user.role === 'admin' || user.role === 'owner') return true;
-  if (user.customer_id && user.customer_id === load.customer_id) return true;
-  const carrierId = load.booked_by_customer_id || load.assigned_customer_id;
-  if (user.customer_id && carrierId && user.customer_id === carrierId) return true;
-  if (load.booked_by_user_id === user.id) return true;
+  if (isLoadPoster(user, load)) return true;
+  if (isLoadCarrier(user, load)) return true;
+
+  const openMarketplace = load.marketplace_visible !== false
+    && load.status === 'available'
+    && (!load.booking_status || load.booking_status === 'open');
+
+  if (openMarketplace && user.customer_id && !isFreightBroker(user)) {
+    if (load.customer_id && user.customer_id === load.customer_id) return false;
+    return true;
+  }
+
+  if (load.booking_status === 'pending' && isLoadPoster(user, load)) return true;
+
   return false;
+}
+
+export function canViewSltMarketplaceOversight(user) {
+  return isFleetCoAdmin(user?.role) || user?.role === 'fleet_manager';
 }
 
 export {

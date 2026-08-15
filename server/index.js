@@ -729,8 +729,10 @@ const ENTITY_NAMES = [
   'MarketingConversation', 'MarketingAutopilotRun',
   'CustomerFundingAccount', 'PayeeBankAccount', 'PayrollDisbursement', 'PayrollDisbursementBatch',
   'EmployeeTaxProfile',
-  'BrokerApplication', 'TrialRequest', 'LoadMessage',
+  'BrokerApplication', 'TrialRequest', 'LoadMessage', 'LoadMarketplaceEvent',
 ];
+
+const IMMUTABLE_ENTITY_TYPES = new Set(['LoadMessage', 'LoadMarketplaceEvent']);
 
 function filterUsersForActor(actor, users) {
   if (!actor) return [];
@@ -896,6 +898,17 @@ app.post('/api/entities/:type', requireAuth, (req, res) => {
     }
   }
   const item = createEntity(type, payload);
+  if (type === 'Load' && item.marketplace_visible !== false && req.user) {
+    import('./loadMarketplaceAudit.js').then(({ logLoadMarketplaceEvent }) => {
+      logLoadMarketplaceEvent({
+        loadId: item.id,
+        action: 'load_posted',
+        user: req.user,
+        summary: `${req.user.full_name || req.user.email} posted load #${item.load_number}`,
+        metadata: { origin: item.origin, destination: item.destination, rate: item.rate },
+      });
+    }).catch(() => {});
+  }
   res.status(201).json(item);
 });
 
@@ -924,6 +937,9 @@ app.patch('/api/entities/:type/:id', requireAuth, (req, res) => {
   } catch (err) {
     return res.status(err.status || 403).json({ error: err.message });
   }
+  if (IMMUTABLE_ENTITY_TYPES.has(type)) {
+    return res.status(403).json({ error: 'Marketplace communications and booking records cannot be edited' });
+  }
   let patch = req.body;
   if (type === 'Load') {
     try {
@@ -945,6 +961,9 @@ app.delete('/api/entities/:type/:id', requireAuth, (req, res) => {
     assertDeleteAllowed(type, ctx, req.user);
   } catch (err) {
     return res.status(err.status || 403).json({ error: err.message });
+  }
+  if (IMMUTABLE_ENTITY_TYPES.has(type)) {
+    return res.status(403).json({ error: 'Marketplace communications and booking records cannot be deleted' });
   }
   if (type === 'Customer' && !canProvisionCustomers(req.user.role)) {
     return res.status(403).json({ error: 'Only FleetCo staff can delete customer records' });

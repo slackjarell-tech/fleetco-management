@@ -330,6 +330,14 @@ export async function invokeFunction(name, body, user) {
       const { postLoadMessage } = await import('./loadMarketplaceExecutive.js');
       return postLoadMessage(user, body);
     }
+    case 'listLoadMarketplaceEvents': {
+      const { listLoadMarketplaceEvents } = await import('./loadMarketplaceAudit.js');
+      return listLoadMarketplaceEvents(user, body);
+    }
+    case 'getSltMarketplaceOversight': {
+      const { getSltMarketplaceOversight } = await import('./loadMarketplaceAudit.js');
+      return getSltMarketplaceOversight(user);
+    }
     case 'acknowledgeLoadBoardFee': {
       const { acknowledgeLoadBoardFee } = await import('./loadBoardFeeAcknowledgment.js');
       requireLoadBoardFeeAcknowledgment(body);

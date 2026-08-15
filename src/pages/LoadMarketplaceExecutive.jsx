@@ -6,7 +6,7 @@ import { formatUsd, PLATFORM_FEE_PERCENT, POSTER_FEE_PERCENT, CARRIER_FEE_PERCEN
 import { paymentTermsLabel, paymentStatusLabel, formatPaymentDueDate } from '@/lib/loadCarrierPayments';
 import LoadThreadPanel from '@/components/loadboard/LoadThreadPanel';
 import {
-  Crown, DollarSign, Package, TrendingUp, MessageCircle, ArrowLeft, Loader2, AlertTriangle,
+  Crown, DollarSign, Package, TrendingUp, MessageCircle, ArrowLeft, Loader2, AlertTriangle, Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -43,14 +43,21 @@ export default function LoadMarketplaceExecutive() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [threadLoad, setThreadLoad] = useState(null);
+  const [oversight, setOversight] = useState(null);
+  const [oversightTab, setOversightTab] = useState('messages');
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await api.functions.invoke('getExecutiveLoadMarketplace', {});
+      const [res, ov] = await Promise.all([
+        api.functions.invoke('getExecutiveLoadMarketplace', {}),
+        api.functions.invoke('getSltMarketplaceOversight', {}).catch(() => null),
+      ]);
       setData(res);
+      setOversight(ov);
     } catch {
       setData(null);
+      setOversight(null);
     }
     setLoading(false);
   };
@@ -118,6 +125,63 @@ export default function LoadMarketplaceExecutive() {
           <StatCard icon={Package} label="Carrier Fees" value={formatUsd(totals.carrier_fee)} sub={`${CARRIER_FEE_PERCENT}% of load value`} color="purple" />
           <StatCard icon={AlertTriangle} label="Payment Issues" value={totals.payment_issues || 0} sub={`${totals.overdue_payments || 0} overdue · SLT alerts`} color="amber" />
         </div>
+
+        {oversight && (
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 mb-8">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-amber-500" />
+                <h2 className="text-lg font-bold">SLT communications & booking oversight</h2>
+              </div>
+              <p className="text-xs text-slate-500">Permanent records — cannot be deleted</p>
+            </div>
+            <div className="flex gap-2 mb-4">
+              <Button size="sm" variant={oversightTab === 'messages' ? 'default' : 'outline'} className={oversightTab === 'messages' ? 'bg-amber-500 text-slate-900 font-bold' : 'border-slate-600 text-slate-300'} onClick={() => setOversightTab('messages')}>
+                All messages ({oversight.message_count})
+              </Button>
+              <Button size="sm" variant={oversightTab === 'events' ? 'default' : 'outline'} className={oversightTab === 'events' ? 'bg-amber-500 text-slate-900 font-bold' : 'border-slate-600 text-slate-300'} onClick={() => setOversightTab('events')}>
+                Booking log ({oversight.event_count})
+              </Button>
+              <Button size="sm" variant={oversightTab === 'bookings' ? 'default' : 'outline'} className={oversightTab === 'bookings' ? 'bg-amber-500 text-slate-900 font-bold' : 'border-slate-600 text-slate-300'} onClick={() => setOversightTab('bookings')}>
+                Load bookings ({oversight.load_count})
+              </Button>
+            </div>
+            <div className="max-h-72 overflow-y-auto space-y-2 text-sm">
+              {oversightTab === 'messages' && oversight.messages.slice().reverse().map((m) => (
+                <div key={m.id} className="bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2">
+                  <div className="flex justify-between gap-2 text-xs text-slate-500 mb-1">
+                    <span>#{m.load_number} · {m.poster_company} → {m.carrier_company || 'open'}</span>
+                    <span>{m.created_date?.slice(0, 16).replace('T', ' ')}</span>
+                  </div>
+                  <div className="font-medium text-slate-200">{m.sender_name}{m.sender_role === 'freight_broker' ? ' (Broker)' : ''}</div>
+                  <p className="text-slate-400 mt-1">{m.body}</p>
+                </div>
+              ))}
+              {oversightTab === 'events' && oversight.events.slice().reverse().map((e) => (
+                <div key={e.id} className="bg-slate-900/50 border border-amber-900/30 rounded-lg px-3 py-2">
+                  <div className="flex justify-between gap-2 text-xs text-slate-500 mb-1">
+                    <span className="uppercase text-amber-500 font-bold">{e.action?.replace(/_/g, ' ')}</span>
+                    <span>{e.created_date?.slice(0, 16).replace('T', ' ')}</span>
+                  </div>
+                  <p className="text-slate-300">{e.summary}</p>
+                  <p className="text-xs text-slate-500 mt-1">#{e.load_number} · {e.poster_company} / {e.carrier_company || '—'}</p>
+                </div>
+              ))}
+              {oversightTab === 'bookings' && oversight.loads.map((l) => (
+                <div key={l.id} className="bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 flex flex-wrap justify-between gap-2">
+                  <div>
+                    <span className="font-bold">#{l.load_number}</span>
+                    <span className="text-slate-400 ml-2">{l.origin} → {l.destination}</span>
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {l.poster_company} · booked {l.booked_by_name || '—'} · {l.booking_status || l.status}
+                    {l.booked_at && ` · ${l.booked_at.slice(0, 10)}`}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2 mb-4">
           {['all', 'pending', 'accepted', 'delivered', 'payment_issues'].map((f) => (
@@ -204,7 +268,7 @@ export default function LoadMarketplaceExecutive() {
       </div>
 
       {threadLoad && (
-        <LoadThreadPanel load={threadLoad} onClose={() => setThreadLoad(null)} />
+        <LoadThreadPanel load={threadLoad} onClose={() => setThreadLoad(null)} readOnly={false} />
       )}
     </div>
   );

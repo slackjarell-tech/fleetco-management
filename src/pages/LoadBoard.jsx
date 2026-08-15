@@ -300,8 +300,8 @@ export default function LoadBoard() {
                   </a>
                 </Button>
               )}
-              {canAccessLoadThread(user, load) && (load.booking_status === 'pending' || load.booking_status === 'accepted' || load.booked_by_customer_id) && (
-                <Button size="icon" variant="ghost" title="Messages" onClick={() => setThreadLoad(load)}>
+              {canAccessLoadThread(user, load) && (
+                <Button size="icon" variant="ghost" title="Messages (permanent record — SLT visible)" onClick={() => setThreadLoad(load)}>
                   <MessageCircle className="w-4 h-4 text-purple-600" />
                 </Button>
               )}

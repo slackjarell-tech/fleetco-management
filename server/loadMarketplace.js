@@ -10,6 +10,8 @@ import { isFleetCoInternal } from './roles.js';
 import { isDriverCapableUser } from './driverAccess.js';
 import { computeLoadFinancials, PLATFORM_FEE_PERCENT, POSTER_FEE_PERCENT, CARRIER_FEE_PERCENT } from './loadMarketplaceFinance.js';
 import { initCarrierPaymentOnDelivery } from './loadCarrierPayments.js';
+import { canRespondToLoadBooking as canRespondViaComms } from './loadMarketplaceComms.js';
+import { logLoadMarketplaceEvent } from './loadMarketplaceAudit.js';
 
 function isAdminRole(role) {
   return isFleetCoInternal(role) || role === 'admin' || role === 'owner';
@@ -35,11 +37,7 @@ export function canBookMarketplaceLoad(user, load) {
 }
 
 export function canRespondToBooking(user, load) {
-  if (!user || !load) return false;
-  if (isFleetCoInternal(user.role) || isAdminRole(user.role)) return true;
-  if (load.customer_id && user.customer_id === load.customer_id) return true;
-  if (load.posted_by_user_id === user.id) return true;
-  return false;
+  return canRespondViaComms(user, load);
 }
 
 export function listMarketplaceLoads(user) {
@@ -80,6 +78,15 @@ export function bookLoad(user, { loadId, driverId, vehicleId, notes }) {
     booked_at: nowIso(),
     booking_notes: notes || '',
   });
+
+  logLoadMarketplaceEvent({
+    loadId,
+    action: 'load_booked',
+    user,
+    summary: `${user.full_name || user.email} booked load #${load.load_number}`,
+    metadata: { notes: notes || '', driver_id: assignedDriver, vehicle_id: vehicleId || null },
+  });
+
   return { success: true, load: updated };
 }
 
@@ -99,6 +106,12 @@ export function respondToLoadBooking(user, { loadId, action, assignedDriverId, a
       booked_vehicle_id: null,
       booked_at: null,
       booking_notes: '',
+    });
+    logLoadMarketplaceEvent({
+      loadId,
+      action: 'booking_declined',
+      user,
+      summary: `${user.full_name || user.email} declined booking on load #${load.load_number}`,
     });
     return { success: true, load: updated, action: 'declined' };
   }
@@ -128,6 +141,15 @@ export function respondToLoadBooking(user, { loadId, action, assignedDriverId, a
     poster_payout_amount: fin.poster_payout_amount,
     carrier_payout_amount: fin.carrier_payout_amount,
   });
+
+  logLoadMarketplaceEvent({
+    loadId,
+    action: 'booking_accepted',
+    user,
+    summary: `${user.full_name || user.email} accepted booking on load #${load.load_number}`,
+    metadata: { driver_id: driverId, vehicle_id: vehicleId },
+  });
+
   return { success: true, load: updated, action: 'accepted' };
 }
 
@@ -170,6 +192,14 @@ export async function completeLoadWithFee(user, loadId) {
       console.warn('[carrier-payout] auto-pay failed', loadId, err.message);
     }
   }
+
+  logLoadMarketplaceEvent({
+    loadId,
+    action: 'load_delivered',
+    user,
+    summary: `${user.full_name || user.email} marked load #${load.load_number} delivered`,
+    metadata: { carrier_payout: payoutResult?.success || false },
+  });
 
   return {
     success: true,
