@@ -16,6 +16,8 @@ services:
         value: production
       - key: APP_ORIGIN
         value: https://fleetcomanagement.org
+      - key: PUBLIC_APP_URL
+        value: https://fleetcomanagement.org
       - key: VITE_SITE_URL
         value: https://fleetcomanagement.org
       - key: JWT_SECRET
@@ -28,34 +30,48 @@ services:
         value: "false"
       - key: DATA_PATH
         value: /opt/render/project/src/server/data
+      # AI — marketing guide + autopilot (console.groq.com)
       - key: GROQ_API_KEY
         sync: false
+      # Email — Resend (resend.com, verify fleetcomanagement.org)
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
         value: FleetCo Management <support@fleetcomanagement.org>
       - key: INQUIRY_TO
         value: support@fleetcomanagement.org
-      # Optional: set only when creating the owner account or if password_hash is missing.
-      # Remove after first login — it does NOT reset passwords on redeploy.
+      - key: SLT_INBOX
+        value: support@fleetcomanagement.org
+      - key: SLT_PAYMENT_ALERT_EMAILS
+        sync: false
+      - key: SLT_MARKETING_REPORT_EMAILS
+        sync: false
+      # Stripe — subscriptions, broker cards, load fees (dashboard.stripe.com)
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_CONNECT_ENABLED
+        value: "true"
+      # Schedulers (set to "true" only to disable)
+      # - key: MARKETING_AUTOPILOT_DISABLED
+      # - key: CARRIER_PAYMENT_SCHEDULER_DISABLED
       - key: OWNER_BOOTSTRAP_PASSWORD
         sync: false
-      # One-time only: set to "true" with OWNER_BOOTSTRAP_PASSWORD, deploy once, then remove both.
       - key: OWNER_FORCE_PASSWORD_RESET
         sync: false
-      - key: PUBLIC_APP_URL
-        value: https://fleetcomanagement.org
     disk:
       name: fleetco-data
       mountPath: /opt/render/project/src/server/data
       sizeGB: 1
     healthCheckPath: /api/public-settings
 
-# HTTPS: Render provisions TLS automatically when custom domains are verified.
-# Ensure fleetcomanagement.org + www are added under Settings → Custom Domains.
-# APP_ORIGIN / PUBLIC_APP_URL must use https:// (see envVars below).
-# The Node app also redirects http→https and www→apex in production.
-# 1. Create/link PostgreSQL database "fleetco-db"
-# 2. Set DATABASE_URL on fleetco-management (from database Internal Connection String)
-# 3. Set JWT_SECRET, DATA_PATH, SEED_DEMO_DATA=false
-# Without DATABASE_URL the app runs file-only and data resets on redeploy (see Render logs).
+# Go-live checklist (run after deploy):
+#   node scripts/go-live-check.mjs
+# Or hit: GET https://fleetcomanagement.org/api/system/live-status
+#
+# Stripe webhook: https://fleetcomanagement.org/api/billing/webhook
+# Events: checkout.session.completed, payment_intent.succeeded,
+#         payment_intent.payment_failed, invoice.paid

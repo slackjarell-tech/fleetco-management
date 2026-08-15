@@ -11,6 +11,8 @@
     "build:mobile": "vite build --mode mobile",
     "test:functions": "node scripts/full-functions-test.mjs",
     "test:functions:prod": "node scripts/full-functions-test.mjs --production",
+    "go-live:check": "node scripts/go-live-check.mjs",
+    "go-live:check:prod": "node scripts/go-live-check.mjs",
     "seed:demo-drivers": "node scripts/seed-demo-drivers.mjs",
     "seed:local-drivers": "node scripts/seed-local-demo-drivers.mjs",
     "driver:create-personal": "node scripts/create-personal-driver.mjs",

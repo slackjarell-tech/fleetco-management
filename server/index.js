@@ -329,6 +329,35 @@ app.get('/api/public-settings', (_req, res) => {
   });
 });
 
+/** Safe public snapshot — no secrets. Use to verify production subsystems. */
+app.get('/api/system/live-status', async (_req, res) => {
+  try {
+    const { getProductionReadiness } = await import('./productionReadiness.js');
+    const readiness = await getProductionReadiness({ verifyAi: true });
+    res.json({
+      ok: readiness.ok,
+      live_count: readiness.live_count,
+      total: readiness.total,
+      checks: readiness.checks.map((c) => ({ id: c.id, label: c.label, live: c.live })),
+      pending: readiness.pending,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/slt/system/readiness', requireAuth, async (req, res) => {
+  if (!['owner', 'executive', 'fleet_manager', 'admin'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'SLT access required' });
+  }
+  try {
+    const { getProductionReadiness } = await import('./productionReadiness.js');
+    res.json(await getProductionReadiness({ verifyAi: true }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── AI Agent (Site Commander) ───────────────────────────────────────────────
 
 const conversations = new Map();
