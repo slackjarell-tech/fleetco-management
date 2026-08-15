@@ -346,6 +346,33 @@ app.get('/api/system/live-status', async (_req, res) => {
   }
 });
 
+const groqSetupEmailCooldown = new Map();
+
+/** Send Groq AI setup instructions (rate-limited). Defaults to support inbox. */
+app.post('/api/public/groq-setup-email', async (req, res) => {
+  try {
+    const to = (req.body?.email || 'support@fleetcomanagement.org').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      return res.status(400).json({ error: 'Valid email required' });
+    }
+    const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+    const last = groqSetupEmailCooldown.get(ip);
+    if (last && Date.now() - last < 60_000) {
+      return res.status(429).json({ error: 'Please wait a minute before requesting again' });
+    }
+    groqSetupEmailCooldown.set(ip, Date.now());
+
+    const { sendGroqSetupEmail } = await import('./groqSetupEmail.js');
+    const result = await sendGroqSetupEmail(to);
+    if (!result.success) {
+      return res.status(result.skipped ? 503 : 502).json(result);
+    }
+    res.json({ success: true, to, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/slt/system/readiness', requireAuth, async (req, res) => {
   if (!['owner', 'executive', 'fleet_manager', 'admin'].includes(req.user?.role)) {
     return res.status(403).json({ error: 'SLT access required' });
@@ -527,6 +554,23 @@ app.post('/api/slt-marketing/daily-report', requireAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/slt-marketing/groq-setup-email', requireAuth, async (req, res) => {
+  try {
+    const { assertSltMarketingAccess } = await import('./sltMarketing.js');
+    assertSltMarketingAccess(req.user);
+    const { sendGroqSetupEmail } = await import('./groqSetupEmail.js');
+    const to = (req.body?.to || req.user?.email || '').trim().toLowerCase();
+    if (!to) return res.status(400).json({ error: 'Recipient email required' });
+    const result = await sendGroqSetupEmail(to);
+    if (!result.success) {
+      return res.status(result.skipped ? 503 : 502).json(result);
+    }
+    res.json({ success: true, to, id: result.id });
+  } catch (err) {
+    res.status(err.message?.includes('SLT') ? 403 : 400).json({ error: err.message });
   }
 });
 
