@@ -145,7 +145,7 @@ function finalEmail(lead) {
     'Just checking in — if fleet software is still on your radar, we would love to show you FleetCo live.',
     '',
     `Book anytime: ${cal}`,
-    `Or reply with your fleet size and biggest pain point — we will point you to the right plan.',
+    `Or reply with your fleet size and biggest pain point — we will point you to the right plan.`,
     '',
     '— FleetCo Team',
   ].join('\n');
