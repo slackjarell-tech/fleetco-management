@@ -48,7 +48,7 @@ function appOrigin() {
   return (process.env.APP_ORIGIN || process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org').replace(/\/$/, '');
 }
 
-async function ensureStripeCustomer(customerRecord) {
+export async function ensureStripeCustomer(customerRecord) {
   const stripe = getStripe();
   if (!stripe || !customerRecord) return null;
 
