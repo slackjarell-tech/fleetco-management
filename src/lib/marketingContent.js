@@ -19,13 +19,13 @@ export const LOAD_BOARD_MARKETPLACE = {
   headline: 'FleetCo Load Board',
   subheadline: 'Post Freight Free. Pay Only When It Moves.',
   description:
-    'Freight brokers, shippers, and fleet owners can post loads on the FleetCo Load Board at no cost. When a carrier books and completes the load, FleetCo charges 1.5% of total load value from the poster and 1.5% from the carrier — only when freight moves.',
+    'Freight brokers, shippers, and fleet owners can post loads on the FleetCo Load Board at no cost. When a carrier books and completes the load, FleetCo charges 3.5% of total load value from the poster and 1.5% from the carrier — only when freight moves.',
   brokerPostingFee: 0,
-  platformFeePercent: 3,
-  posterFeePercent: 1.5,
+  platformFeePercent: 5,
+  posterFeePercent: 3.5,
   carrierFeePercent: 1.5,
   feeNote:
-    'Posters and freight brokers pay 1.5% of load value; carriers pay 1.5% of load value. No monthly load-board fees. No per-post charges.',
+    'Posters and freight brokers pay 3.5% of load value; carriers pay 1.5% of load value. No monthly load-board fees. No per-post charges.',
   equipmentExamples: [
     'Cargo Van / Sprinter',
     'Box Truck & Liftgate',
@@ -39,7 +39,7 @@ export const LOAD_BOARD_MARKETPLACE = {
     { title: 'Built-In Equipment Matching', desc: 'Specify required equipment so carriers see loads that fit their fleet.' },
     { title: 'One Portal', desc: 'Post loads, track status, and manage your shippers from the same FleetCo platform.' },
     { title: 'Electronic BOL', desc: 'Attach bill of lading PDFs to loads — drivers download directly from the load board.' },
-    { title: 'Low Transaction Fee', desc: 'Only 1.5% per side when freight moves — not when you post.' },
+    { title: 'Low Transaction Fee', desc: 'Brokers pay 3.5%; carriers pay 1.5% when freight moves — not when you post.' },
   ],
 };
 
@@ -59,7 +59,7 @@ export const PLATFORM_FEATURES = [
   {
     icon: Package,
     title: 'Load Board & Marketplace',
-    desc: 'Post loads free as a broker or shipper. Carriers book freight matched to equipment type — each side pays 1.5% when the load moves.',
+    desc: 'Post loads free as a broker or shipper. Carriers book freight matched to equipment type — brokers pay 3.5% and carriers pay 1.5% when the load moves.',
     tag: 'Operations',
   },
   {
@@ -133,7 +133,7 @@ export const PLATFORM_FEATURES = [
 export const PRICING_FAQ = [
   {
     q: 'How much does it cost to post loads on the FleetCo Load Board?',
-    a: 'Posting loads is free for freight brokers and shippers. When a carrier completes a load, the poster pays 1.5% of load value and the carrier pays 1.5% of load value to FleetCo. There are no per-post or monthly load-board fees.',
+    a: 'Posting loads is free for freight brokers and shippers. When a carrier completes a load, the poster pays 3.5% of load value and the carrier pays 1.5% of load value to FleetCo. There are no per-post or monthly load-board fees.',
   },
   {
     q: 'What is included in every plan?',

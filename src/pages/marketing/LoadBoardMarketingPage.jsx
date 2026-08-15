@@ -8,13 +8,13 @@ export default function LoadBoardMarketingPage() {
   return (
     <MarketingShell
       title="Free Load Board for Freight Brokers"
-      description="Post freight free on FleetCo. Attach electronic BOLs. Carriers book loads. Posters and carriers each pay 1.5% when freight moves."
+      description="Post freight free on FleetCo. Attach electronic BOLs. Carriers book loads. Brokers pay 3.5% and carriers pay 1.5% when freight moves."
       path="/load-board"
     >
       <MarketingHero
         badge="FleetCo Load Board"
         title="Post Loads Free. Carriers Book Direct."
-        subtitle="Freight brokers and shippers list freight at no cost. FleetCo carriers find matching equipment and download BOLs — poster and carrier each pay 1.5% only when the load delivers."
+        subtitle="Freight brokers and shippers list freight at no cost. FleetCo carriers find matching equipment and download BOLs — brokers pay 3.5% and carriers pay 1.5% only when the load delivers."
       >
         <Link to="/broker-signup" className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-6 py-3 rounded-lg text-sm inline-flex items-center gap-2">
           Create broker account <ArrowRight className="w-4 h-4" />

@@ -109,7 +109,7 @@ export default function HeroSection() {
               className="inline-flex items-center gap-2 text-sm font-bold text-amber-300 hover:text-amber-200 border border-amber-500/40 hover:border-amber-400/60 bg-amber-500/10 hover:bg-amber-500/15 px-4 py-2 rounded-lg transition-colors"
             >
               <Package className="w-4 h-4" />
-              Freight Brokers — Post Loads Free, 1.5% When It Moves
+              Freight Brokers — Post Loads Free, 3.5% When It Moves
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

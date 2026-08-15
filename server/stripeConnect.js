@@ -12,7 +12,7 @@ function resolveFeeParty(user, load) {
 
 /**
  * Stripe Connect scaffold for load marketplace fees.
- * Each party pays their 1.5% share when settling the platform fee.
+ * Each party pays their platform fee share when settling (poster 3.5%, carrier 1.5%).
  */
 export function getConnectConfigStatus() {
   const stripe = getStripeConfigStatus();

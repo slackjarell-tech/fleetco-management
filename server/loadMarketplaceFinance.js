@@ -1,5 +1,5 @@
-/** Platform fees: poster and carrier each pay 1.5% of load value to FleetCo. */
-export const POSTER_FEE_PERCENT = 1.5;
+/** Platform fees: brokers/posters pay 3.5%; carriers pay 1.5% of load value to FleetCo. */
+export const POSTER_FEE_PERCENT = 3.5;
 export const CARRIER_FEE_PERCENT = 1.5;
 /** Combined FleetCo take on total load value. */
 export const PLATFORM_FEE_PERCENT = POSTER_FEE_PERCENT + CARRIER_FEE_PERCENT;

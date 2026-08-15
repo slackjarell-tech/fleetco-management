@@ -1,5 +1,5 @@
 /** Client-side load marketplace financial helpers. */
-export const POSTER_FEE_PERCENT = 1.5;
+export const POSTER_FEE_PERCENT = 3.5;
 export const CARRIER_FEE_PERCENT = 1.5;
 export const PLATFORM_FEE_PERCENT = POSTER_FEE_PERCENT + CARRIER_FEE_PERCENT;
 

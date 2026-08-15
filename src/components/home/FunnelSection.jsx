@@ -15,7 +15,7 @@ const FUNNELS = [
   {
     icon: Package,
     title: 'Load Board',
-    desc: 'Brokers post loads free. Carriers book freight. Each side pays 1.5% only when freight moves.',
+    desc: 'Brokers post loads free. Carriers book freight. Brokers pay 3.5% and carriers pay 1.5% only when freight moves.',
     cta: 'Load Board',
     to: '/load-board',
     accent: 'bg-slate-900 border-slate-800 text-white',
