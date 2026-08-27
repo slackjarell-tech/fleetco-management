@@ -349,6 +349,13 @@ export async function invokeFunction(name, body, user) {
       const { hasLoadBoardFeeAcknowledgment } = await import('./loadBoardFeeAcknowledgment.js');
       return { acknowledged: hasLoadBoardFeeAcknowledgment(user) };
     }
+    case 'seedFleetCoHiringPosts': {
+      if (!user || !['owner', 'executive', 'fleet_manager'].includes(user.role)) {
+        throw new Error('FleetCo leadership access required');
+      }
+      const { seedAndEmailFleetCoHiringPosts } = await import('./fleetcoHiringPosts.js');
+      return seedAndEmailFleetCoHiringPosts({ to: body.to, reopen: body.reopen !== false });
+    }
     default:
       throw new Error(`Unknown function: ${name}`);
   }
