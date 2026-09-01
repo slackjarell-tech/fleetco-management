@@ -10,6 +10,8 @@ import VehicleModal from '@/components/fleet/VehicleModal';
 import VehicleDocuments from '@/components/fleet/VehicleDocuments';
 import VehicleHistory from '@/components/fleet/VehicleHistory';
 import { isFleetCoAdmin, filterVehiclesForUser } from '@/lib/roles';
+import { canAddCustomerVehicles, isCustomerPortalUser } from '@/lib/customerRoles';
+import AddVehiclesWizard from '@/components/fleet/AddVehiclesWizard';
 
 const STATUS_COLORS = {
   active: 'bg-green-100 text-green-700',
@@ -50,6 +52,7 @@ export default function Fleet() {
   const [historyVehicle, setHistoryVehicle] = useState(null);
   const [manualsVehicle, setManualsVehicle] = useState(null);
   const [detailVehicle, setDetailVehicle] = useState(null);
+  const [showAddWizard, setShowAddWizard] = useState(false);
 
   useEffect(() => {
     api.auth.me().then(async (u) => {
@@ -86,6 +89,7 @@ export default function Fleet() {
   };
 
   const isAdmin = isFleetCoAdmin(user?.role) || user?.role === 'tech';
+  const canCustomerAddUnits = isCustomerPortalUser(user) && canAddCustomerVehicles(user?.role);
   const canViewManuals = ['admin', 'tech', 'employee'].includes(user?.role);
   const getName = (id) => users.find(u => u.id === id)?.full_name || '—';
 
@@ -110,14 +114,26 @@ export default function Fleet() {
           <h1 className="text-2xl font-bold text-slate-900">Fleet</h1>
           <p className="text-slate-500 text-sm">{powerUnits.length} vehicles · {trailers.length} trailers</p>
         </div>
-        {isAdmin && (
+        {(isAdmin || canCustomerAddUnits) && (
           <div className="flex gap-2">
-            <Button onClick={() => { setEditVehicle(null); setDefaultUnitType('trailer'); setShowModal(true); }} variant="outline" className="font-bold">
-              <Plus className="w-4 h-4 mr-1" /> Add Trailer
-            </Button>
-            <Button onClick={() => { setEditVehicle(null); setDefaultUnitType('truck'); setShowModal(true); }} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold">
-              <Plus className="w-4 h-4 mr-1" /> Add Vehicle
-            </Button>
+            {isAdmin && (
+              <>
+                <Button onClick={() => { setEditVehicle(null); setDefaultUnitType('trailer'); setShowModal(true); }} variant="outline" className="font-bold">
+                  <Plus className="w-4 h-4 mr-1" /> Add Trailer
+                </Button>
+                <Button onClick={() => { setEditVehicle(null); setDefaultUnitType('truck'); setShowModal(true); }} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold">
+                  <Plus className="w-4 h-4 mr-1" /> Add Vehicle
+                </Button>
+              </>
+            )}
+            {canCustomerAddUnits && (
+              <Button
+                onClick={() => setShowAddWizard(true)}
+                className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold"
+              >
+                <Plus className="w-4 h-4 mr-1" /> Add Vehicle Info
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -264,6 +280,20 @@ export default function Fleet() {
           customers={customers}
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditVehicle(null); }}
+        />
+      )}
+
+      {showAddWizard && (
+        <AddVehiclesWizard
+          user={user}
+          existingVehicles={vehicles}
+          defaultUnitType={activeTab === 'trailers' ? 'trailer' : 'truck'}
+          onClose={() => setShowAddWizard(false)}
+          onSubmitted={(created) => {
+            if (created?.length) {
+              setVehicles((prev) => [...created, ...prev]);
+            }
+          }}
         />
       )}
     </div>
