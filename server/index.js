@@ -229,6 +229,7 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
       user.customer_name = customer.company_name;
       user.notification_prefs = getCustomerNotificationPrefs(customer);
       user.driver_dual_camera_enabled = !!customer.driver_dual_camera_enabled;
+      user.driver_safety_ai_enabled = customer.driver_safety_ai_enabled !== false;
       user.max_stops_per_route = Number(customer.max_stops_per_route) || 200;
       user.require_pod_signature = !!customer.require_pod_signature;
       user.allow_virtual_pod = customer.allow_virtual_pod !== false;
@@ -800,7 +801,7 @@ const ENTITY_NAMES = [
   'DeliveryStop', 'HOSLog', 'FuelStation', 'FuelCard', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
-  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
+  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'DrivingSafetyEvent', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
   'MarketingSocialPost', 'MarketingScheduledCall', 'MarketingActivityLog', 'MarketingReportRun',
   'MarketingConversation', 'MarketingAutopilotRun',
   'CustomerFundingAccount', 'PayeeBankAccount', 'PayrollDisbursement', 'PayrollDisbursementBatch',
@@ -1089,7 +1090,8 @@ app.post('/api/accounting/purchase-orders/:id/email', requireAuth, async (req, r
 
 app.post('/api/functions/:name', authMiddleware, async (req, res) => {
   try {
-    const result = await invokeFunction(req.params.name, req.body, req.user);
+    const ctx = getEntityContext(req);
+    const result = await invokeFunction(req.params.name, req.body, req.user, ctx);
     res.json(result);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });

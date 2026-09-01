@@ -9,13 +9,14 @@ import {
 } from 'lucide-react';
 
 const MODES = [
+  { id: 'live_stream', label: 'Live Stream (Dual Camera)', desc: 'Road + driver cameras updating every second — fleet watches live in Driver Media', fleetOption: true, live: true },
   { id: 'view_ahead', label: 'View Ahead', desc: 'Dashcam time-lapse (photo every few seconds)' },
   { id: 'dual_monitoring', label: 'Road + Driver (Dual ELD)', desc: 'Road view + in-cabin driver camera at the same time — fleet can check distraction', fleetOption: true },
   { id: 'cabin', label: 'In-Cabin', desc: 'Driver/passenger vlog & reactions' },
   { id: 'broll', label: 'B-Roll', desc: 'Manual clips at stops (scenic, fuel, etc.)' },
 ];
 
-const INTERVALS = [3, 5, 10, 15];
+const INTERVALS = [1, 2, 3, 5, 10, 15];
 
 const SETUP_GUIDES = {
   view_ahead: {
@@ -56,6 +57,16 @@ const SETUP_GUIDES = {
       'Your fleet enabled this so managers can review road view and driver focus together.',
       'Keep the phone plugged in — dual cameras use more battery.',
       'Some iPhones only support one live camera; road view is always captured, cabin when supported.',
+    ],
+  },
+  live_stream: {
+    title: 'Live Stream — Dual Camera',
+    tips: [
+      'Both road and driver cameras stream to your fleet office in near real-time.',
+      'FleetCo Safety AI may flag lane departure, distraction, drowsiness, and phone use.',
+      'Keep the app open and phone plugged in for best results.',
+      'Use a dash mount for road view and face the front camera toward the driver.',
+      'Some iPhones only support one live camera — road is always captured.',
     ],
   },
 };
@@ -114,12 +125,14 @@ export default function DriverDashcam() {
     return () => { cancelled = true; clearInterval(t); window.removeEventListener('fleetco:offline-sync-complete', onSync); };
   }, []);
 
-  const isDualMode = mode === 'dual_monitoring';
+  const isDualMode = mode === 'dual_monitoring' || mode === 'live_stream';
+  const isLiveStream = mode === 'live_stream';
   const isTimelapse = mode === 'view_ahead' || isDualMode;
 
   const startTimelapseTimer = (activeSession) => {
     if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => captureFrame(activeSession), intervalSec * 1000);
+    const sec = activeSession.mode === 'live_stream' ? 1 : intervalSec;
+    timerRef.current = setInterval(() => captureFrame(activeSession), sec * 1000);
   };
 
   const pauseForBackground = () => {
@@ -268,7 +281,7 @@ export default function DriverDashcam() {
         <h1 className="text-xl font-black text-slate-900 flex items-center gap-2">
           <Video className="w-6 h-6 text-amber-500" /> Dashcam & Media
         </h1>
-        <p className="text-slate-500 text-sm mt-1">Time-lapse view ahead, in-cabin shots, and B-roll — synced to your fleet office.</p>
+        <p className="text-slate-500 text-sm mt-1">Live dual-camera stream, time-lapse dashcam, and field captures — synced to your fleet office.</p>
       </div>
 
       {/* Setup guide */}
@@ -294,7 +307,7 @@ export default function DriverDashcam() {
           <Battery className="w-3 h-3" /> Keep plugged in
         </span>
         <span className="inline-flex items-center gap-1 text-xs font-semibold bg-blue-50 text-blue-800 px-2.5 py-1 rounded-full">
-          <Wind className="w-3 h-3" /> Photos not video (saves space)
+          <Wind className="w-3 h-3" /> {isLiveStream ? 'Live stream (~1s updates)' : 'Photos not video (saves space)'}
         </span>
         <span className="inline-flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
           <AlertTriangle className="w-3 h-3" /> Check local mount laws
@@ -325,7 +338,7 @@ export default function DriverDashcam() {
             </div>
           </div>
 
-          {isTimelapse && (
+          {isTimelapse && !isLiveStream && (
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase">Time-lapse interval</label>
               <div className="flex flex-wrap gap-2 mt-2">
@@ -340,7 +353,13 @@ export default function DriverDashcam() {
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-slate-500 mt-2">1 photo every {intervalSec}s — hours of driving compress into a manageable sequence.</p>
+              <p className="text-xs text-slate-500 mt-2">1 photo every {intervalSec}s — use 1–2s for near-live updates.</p>
+            </div>
+          )}
+
+          {isLiveStream && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-900">
+              <strong>Live Stream mode</strong> — both cameras update every second. Your fleet office can watch live under Driver Media. Safety AI may alert on distraction or lane issues.
             </div>
           )}
 
@@ -362,7 +381,7 @@ export default function DriverDashcam() {
             onClick={startRecording}
             className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-bold py-3.5 rounded-xl"
           >
-            <Play className="w-5 h-5" /> Start {isTimelapse ? 'Time-Lapse' : 'Session'}
+            <Play className="w-5 h-5" /> Start {isLiveStream ? 'Live Stream' : isTimelapse ? 'Time-Lapse' : 'Session'}
           </button>
         </>
       )}
@@ -417,7 +436,8 @@ export default function DriverDashcam() {
               )}
               <div className={`px-3 py-2 bg-slate-900 text-xs text-slate-300 flex items-center justify-between ${isDualMode ? 'col-span-2' : ''}`}>
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" /> ELD {isDualMode ? 'dual' : ''} camera live
+                  <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  {isLiveStream ? 'Dual camera live stream' : `ELD ${isDualMode ? 'dual' : ''} camera live`}
                 </span>
                 {position && (
                   <span className="flex items-center gap-1 text-slate-400">
@@ -432,12 +452,14 @@ export default function DriverDashcam() {
             <span className={`w-3 h-3 bg-white rounded-full ${pausedByBackground ? '' : 'animate-pulse'}`} />
             <div className="flex-1">
               <div className="font-black text-sm">
-                {pausedByBackground ? 'PAUSED' : 'REC'} — {MODES.find((m) => m.id === mode)?.label}
+                {pausedByBackground ? 'PAUSED' : isLiveStream ? 'LIVE' : 'REC'} — {MODES.find((m) => m.id === mode)?.label}
               </div>
               <div className="text-xs text-red-100">{frameCount} frame{frameCount !== 1 ? 's' : ''} captured</div>
             </div>
             {isTimelapse && (
-              <span className="text-xs font-bold bg-red-800 px-2 py-1 rounded">every {intervalSec}s</span>
+              <span className="text-xs font-bold bg-red-800 px-2 py-1 rounded">
+                {isLiveStream ? 'live ~1s' : `every ${intervalSec}s`}
+              </span>
             )}
           </div>
 

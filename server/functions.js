@@ -84,7 +84,7 @@ const SIM_ROUTES = [
   ]},
 ];
 
-export async function invokeFunction(name, body, user) {
+export async function invokeFunction(name, body, user, ctx = null) {
   switch (name) {
     case 'decodeVin':
       return decodeVin(body);
@@ -152,6 +152,10 @@ export async function invokeFunction(name, body, user) {
       return captureDashcamFrame(body, user);
     case 'stopDashcamSession':
       return stopDashcamSession(body, user);
+    case 'getLiveDashcamFeeds': {
+      const { getLiveDashcamFeedsHandler } = await import('./drivingSafetyAi.js');
+      return getLiveDashcamFeedsHandler(body, user, ctx);
+    }
     case 'createDomainEmail':
       return createDomainEmail(body, user);
     case 'simulateDrivers':
@@ -1384,8 +1388,9 @@ function setCustomerPause(body, user) {
   };
 }
 
-const DASHCAM_MODES = ['view_ahead', 'cabin', 'broll', 'dual_monitoring'];
-const DASHCAM_INTERVALS = [3, 5, 10, 15];
+const DASHCAM_MODES = ['view_ahead', 'cabin', 'broll', 'dual_monitoring', 'live_stream'];
+const DASHCAM_INTERVALS = [1, 2, 3, 5, 10, 15];
+const LIVE_STREAM_INTERVAL = 1;
 
 function assertDriver(user) {
   if (!user) throw new Error('Unauthorized');
@@ -1397,14 +1402,20 @@ function startDashcamSession(body, user) {
 
   const { mode = 'view_ahead', intervalSec = 5, mountNotes = '', vehicleId = '' } = body;
   if (!DASHCAM_MODES.includes(mode)) {
-    throw new Error('mode must be view_ahead, cabin, broll, or dual_monitoring');
-  }
-  const interval = Number(intervalSec);
-  if (!DASHCAM_INTERVALS.includes(interval) && (mode === 'view_ahead' || mode === 'dual_monitoring')) {
-    throw new Error('intervalSec must be 3, 5, 10, or 15 for time-lapse');
+    throw new Error('mode must be view_ahead, cabin, broll, dual_monitoring, or live_stream');
   }
 
-  if (mode === 'dual_monitoring') {
+  const isTimelapse = mode === 'view_ahead' || mode === 'dual_monitoring';
+  const isLive = mode === 'live_stream';
+  let interval = Number(intervalSec);
+
+  if (isLive) {
+    interval = LIVE_STREAM_INTERVAL;
+  } else if (isTimelapse && !DASHCAM_INTERVALS.includes(interval)) {
+    throw new Error('intervalSec must be 1, 2, 3, 5, 10, or 15 for time-lapse');
+  }
+
+  if (mode === 'dual_monitoring' || mode === 'live_stream') {
     const customer = user.customer_id ? getEntity('Customer', user.customer_id) : null;
     if (!customer?.driver_dual_camera_enabled) {
       throw new Error('Dual camera monitoring is not enabled for your fleet — ask your fleet manager to turn it on in Driver Media.');
@@ -1422,7 +1433,7 @@ function startDashcamSession(body, user) {
     driver_name: user.full_name || user.email,
     customer_id: user.customer_id || '',
     mode,
-    interval_sec: (mode === 'view_ahead' || mode === 'dual_monitoring') ? interval : 0,
+    interval_sec: (isTimelapse || isLive) ? interval : 0,
     mount_notes: mountNotes,
     vehicle_id: vehicleId,
     status: 'recording',
@@ -1435,7 +1446,9 @@ function startDashcamSession(body, user) {
   return {
     success: true,
     session,
-    message: mode === 'view_ahead'
+    message: mode === 'live_stream'
+      ? 'Live stream started — road + driver cameras updating every second. Fleet office can watch live in Driver Media.'
+      : mode === 'view_ahead'
       ? `View-ahead time-lapse started — 1 frame every ${interval}s (photos only, saves memory).`
       : mode === 'dual_monitoring'
         ? `Dual ELD monitoring started — road + driver view every ${interval}s. Your fleet office can review both feeds.`
@@ -1487,6 +1500,14 @@ function captureDashcamFrame(body, user) {
   }
 
   updateEntity('DashcamSession', sessionId, { frame_count: frameIndex });
+
+  const analyzeEvery = session.mode === 'live_stream' ? 3 : 5;
+  if (frameIndex % analyzeEvery === 0) {
+    import('./drivingSafetyAi.js').then(({ analyzeDashcamFrameAsync }) => {
+      analyzeDashcamFrameAsync(roadFrame, session);
+      if (cabinFrame) analyzeDashcamFrameAsync(cabinFrame, session);
+    }).catch(() => {});
+  }
 
   return { success: true, frame: roadFrame, cabinFrame, frameIndex };
 }

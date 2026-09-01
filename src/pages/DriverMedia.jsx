@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { api } from '@/api/apiClient';
-import { Video, User, Clock, MapPin, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Video, User, Clock, MapPin, Eye, ToggleLeft, ToggleRight, Radio, Brain, AlertTriangle } from 'lucide-react';
 import { filterByCustomerId, isFleetCoAdmin } from '@/lib/roles';
 import { canManageCustomerTeam } from '@/lib/customerRoles';
 import { uploadUrl } from '@/lib/nativeBridge';
+import { safetyEventLabel, SEVERITY_COLORS } from '@/lib/drivingSafety';
 
 const MODE_LABELS = {
   view_ahead: 'View Ahead (Time-Lapse)',
   dual_monitoring: 'Road + Driver (Dual ELD)',
+  live_stream: 'Live Stream (Dual Camera)',
   cabin: 'In-Cabin',
   broll: 'B-Roll',
 };
@@ -30,28 +32,96 @@ function groupFramesForDisplay(frames) {
     }));
 }
 
+function LiveFeedCard({ feed }) {
+  const { session, latestRoad, latestCabin, recentAlerts, isLive } = feed;
+  const roadUrl = latestRoad ? uploadUrl(latestRoad.image_url) : null;
+  const cabinUrl = latestCabin ? uploadUrl(latestCabin.image_url) : null;
+
+  return (
+    <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-700">
+      <div className="px-4 py-3 flex items-center justify-between border-b border-slate-700">
+        <div>
+          <div className="font-bold text-white text-sm flex items-center gap-2">
+            {isLive && (
+              <span className="flex items-center gap-1 text-red-400 text-xs font-black uppercase">
+                <Radio className="w-3 h-3 animate-pulse" /> Live
+              </span>
+            )}
+            {session.driver_name}
+          </div>
+          <div className="text-xs text-slate-400 mt-0.5">{MODE_LABELS[session.mode] || session.mode}</div>
+        </div>
+        <div className="text-xs text-slate-400">{session.frame_count || 0} frames</div>
+      </div>
+
+      <div className={`grid ${cabinUrl || session.mode !== 'view_ahead' ? 'grid-cols-2' : 'grid-cols-1'} gap-0.5 bg-black`}>
+        <div className="relative">
+          {roadUrl ? (
+            <img src={roadUrl} alt="Road live" className="w-full h-40 sm:h-48 object-cover" />
+          ) : (
+            <div className="w-full h-40 sm:h-48 bg-slate-800 flex items-center justify-center text-slate-500 text-xs">Waiting for road feed…</div>
+          )}
+          <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-black/60 text-[10px] font-bold text-white">ROAD</div>
+        </div>
+        {(cabinUrl || session.mode === 'live_stream' || session.mode === 'dual_monitoring') && (
+          <div className="relative">
+            {cabinUrl ? (
+              <img src={cabinUrl} alt="Driver live" className="w-full h-40 sm:h-48 object-cover" />
+            ) : (
+              <div className="w-full h-40 sm:h-48 bg-slate-800 flex items-center justify-center text-slate-500 text-xs">Waiting for driver feed…</div>
+            )}
+            <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-black/60 text-[10px] font-bold text-white">DRIVER</div>
+          </div>
+        )}
+      </div>
+
+      {recentAlerts?.length > 0 && (
+        <div className="px-3 py-2 border-t border-slate-700 space-y-1.5 max-h-32 overflow-y-auto">
+          <div className="text-[10px] font-bold text-amber-400 uppercase flex items-center gap-1">
+            <Brain className="w-3 h-3" /> Safety AI Alerts
+          </div>
+          {recentAlerts.map((alert) => (
+            <div key={alert.id} className={`text-xs px-2 py-1 rounded border ${SEVERITY_COLORS[alert.severity] || SEVERITY_COLORS.low}`}>
+              <span className="font-bold">{safetyEventLabel(alert.event_type)}</span>
+              {alert.description && <span className="opacity-90"> — {alert.description}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DriverMedia() {
   const [user, setUser] = useState(null);
   const [customer, setCustomer] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [frames, setFrames] = useState([]);
+  const [safetyEvents, setSafetyEvents] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [savingDual, setSavingDual] = useState(false);
+  const [savingAi, setSavingAi] = useState(false);
+  const [activeTab, setActiveTab] = useState('live');
+  const [liveFeeds, setLiveFeeds] = useState([]);
+  const [aiConfigured, setAiConfigured] = useState(false);
 
   const load = async () => {
-    const [u, allSessions, allFrames] = await Promise.all([
+    const [u, allSessions, allFrames, allEvents] = await Promise.all([
       api.auth.me(),
       api.entities.DashcamSession.list('-started_at', 100),
       api.entities.DashcamFrame.list('-captured_at', 500),
+      api.entities.DrivingSafetyEvent.list('-captured_at', 200),
     ]);
     setUser(u);
     const internal = isFleetCoAdmin(u?.role) || ['fleet_manager', 'fleet_coordinator'].includes(u?.role);
     const sess = internal ? allSessions : filterByCustomerId(allSessions, u);
     const sessionIds = new Set(sess.map((s) => s.id));
     const fr = internal ? allFrames : allFrames.filter((f) => sessionIds.has(f.session_id));
+    const ev = internal ? allEvents : allEvents.filter((e) => sessionIds.has(e.session_id) || e.customer_id === u?.customer_id);
     setSessions(sess);
     setFrames(fr);
+    setSafetyEvents(ev);
 
     if (u?.customer_id && canManageCustomerTeam(u.role)) {
       const rows = await api.entities.Customer.filter({ id: u.customer_id });
@@ -60,12 +130,25 @@ export default function DriverMedia() {
     setLoading(false);
   };
 
+  const refreshLive = useCallback(async () => {
+    try {
+      const result = await api.functions.invoke('getLiveDashcamFeeds');
+      setLiveFeeds(result.feeds || []);
+      setAiConfigured(!!result.aiConfigured);
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => { load().catch(() => setLoading(false)); }, []);
 
-  const sessionFrames = selectedSession
-    ? frames.filter((f) => f.session_id === selectedSession)
-    : [];
+  useEffect(() => {
+    if (activeTab !== 'live') return undefined;
+    refreshLive();
+    const t = setInterval(refreshLive, 1500);
+    return () => clearInterval(t);
+  }, [activeTab, refreshLive]);
 
+  const sessionFrames = selectedSession ? frames.filter((f) => f.session_id === selectedSession) : [];
+  const sessionAlerts = selectedSession ? safetyEvents.filter((e) => e.session_id === selectedSession) : [];
   const selectedSessionMeta = sessions.find((s) => s.id === selectedSession);
   const displayGroups = groupFramesForDisplay(sessionFrames);
   const canManageDual = customer && canManageCustomerTeam(user?.role);
@@ -79,6 +162,18 @@ export default function DriverMedia() {
       setCustomer({ ...customer, driver_dual_camera_enabled: next });
     } finally {
       setSavingDual(false);
+    }
+  };
+
+  const toggleSafetyAi = async () => {
+    if (!customer) return;
+    setSavingAi(true);
+    try {
+      const next = customer.driver_safety_ai_enabled === false;
+      await api.entities.Customer.update(customer.id, { driver_safety_ai_enabled: next });
+      setCustomer({ ...customer, driver_safety_ai_enabled: next });
+    } finally {
+      setSavingAi(false);
     }
   };
 
@@ -97,114 +192,209 @@ export default function DriverMedia() {
           <Video className="w-7 h-7 text-amber-500" /> Driver Media
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Dashcam time-lapse, dual road + driver monitoring, and field captures from the FleetCo Driver app.
+          Live dual-camera streams, Safety AI alerts, and dashcam session review from the FleetCo Driver app.
         </p>
       </div>
 
       {canManageDual && (
-        <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex-1">
-            <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <Eye className="w-4 h-4 text-amber-600" /> Dual camera & distraction monitoring
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Eye className="w-4 h-4 text-amber-600" /> Dual camera monitoring
+              </div>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Enables live stream and dual ELD modes — road + driver cameras at the same time.
+              </p>
             </div>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              When enabled, drivers can run <strong>Road + Driver (Dual ELD)</strong> mode — rear camera on the road and front camera on the driver at the same time. Review both feeds here to check road conditions and driver focus.
-            </p>
+            <button
+              type="button"
+              disabled={savingDual}
+              onClick={toggleDualCamera}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm shrink-0 ${
+                customer.driver_dual_camera_enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {customer.driver_dual_camera_enabled ? <><ToggleRight className="w-5 h-5" /> Enabled</> : <><ToggleLeft className="w-5 h-5" /> Disabled</>}
+            </button>
           </div>
-          <button
-            type="button"
-            disabled={savingDual}
-            onClick={toggleDualCamera}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm shrink-0 ${
-              customer.driver_dual_camera_enabled
-                ? 'bg-emerald-100 text-emerald-800'
-                : 'bg-slate-100 text-slate-600'
-            }`}
-          >
-            {customer.driver_dual_camera_enabled ? (
-              <><ToggleRight className="w-5 h-5" /> Enabled</>
-            ) : (
-              <><ToggleLeft className="w-5 h-5" /> Disabled</>
-            )}
-          </button>
+
+          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Brain className="w-4 h-4 text-indigo-600" /> FleetCo Safety AI
+              </div>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                AI analyzes frames for lane departure, distraction, drowsiness, phone use, and impairment signs.
+                {!aiConfigured && ' Requires GEMINI_API_KEY on server.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={savingAi || !aiConfigured}
+              onClick={toggleSafetyAi}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm shrink-0 ${
+                customer.driver_safety_ai_enabled !== false ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {customer.driver_safety_ai_enabled !== false ? <><ToggleRight className="w-5 h-5" /> Enabled</> : <><ToggleLeft className="w-5 h-5" /> Disabled</>}
+            </button>
+          </div>
         </div>
       )}
 
-      {sessions.length === 0 ? (
-        <div className="text-center py-16 text-slate-400 bg-white rounded-xl border border-slate-200">
-          <Video className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p>No driver media sessions yet.</p>
-          <p className="text-sm mt-1">Drivers record from the app under Dashcam & Media.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-1 bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 max-h-[70vh] overflow-y-auto">
-            {sessions.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setSelectedSession(s.id)}
-                className={`w-full text-left px-4 py-3 hover:bg-slate-50 ${selectedSession === s.id ? 'bg-amber-50 border-l-2 border-amber-500' : ''}`}
-              >
-                <div className="font-bold text-slate-900 text-sm">{MODE_LABELS[s.mode] || s.mode}</div>
-                <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                  <User className="w-3 h-3" /> {s.driver_name}
-                </div>
-                <div className="text-xs text-slate-400 mt-1 flex flex-wrap gap-2">
-                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(s.started_at).toLocaleString()}</span>
-                  <span>{s.frame_count} frames</span>
-                  <span className="capitalize">{s.status}</span>
-                </div>
-              </button>
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        <button
+          type="button"
+          onClick={() => setActiveTab('live')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold ${activeTab === 'live' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+        >
+          <Radio className="w-4 h-4" /> Live Feeds
+          {liveFeeds.length > 0 && (
+            <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">{liveFeeds.length}</span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('sessions')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold ${activeTab === 'sessions' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+        >
+          <Clock className="w-4 h-4" /> Session Review
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('alerts')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold ${activeTab === 'alerts' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+        >
+          <AlertTriangle className="w-4 h-4" /> Safety AI
+          {safetyEvents.length > 0 && (
+            <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold">{safetyEvents.length}</span>
+          )}
+        </button>
+      </div>
+
+      {activeTab === 'live' && (
+        liveFeeds.length === 0 ? (
+          <div className="text-center py-16 text-slate-400 bg-white rounded-xl border border-slate-200">
+            <Radio className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p>No active live streams</p>
+            <p className="text-sm mt-1">Drivers start live stream from Dashcam & Media in the driver app.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {liveFeeds.map((feed) => (
+              <LiveFeedCard key={feed.session.id} feed={feed} />
             ))}
           </div>
+        )
+      )}
 
-          <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-4">
-            {!selectedSession ? (
-              <div className="text-center py-20 text-slate-400 text-sm">Select a session to view frames</div>
-            ) : displayGroups.length === 0 ? (
-              <div className="text-center py-20 text-slate-400 text-sm">No frames in this session</div>
-            ) : (
-              <div className="space-y-4">
-                {selectedSessionMeta?.mode === 'dual_monitoring' && (
-                  <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
-                    Dual ELD session — road view (left) and driver view (right) captured together for distraction review.
-                  </p>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {displayGroups.map(({ index, road, cabin }) => (
-                    <div key={road.id} className={`rounded-lg overflow-hidden border border-slate-200 ${cabin ? 'sm:col-span-2' : ''}`}>
-                      <div className={`grid ${cabin ? 'grid-cols-2' : 'grid-cols-1'} gap-0.5 bg-slate-100`}>
-                        <div>
-                          <img
-                            src={uploadUrl(road.image_url)}
-                            alt={`Road frame ${index}`}
-                            className="w-full h-32 object-cover bg-slate-100"
-                          />
-                          <div className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-white">ROAD #{index}</div>
-                        </div>
-                        {cabin && (
-                          <div>
-                            <img
-                              src={uploadUrl(cabin.image_url)}
-                              alt={`Driver frame ${index}`}
-                              className="w-full h-32 object-cover bg-slate-100"
-                            />
-                            <div className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-white">DRIVER #{index}</div>
-                          </div>
-                        )}
-                      </div>
-                      <div className="px-2 py-1.5 text-[10px] text-slate-500 flex justify-between bg-white">
-                        <span>{new Date(road.captured_at).toLocaleTimeString()}</span>
-                        {road.lat && <span className="flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" /> GPS</span>}
-                      </div>
-                    </div>
-                  ))}
+      {activeTab === 'alerts' && (
+        safetyEvents.length === 0 ? (
+          <div className="text-center py-16 text-slate-400 bg-white rounded-xl border border-slate-200">
+            <Brain className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p>No Safety AI alerts yet</p>
+            <p className="text-sm mt-1">Alerts appear when AI detects lane issues, distraction, or impairment during recording.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 max-h-[70vh] overflow-y-auto">
+            {safetyEvents.map((alert) => (
+              <div key={alert.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                <span className={`text-xs font-bold px-2 py-1 rounded border shrink-0 w-fit ${SEVERITY_COLORS[alert.severity] || SEVERITY_COLORS.low}`}>
+                  {alert.severity?.toUpperCase()}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm text-slate-900">{safetyEventLabel(alert.event_type)}</div>
+                  {alert.description && <div className="text-xs text-slate-500 truncate">{alert.description}</div>}
+                </div>
+                <div className="text-xs text-slate-400 shrink-0">
+                  {new Date(alert.captured_at).toLocaleString()}
                 </div>
               </div>
-            )}
+            ))}
           </div>
-        </div>
+        )
+      )}
+
+      {activeTab === 'sessions' && (
+        sessions.length === 0 ? (
+          <div className="text-center py-16 text-slate-400 bg-white rounded-xl border border-slate-200">
+            <Video className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p>No driver media sessions yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-1 bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 max-h-[70vh] overflow-y-auto">
+              {sessions.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSelectedSession(s.id)}
+                  className={`w-full text-left px-4 py-3 hover:bg-slate-50 ${selectedSession === s.id ? 'bg-amber-50 border-l-2 border-amber-500' : ''}`}
+                >
+                  <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    {s.status === 'recording' && <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
+                    {MODE_LABELS[s.mode] || s.mode}
+                  </div>
+                  <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                    <User className="w-3 h-3" /> {s.driver_name}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1 flex flex-wrap gap-2">
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(s.started_at).toLocaleString()}</span>
+                    <span>{s.frame_count} frames</span>
+                    <span className="capitalize">{s.status}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-4">
+              {!selectedSession ? (
+                <div className="text-center py-20 text-slate-400 text-sm">Select a session to view frames</div>
+              ) : displayGroups.length === 0 ? (
+                <div className="text-center py-20 text-slate-400 text-sm">No frames in this session</div>
+              ) : (
+                <div className="space-y-4">
+                  {sessionAlerts.length > 0 && (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-1">
+                      <div className="text-xs font-bold text-indigo-800 flex items-center gap-1"><Brain className="w-3.5 h-3.5" /> Safety AI — this session</div>
+                      {sessionAlerts.slice(0, 5).map((a) => (
+                        <div key={a.id} className="text-xs text-indigo-900">{safetyEventLabel(a.event_type)} — {a.description}</div>
+                      ))}
+                    </div>
+                  )}
+                  {(selectedSessionMeta?.mode === 'dual_monitoring' || selectedSessionMeta?.mode === 'live_stream') && (
+                    <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
+                      Dual camera session — road view (left) and driver view (right).
+                    </p>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {displayGroups.map(({ index, road, cabin }) => (
+                      <div key={road.id} className={`rounded-lg overflow-hidden border border-slate-200 ${cabin ? 'sm:col-span-2' : ''}`}>
+                        <div className={`grid ${cabin ? 'grid-cols-2' : 'grid-cols-1'} gap-0.5 bg-slate-100`}>
+                          <div>
+                            <img src={uploadUrl(road.image_url)} alt={`Road frame ${index}`} className="w-full h-32 object-cover bg-slate-100" />
+                            <div className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-white">ROAD #{index}</div>
+                          </div>
+                          {cabin && (
+                            <div>
+                              <img src={uploadUrl(cabin.image_url)} alt={`Driver frame ${index}`} className="w-full h-32 object-cover bg-slate-100" />
+                              <div className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-white">DRIVER #{index}</div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 text-[10px] text-slate-500 flex justify-between bg-white">
+                          <span>{new Date(road.captured_at).toLocaleTimeString()}</span>
+                          {road.lat && <span className="flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" /> GPS</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
       )}
     </div>
   );

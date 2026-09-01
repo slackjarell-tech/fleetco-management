@@ -165,7 +165,16 @@ export function entityBelongsToCustomer(type, item, customerId, scopeIndex) {
 
   if (type === 'DashcamFrame' && item.session_id) {
     const session = getEntity('DashcamSession', item.session_id);
-    if (session?.user_id && userIds?.has(session.user_id)) return true;
+    if (session && matchesCustomerField(session, customerId)) return true;
+    if (session?.driver_id && userIds?.has(session.driver_id)) return true;
+  }
+
+  if (type === 'DrivingSafetyEvent') {
+    if (matchesCustomerField(item, customerId)) return true;
+    if (item.session_id) {
+      const session = getEntity('DashcamSession', item.session_id);
+      if (session && matchesCustomerField(session, customerId)) return true;
+    }
   }
 
   if (type === 'LoadMessage' && item.load_id) {
