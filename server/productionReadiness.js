@@ -9,7 +9,7 @@ import { isAutopilotEnabled } from './marketingAutopilot.js';
 import { getAiStatus, verifyAiProvider } from './aiProvider.js';
 import { getStoreStats } from './db.js';
 import { getStorageStatus } from './mediaStorage.js';
-import { isLiveKitConfigured } from './liveStream.js';
+import { isLiveKitConfigured, getLiveKitConfigSource } from './liveKitSettings.js';
 
 export async function getProductionReadiness({ verifyAi = false } = {}) {
   const email = getEmailConfigStatus();
@@ -111,8 +111,8 @@ export async function getProductionReadiness({ verifyAi = false } = {}) {
       label: 'Live office viewing (LiveKit, optional)',
       live: isLiveKitConfigured(),
       detail: isLiveKitConfigured()
-        ? `WebRTC live feeds enabled · ${process.env.LIVE_STREAM_RETENTION_DAYS || 15}-day retention`
-        : 'Optional — set LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET for real-time office viewing',
+        ? `WebRTC live feeds · source: ${getLiveKitConfigSource() || 'unknown'}`
+        : 'Optional — paste keys in Driver Media (executive) or set LIVEKIT_* env vars on Render',
     },
   ];
 

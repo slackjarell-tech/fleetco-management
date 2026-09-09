@@ -66,7 +66,7 @@ import {
   validateBackup,
 } from './datastoreBackup.js';
 import { userMustChangePassword, activatePendingAccount } from './authHelpers.js';
-import { isLiveKitConfigured } from './liveStream.js';
+import { isLiveKitConfigured } from './liveKitSettings.js';
 import {
   ensureUploadDirs,
   getLiveRecordingsDir,

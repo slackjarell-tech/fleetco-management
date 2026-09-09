@@ -6,72 +6,30 @@ function pickMimeType() {
   return types.find((t) => MediaRecorder.isTypeSupported(t)) || 'video/webm';
 }
 
-/**
- * Connect driver to LiveKit, publish road (+ optional cabin) video, and record WebM locally for upload.
- */
+/** Connect driver to LiveKit, publish road-facing video, and record WebM locally for upload. */
 export function useLiveVideoPublisher() {
   const roomRef = useRef(null);
   const recorderRef = useRef(null);
-  const cabinRecorderRef = useRef(null);
   const chunksRef = useRef([]);
-  const cabinChunksRef = useRef([]);
   const tracksRef = useRef([]);
 
-  const stopRecorders = useCallback(() => {
+  const stopRecorder = useCallback(() => {
     return new Promise((resolve) => {
-      let pending = 0;
-      let roadBlob = null;
-      let cabinBlob = null;
-
-      const done = () => {
-        pending -= 1;
-        if (pending <= 0) resolve({ roadBlob, cabinBlob });
+      if (!recorderRef.current || recorderRef.current.state === 'inactive') {
+        resolve({ roadBlob: null, cabinBlob: null });
+        return;
+      }
+      recorderRef.current.onstop = () => {
+        resolve({
+          roadBlob: new Blob(chunksRef.current, { type: pickMimeType() }),
+          cabinBlob: null,
+        });
       };
-
-      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-        pending += 1;
-        recorderRef.current.onstop = () => {
-          roadBlob = new Blob(chunksRef.current, { type: pickMimeType() });
-          done();
-        };
-        recorderRef.current.stop();
-      }
-
-      if (cabinRecorderRef.current && cabinRecorderRef.current.state !== 'inactive') {
-        pending += 1;
-        cabinRecorderRef.current.onstop = () => {
-          cabinBlob = new Blob(cabinChunksRef.current, { type: pickMimeType() });
-          done();
-        };
-        cabinRecorderRef.current.stop();
-      }
-
-      if (pending === 0) resolve({ roadBlob: null, cabinBlob: null });
+      recorderRef.current.stop();
     });
   }, []);
 
-  const startRecorder = useCallback((mediaStream, isCabin = false) => {
-    if (!mediaStream) return null;
-    const mime = pickMimeType();
-    const recorder = new MediaRecorder(mediaStream, { mimeType: mime, videoBitsPerSecond: 1_500_000 });
-    if (isCabin) {
-      cabinChunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data?.size) cabinChunksRef.current.push(e.data);
-      };
-      cabinRecorderRef.current = recorder;
-    } else {
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data?.size) chunksRef.current.push(e.data);
-      };
-      recorderRef.current = recorder;
-    }
-    recorder.start(4000);
-    return recorder;
-  }, []);
-
-  const start = useCallback(async ({ livekitUrl, token, roadVideoEl, cabinVideoEl, dualCamera }) => {
+  const start = useCallback(async ({ livekitUrl, token, roadVideoEl }) => {
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
 
@@ -88,33 +46,23 @@ export function useLiveVideoPublisher() {
     tracksRef.current.push(roadTrack);
     if (roadVideoEl) roadTrack.attach(roadVideoEl);
 
-    const roadStream = new MediaStream([roadTrack.mediaStreamTrack]);
-    startRecorder(roadStream, false);
-
-    if (dualCamera) {
-      try {
-        const cabinTracks = await createLocalTracks({
-          audio: false,
-          video: { facingMode: 'user', resolution: { width: 640, height: 480 } },
-        });
-        const cabinTrack = cabinTracks.find((t) => t.kind === Track.Kind.Video);
-        if (cabinTrack) {
-          await room.localParticipant.publishTrack(cabinTrack, { name: 'cabin', source: Track.Source.Unknown });
-          tracksRef.current.push(cabinTrack);
-          if (cabinVideoEl) cabinTrack.attach(cabinVideoEl);
-          const cabinStream = new MediaStream([cabinTrack.mediaStreamTrack]);
-          startRecorder(cabinStream, true);
-        }
-      } catch {
-        /* cabin optional on iOS */
-      }
-    }
+    const mime = pickMimeType();
+    chunksRef.current = [];
+    const recorder = new MediaRecorder(new MediaStream([roadTrack.mediaStreamTrack]), {
+      mimeType: mime,
+      videoBitsPerSecond: 1_500_000,
+    });
+    recorder.ondataavailable = (e) => {
+      if (e.data?.size) chunksRef.current.push(e.data);
+    };
+    recorder.start(4000);
+    recorderRef.current = recorder;
 
     return room;
-  }, [startRecorder]);
+  }, []);
 
   const stop = useCallback(async () => {
-    const blobs = await stopRecorders();
+    const blobs = await stopRecorder();
 
     tracksRef.current.forEach((t) => {
       try { t.stop(); } catch { /* ignore */ }
@@ -127,10 +75,8 @@ export function useLiveVideoPublisher() {
     }
 
     recorderRef.current = null;
-    cabinRecorderRef.current = null;
-
     return blobs;
-  }, [stopRecorders]);
+  }, [stopRecorder]);
 
   return { start, stop };
 }

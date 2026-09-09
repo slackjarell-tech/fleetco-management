@@ -9,6 +9,11 @@
  */
 import { AccessToken } from 'livekit-server-sdk';
 import {
+  getLiveKitConfig,
+  isLiveKitConfigured,
+  getLiveKitConfigSource,
+} from './liveKitSettings.js';
+import {
   getLiveRecordingsDir,
   ensureUploadDirs,
   deleteStoredFile,
@@ -63,18 +68,12 @@ function expireStaleRequest(session) {
 }
 
 function liveKitConfig() {
-  const url = (process.env.LIVEKIT_URL || '').trim();
-  const apiKey = (process.env.LIVEKIT_API_KEY || '').trim();
-  const apiSecret = (process.env.LIVEKIT_API_SECRET || '').trim();
-  if (!url || !apiKey || !apiSecret) return null;
-  return { url, apiKey, apiSecret };
+  return getLiveKitConfig();
 }
 
-export function isLiveKitConfigured() {
-  return !!liveKitConfig();
-}
+export { isLiveKitConfigured };
 
-/** Local on-device recording works without LiveKit; LiveKit only adds real-time office viewing. */
+/** Local on-device recording works without LiveKit; LiveKit enables live office viewing. */
 export function getStreamMode() {
   return isLiveKitConfigured() ? 'livekit' : 'local';
 }
@@ -137,7 +136,7 @@ export async function startLiveVideoStream(body, user) {
 
   const customer = user.customer_id ? getEntity('Customer', user.customer_id) : null;
   if (!isDualCameraEnabledForCustomer(customer)) {
-    throw new Error('Dual camera / live video is turned off for your fleet — your fleet manager can re-enable it in Driver Media.');
+    throw new Error('Dashcam recording is turned off for your fleet — your fleet manager can re-enable it in Driver Media.');
   }
 
   const active = filterEntities('LiveStreamSession', { driver_id: user.id, status: 'live' }, null, 1)[0];
@@ -244,7 +243,7 @@ export function requestLiveVideoForDriver(body, user, ctx) {
 
   const customer = driver.customer_id ? getEntity('Customer', driver.customer_id) : null;
   if (!isDualCameraEnabledForCustomer(customer)) {
-    throw new Error('Live video is turned off for this fleet');
+    throw new Error('Dashcam recording is turned off for this fleet');
   }
 
   const sessions = listEntities('LiveStreamSession', '-started_at', 20)
@@ -438,6 +437,7 @@ export async function listActiveLiveVideoSessions(_body, user, ctx) {
     sessions: liveSessions,
     requestedSessions,
     livekitConfigured: !!cfg,
+    livekitSource: getLiveKitConfigSource(),
     localRecordingEnabled: true,
     livekitUrl: cfg?.url || null,
     canStart: canStartLiveVideoForDriver(user),

@@ -7,7 +7,12 @@ import {
 import { canManageCustomerTeam } from '@/lib/customerRoles';
 import LiveStreamViewer from '@/components/live/LiveStreamViewer';
 import RecordingSessionCard from '@/components/live/RecordingSessionCard';
+import LiveKitSetupCard from '@/components/live/LiveKitSetupCard';
 import { daysRemainingLabel, downloadLiveRecording } from '@/lib/liveVideo';
+
+function canManageLiveKit(role) {
+  return ['owner', 'executive'].includes(role);
+}
 
 export default function DriverMedia() {
   const [user, setUser] = useState(null);
@@ -156,18 +161,20 @@ export default function DriverMedia() {
           <Video className="w-7 h-7 text-amber-500" /> Driver Media
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Dashcam recording — drivers save video from the app; review in the library (15-day retention). Live office viewing when LiveKit is configured.
+          Road dashcam — drivers record from the app; review saved video in the library (15-day retention). Connect LiveKit below for live office viewing.
         </p>
       </div>
+
+      {canManageLiveKit(user?.role) && <LiveKitSetupCard />}
 
       {canManageDual && (
         <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1">
             <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <Eye className="w-4 h-4 text-amber-600" /> Live dashcam
+              <Eye className="w-4 h-4 text-amber-600" /> Road dashcam
             </div>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Included for all fleets — drivers stream road + driver cameras live. Turn off only if your fleet opts out.
+              Included for all fleets — drivers record the road ahead from the FleetCo Driver app. Turn off only if your fleet opts out.
             </p>
           </div>
           <button

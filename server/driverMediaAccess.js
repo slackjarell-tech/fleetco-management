@@ -36,7 +36,7 @@ function normalizeCustomerRole(role) {
   return role === 'user' ? 'customer_owner' : role;
 }
 
-/** Dual camera / live stream is on by default for every customer (opt-out only). */
+/** Road dashcam recording is on by default for every customer (opt-out only). */
 export function isDualCameraEnabledForCustomer(customer) {
   return customer?.driver_dual_camera_enabled !== false;
 }

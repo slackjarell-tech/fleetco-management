@@ -10,7 +10,7 @@ const QUICK_ACTIONS = [
   { path: '/driver/loads', label: 'My Loads', desc: 'OTR & freight', icon: Truck, color: 'text-amber-400', bg: 'bg-amber-900/30' },
   { path: '/driver/route', label: 'Delivery Route', desc: 'Last-mile & parcels', icon: Route, color: 'text-emerald-400', bg: 'bg-emerald-900/30' },
   { path: '/driver/scan', label: 'Scan', desc: 'Packages & manifests', icon: ScanLine, color: 'text-blue-400', bg: 'bg-blue-900/30' },
-  { path: '/driver/dashcam', label: 'Start Recording', desc: 'Live dashcam — you or office', icon: Video, color: 'text-purple-400', bg: 'bg-purple-900/30' },
+  { path: '/driver/dashcam', label: 'Road Dashcam', desc: 'Record the road ahead', icon: Video, color: 'text-purple-400', bg: 'bg-purple-900/30' },
   { path: '/driver/navigation', label: 'Navigate', desc: 'Turn-by-turn', icon: Navigation, color: 'text-cyan-400', bg: 'bg-cyan-900/30' },
   { path: '/driver/fuel-stations', label: 'Fuel & EV', desc: 'Stations nearby', icon: Zap, color: 'text-yellow-400', bg: 'bg-yellow-900/30' },
   { path: '/driver/fuel', label: 'Fuel Logs', desc: 'Receipts & cards', icon: Fuel, color: 'text-orange-400', bg: 'bg-orange-900/30' },

@@ -23,6 +23,7 @@ export const defaultStore = {
   entities: [],
   otp_codes: {},
   site_settings: {},
+  platform_settings: {},
 };
 
 let memoryStore = null;
@@ -41,6 +42,7 @@ function normalizeStore(raw) {
     entities: Array.isArray(store.entities) ? store.entities : [],
     otp_codes: store.otp_codes && typeof store.otp_codes === 'object' ? store.otp_codes : {},
     site_settings: store.site_settings && typeof store.site_settings === 'object' ? store.site_settings : {},
+    platform_settings: store.platform_settings && typeof store.platform_settings === 'object' ? store.platform_settings : {},
   };
 }
 

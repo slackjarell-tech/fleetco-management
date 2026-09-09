@@ -34,9 +34,9 @@ export default function DriverRecordingPrompt({ user }) {
           <Video className="w-5 h-5 text-red-400" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-white font-black text-sm">Dashcam recording</div>
+          <div className="text-white font-black text-sm">Road dashcam</div>
           <p className="text-slate-400 text-xs mt-0.5 leading-relaxed">
-            Start recording yourself — or accept a request from your fleet office.
+            Record the road ahead — or accept a request from your fleet office.
           </p>
         </div>
       </div>

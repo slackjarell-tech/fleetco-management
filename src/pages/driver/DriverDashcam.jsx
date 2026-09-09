@@ -12,26 +12,18 @@ import {
 } from 'lucide-react';
 
 const SETUP_TIPS = [
-  'Mount the phone on the dash — rear camera sees the road, front camera toward the driver.',
+  'Mount the phone on the dash with the rear camera facing the road.',
   'Keep the phone plugged into a fast car charger the entire trip.',
   'Keep FleetCo Driver open while recording — video saves when you tap Stop.',
-  'Video auto-saves for 15 days when you stop. Fleet managers can download or keep permanently.',
-  'Some iPhones only support one camera at a time — road view is always captured.',
+  'Video auto-saves for 15 days. Fleet managers can download or keep permanently.',
   'Texas & some states restrict windshield mounts — use a dash mount if needed.',
 ];
 
 export default function DriverDashcam() {
   const { user } = useOutletContext();
   const [searchParams, setSearchParams] = useSearchParams();
-  const {
-    position,
-    dualCameraEnabled,
-    dualCameraActive,
-    dualCameraSupported,
-    refreshPosition,
-  } = useDriverDevice();
+  const { position, dualCameraEnabled, refreshPosition } = useDriverDevice();
   const roadPreviewRef = useRef(null);
-  const cabinPreviewRef = useRef(null);
   const [session, setSession] = useState(null);
   const [streamMode, setStreamMode] = useState('local');
   const [recording, setRecording] = useState(false);
@@ -105,15 +97,9 @@ export default function DriverDashcam() {
           livekitUrl: result.livekitUrl,
           token: result.token,
           roadVideoEl: roadPreviewRef.current,
-          cabinVideoEl: cabinPreviewRef.current,
-          dualCamera: dualCameraEnabled,
         });
       } else {
-        await localRecorder.start({
-          roadVideoEl: roadPreviewRef.current,
-          cabinVideoEl: cabinPreviewRef.current,
-          dualCamera: dualCameraEnabled,
-        });
+        await localRecorder.start({ roadVideoEl: roadPreviewRef.current });
       }
     } catch (err) {
       setError(err?.data?.error || err?.message || 'Could not start recording');
@@ -129,7 +115,7 @@ export default function DriverDashcam() {
       const durationSec = liveStartRef.current
         ? Math.round((Date.now() - liveStartRef.current) / 1000)
         : null;
-      const { roadBlob, cabinBlob } = streamMode === 'livekit'
+      const { roadBlob } = streamMode === 'livekit'
         ? await livePublisher.stop()
         : await localRecorder.stop();
       await api.functions.invoke('stopLiveVideoStream', { sessionId: session.id });
@@ -146,15 +132,10 @@ export default function DriverDashcam() {
 
       if (roadBlob?.size) {
         const upload = await uploadLiveRecording(roadBlob, { sessionId: session.id, track: 'road' });
-        let cabinVideoUrl = '';
-        if (cabinBlob?.size) {
-          const cabinUpload = await uploadLiveRecording(cabinBlob, { sessionId: session.id, track: 'cabin' });
-          cabinVideoUrl = cabinUpload.file_url;
-        }
         await api.functions.invoke('registerLiveVideoRecording', {
           sessionId: session.id,
           videoUrl: upload.file_url,
-          cabinVideoUrl,
+          cabinVideoUrl: '',
           durationSec,
           fileSizeBytes: upload.file_size,
           lat,
@@ -163,7 +144,7 @@ export default function DriverDashcam() {
         });
       }
 
-      setMessage('Recording stopped. Video saved for 15 days — fleet managers can download or keep it permanently.');
+      setMessage('Recording stopped. Road video saved for 15 days — fleet managers can download or keep it permanently.');
       setRecording(false);
       setSession(null);
       liveStartRef.current = null;
@@ -178,10 +159,10 @@ export default function DriverDashcam() {
     <div className="p-4 space-y-4 pb-8">
       <div>
         <h1 className="text-xl font-black text-slate-900 flex items-center gap-2">
-          <Video className="w-6 h-6 text-amber-500" /> Dashcam Recording
+          <Video className="w-6 h-6 text-amber-500" /> Road Dashcam
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Tap Start Recording anytime — or accept a request from your fleet office. Video saves automatically when you stop.
+          Records the road ahead only. Tap Start Recording — video saves automatically when you stop.
         </p>
       </div>
 
@@ -209,7 +190,7 @@ export default function DriverDashcam() {
 
       {canRecord && !livekitReady && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-900">
-          Recording works on your phone now — no extra setup. Live office viewing can be added later with LiveKit.
+          Road recording works now — no extra setup. Live office viewing can be added later with LiveKit.
         </div>
       )}
 
@@ -225,7 +206,7 @@ export default function DriverDashcam() {
             {startingLive ? 'Starting…' : 'Start Recording'}
           </button>
           <p className="text-xs text-center text-slate-500">
-            You or your fleet office can start recording — saved video appears in Driver Media when you stop.
+            Road-facing camera only · saved video appears in Driver Media when you stop.
           </p>
           {officeRequest && (
             <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3">
@@ -254,7 +235,7 @@ export default function DriverDashcam() {
           <Battery className="w-3 h-3" /> Keep plugged in
         </span>
         <span className="inline-flex items-center gap-1 text-xs font-semibold bg-blue-50 text-blue-800 px-2.5 py-1 rounded-full">
-          <Wind className="w-3 h-3" /> {livekitReady ? 'Live + saved video' : 'On-device recording'}
+          <Wind className="w-3 h-3" /> Road camera only
         </span>
         <span className="inline-flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
           <AlertTriangle className="w-3 h-3" /> Check local mount laws
@@ -266,30 +247,12 @@ export default function DriverDashcam() {
         )}
       </div>
 
-      {!dualCameraSupported && canRecord && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
-          This device may only support one camera (common on iPhone). Road view is always captured; driver view when supported.
-        </div>
-      )}
-
       {recording && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl overflow-hidden border border-slate-200 bg-black">
-              <video ref={roadPreviewRef} className="w-full h-36 object-cover" playsInline muted aria-label="Road camera" />
-              <div className="px-2 py-1.5 bg-slate-900 text-[10px] text-slate-300 font-bold">ROAD</div>
-            </div>
-            <div className="rounded-xl overflow-hidden border border-slate-200 bg-black">
-              <video ref={cabinPreviewRef} className="w-full h-36 object-cover" playsInline muted aria-label="Driver camera" />
-              <div className="px-2 py-1.5 bg-slate-900 text-[10px] text-slate-300 font-bold">
-                DRIVER {dualCameraActive ? '' : '(limited)'}
-              </div>
-            </div>
-            <div className="col-span-2 px-3 py-2 bg-slate-900 text-xs text-slate-300 flex items-center justify-between rounded-lg">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                {streamMode === 'livekit' ? 'Live stream + recording' : 'Recording on device'}
-              </span>
+          <div className="rounded-xl overflow-hidden border border-slate-200 bg-black">
+            <video ref={roadPreviewRef} className="w-full h-48 object-cover" playsInline muted aria-label="Road camera" />
+            <div className="px-3 py-2 bg-slate-900 text-xs text-slate-300 flex items-center justify-between">
+              <span className="font-bold">ROAD AHEAD</span>
               {position && (
                 <span className="flex items-center gap-1 text-slate-400">
                   <MapPin className="w-3 h-3" /> GPS ±{Math.round(position.accuracy || 0)}m
@@ -301,10 +264,10 @@ export default function DriverDashcam() {
           <div className="bg-red-600 text-white rounded-xl p-4 flex items-center gap-3">
             <span className={`w-3 h-3 bg-white rounded-full ${uploading ? '' : 'animate-pulse'}`} />
             <div className="flex-1">
-              <div className="font-black text-sm">{uploading ? 'SAVING VIDEO' : 'RECORDING'}</div>
+              <div className="font-black text-sm">{uploading ? 'SAVING VIDEO' : 'RECORDING — Road View'}</div>
               <div className="text-xs text-red-100">
                 {streamMode === 'livekit'
-                  ? 'Fleet office is watching · auto-saved when you stop'
+                  ? 'Fleet office may be watching live · auto-saved when you stop'
                   : 'Video saves to fleet library when you stop'}
               </div>
             </div>

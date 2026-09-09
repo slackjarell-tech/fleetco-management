@@ -201,6 +201,14 @@ export async function invokeFunction(name, body, user, ctx = null) {
       const { listDriversForLiveVideo } = await import('./liveStream.js');
       return listDriversForLiveVideo(body, user, ctx);
     }
+    case 'getLiveKitSetupStatus': {
+      const { getLiveKitSetupStatus } = await import('./liveKitSettings.js');
+      return getLiveKitSetupStatus();
+    }
+    case 'saveLiveKitSettings': {
+      const { saveLiveKitSettings } = await import('./liveKitSettings.js');
+      return saveLiveKitSettings(body, user);
+    }
     case 'createDomainEmail':
       return createDomainEmail(body, user);
     case 'simulateDrivers':
