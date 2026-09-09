@@ -66,13 +66,21 @@ import {
   validateBackup,
 } from './datastoreBackup.js';
 import { userMustChangePassword, activatePendingAccount } from './authHelpers.js';
+import { isLiveKitConfigured } from './liveStream.js';
+import {
+  ensureUploadDirs,
+  getLiveRecordingsDir,
+  getReadableStream,
+  replicateToObjectStorage,
+  logStorageStartup,
+} from './mediaStorage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || 'fleet-pulse-dev-secret-change-in-production';
 const PORT = process.env.PORT || 3001;
 
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+const { root: uploadsDir } = ensureUploadDirs();
+const liveRecordingsDir = getLiveRecordingsDir();
 
 const app = express();
 
@@ -118,9 +126,40 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
 });
 
 app.use(express.json({ limit: '50mb' }));
-app.use('/uploads', express.static(uploadsDir));
+
+/** Serve uploads from persistent disk, falling back to object storage (R2/S3) if local file missing. */
+app.use('/uploads', async (req, res, next) => {
+  try {
+    const rel = (req.path || '').replace(/^\//, '');
+    if (!rel || rel.includes('..')) return next();
+    const localPath = path.join(uploadsDir, rel);
+    const normalized = path.normalize(localPath);
+    if (normalized.startsWith(path.normalize(uploadsDir)) && fs.existsSync(normalized)) {
+      return res.sendFile(normalized);
+    }
+    const stream = await getReadableStream(`/uploads/${rel}`);
+    if (stream) {
+      res.type(path.extname(rel));
+      return stream.pipe(res);
+    }
+    return next();
+  } catch (err) {
+    console.warn('[uploads] serve failed:', err.message);
+    return next();
+  }
+});
 
 const upload = multer({ dest: uploadsDir });
+const liveVideoUpload = multer({
+  storage: multer.diskStorage({
+    destination: liveRecordingsDir,
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || '') || '.webm';
+      cb(null, `live-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 512 * 1024 * 1024 },
+});
 
 function signToken(userId) {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: '7d' });
@@ -235,6 +274,7 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
       user.allow_virtual_pod = customer.allow_virtual_pod !== false;
     }
   }
+  user.livekit_configured = isLiveKitConfigured();
   res.json(user);
 });
 
@@ -801,7 +841,7 @@ const ENTITY_NAMES = [
   'DeliveryStop', 'HOSLog', 'FuelStation', 'FuelCard', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
-  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'DrivingSafetyEvent', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
+  'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'DrivingSafetyEvent', 'LiveStreamSession', 'LiveStreamRecording', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
   'MarketingSocialPost', 'MarketingScheduledCall', 'MarketingActivityLog', 'MarketingReportRun',
   'MarketingConversation', 'MarketingAutopilotRun',
   'CustomerFundingAccount', 'PayeeBankAccount', 'PayrollDisbursement', 'PayrollDisbursementBatch',
@@ -1098,10 +1138,59 @@ app.post('/api/functions/:name', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/integrations/upload', requireAuth, upload.single('file'), (req, res) => {
+app.post('/api/integrations/upload', requireAuth, upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   const fileUrl = `/uploads/${req.file.filename}`;
+  try {
+    await replicateToObjectStorage(req.file.path, fileUrl, req.file.mimetype);
+  } catch (err) {
+    console.warn('[upload] object storage mirror failed:', err.message);
+  }
   res.json({ file_url: fileUrl });
+});
+
+app.post('/api/live-recordings/upload', requireAuth, liveVideoUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No video uploaded' });
+  const fileUrl = `/uploads/live-recordings/${req.file.filename}`;
+  try {
+    await replicateToObjectStorage(req.file.path, fileUrl, req.file.mimetype || 'video/webm');
+  } catch (err) {
+    console.warn('[live-recordings] object storage mirror failed:', err.message);
+  }
+  res.json({
+    file_url: fileUrl,
+    file_size: req.file.size,
+    filename: req.file.filename,
+  });
+});
+
+app.get('/api/live-recordings/:id/download', requireAuth, async (req, res) => {
+  try {
+    const { getLiveRecordingUrl, canDownloadLiveVideo } = await import('./liveStream.js');
+    if (!canDownloadLiveVideo(req.user)) {
+      return res.status(403).json({ error: 'Only fleet managers can download recordings' });
+    }
+    const recording = getEntity('LiveStreamRecording', req.params.id);
+    if (!recording) return res.status(404).json({ error: 'Recording not found' });
+    const ctx = getEntityContext(req);
+    if (ctx.customerId && recording.customer_id !== ctx.customerId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    if (req.user.customer_id && recording.customer_id !== req.user.customer_id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    const which = req.query.track === 'cabin' ? 'cabin' : 'road';
+    const fileUrl = getLiveRecordingUrl(recording, which);
+    if (!fileUrl) return res.status(404).json({ error: 'Video file not found or expired' });
+    const stream = await getReadableStream(fileUrl);
+    if (!stream) return res.status(404).json({ error: 'Video file not found or expired' });
+    const name = `FleetCo-${recording.driver_name || 'driver'}-${recording.started_at?.slice(0, 10) || 'recording'}.webm`;
+    res.setHeader('Content-Disposition', `attachment; filename="${name.replace(/[^\w.-]+/g, '_')}"`);
+    res.type('.webm');
+    stream.pipe(res);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
 });
 
 app.post('/api/integrations/llm', requireAuth, async (req, res) => {
@@ -1230,6 +1319,15 @@ async function startServer() {
     import('./loadCarrierPayments.js').then(({ startCarrierPaymentScheduler }) => {
       startCarrierPaymentScheduler();
     }).catch((err) => console.warn('[carrier-payments] scheduler not started', err.message));
+    logStorageStartup();
+    import('./liveStream.js').then(({ startLiveStreamRetentionScheduler, isLiveKitConfigured }) => {
+      startLiveStreamRetentionScheduler();
+      if (isLiveKitConfigured()) {
+        console.log('[live-stream] LiveKit configured — live video streaming enabled');
+      } else {
+        console.warn('[live-stream] LIVEKIT_URL/API_KEY/API_SECRET not set — live video disabled (photo dashcam still works)');
+      }
+    }).catch((err) => console.warn('[live-stream] scheduler not started', err.message));
   });
 }
 

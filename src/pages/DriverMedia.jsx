@@ -1,10 +1,15 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { api } from '@/api/apiClient';
-import { Video, User, Clock, MapPin, Eye, ToggleLeft, ToggleRight, Radio, Brain, AlertTriangle } from 'lucide-react';
+import {
+  Video, User, Clock, MapPin, Eye, ToggleLeft, ToggleRight, Radio, Brain, AlertTriangle,
+  Download, Archive, HardDrive,
+} from 'lucide-react';
 import { filterByCustomerId, isFleetCoAdmin } from '@/lib/roles';
 import { canManageCustomerTeam } from '@/lib/customerRoles';
 import { uploadUrl } from '@/lib/nativeBridge';
 import { safetyEventLabel, SEVERITY_COLORS } from '@/lib/drivingSafety';
+import LiveStreamViewer from '@/components/live/LiveStreamViewer';
+import { daysRemainingLabel, downloadLiveRecording } from '@/lib/liveVideo';
 
 const MODE_LABELS = {
   view_ahead: 'View Ahead (Time-Lapse)',
@@ -104,6 +109,14 @@ export default function DriverMedia() {
   const [savingAi, setSavingAi] = useState(false);
   const [activeTab, setActiveTab] = useState('live');
   const [liveFeeds, setLiveFeeds] = useState([]);
+  const [liveVideoSessions, setLiveVideoSessions] = useState([]);
+  const [livekitConfigured, setLivekitConfigured] = useState(false);
+  const [recordings, setRecordings] = useState([]);
+  const [retentionDays, setRetentionDays] = useState(15);
+  const [canDownloadRecordings, setCanDownloadRecordings] = useState(false);
+  const [recordingsLoading, setRecordingsLoading] = useState(false);
+  const [archivingId, setArchivingId] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
   const [aiConfigured, setAiConfigured] = useState(false);
 
   const load = async () => {
@@ -132,10 +145,26 @@ export default function DriverMedia() {
 
   const refreshLive = useCallback(async () => {
     try {
-      const result = await api.functions.invoke('getLiveDashcamFeeds');
-      setLiveFeeds(result.feeds || []);
-      setAiConfigured(!!result.aiConfigured);
+      const [dashcam, liveVideo] = await Promise.all([
+        api.functions.invoke('getLiveDashcamFeeds'),
+        api.functions.invoke('listActiveLiveVideoSessions').catch(() => ({ sessions: [], livekitConfigured: false })),
+      ]);
+      setLiveFeeds(dashcam.feeds || []);
+      setAiConfigured(!!dashcam.aiConfigured);
+      setLiveVideoSessions(liveVideo.sessions || []);
+      setLivekitConfigured(!!liveVideo.livekitConfigured);
     } catch { /* ignore */ }
+  }, []);
+
+  const refreshRecordings = useCallback(async () => {
+    setRecordingsLoading(true);
+    try {
+      const result = await api.functions.invoke('listLiveVideoRecordings');
+      setRecordings(result.recordings || []);
+      setRetentionDays(result.retentionDays || 15);
+      setCanDownloadRecordings(!!result.canDownload);
+    } catch { /* ignore */ }
+    finally { setRecordingsLoading(false); }
   }, []);
 
   useEffect(() => { load().catch(() => setLoading(false)); }, []);
@@ -143,9 +172,38 @@ export default function DriverMedia() {
   useEffect(() => {
     if (activeTab !== 'live') return undefined;
     refreshLive();
-    const t = setInterval(refreshLive, 1500);
+    const t = setInterval(refreshLive, 2000);
     return () => clearInterval(t);
   }, [activeTab, refreshLive]);
+
+  useEffect(() => {
+    if (activeTab === 'recordings') refreshRecordings();
+  }, [activeTab, refreshRecordings]);
+
+  const handleDownloadRecording = async (rec, track = 'road') => {
+    setDownloadingId(`${rec.id}-${track}`);
+    try {
+      const label = track === 'cabin' ? 'driver' : 'road';
+      const name = `FleetCo-${rec.driver_name || 'driver'}-${rec.started_at?.slice(0, 10) || 'recording'}-${label}.webm`;
+      await downloadLiveRecording(rec.id, track, name.replace(/[^\w.-]+/g, '_'));
+    } catch (err) {
+      alert(err.message || 'Download failed');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleArchiveRecording = async (rec) => {
+    setArchivingId(rec.id);
+    try {
+      await api.functions.invoke('archiveLiveVideoRecording', { recordingId: rec.id });
+      await refreshRecordings();
+    } catch (err) {
+      alert(err?.data?.error || err?.message || 'Could not save recording');
+    } finally {
+      setArchivingId(null);
+    }
+  };
 
   const sessionFrames = selectedSession ? frames.filter((f) => f.session_id === selectedSession) : [];
   const sessionAlerts = selectedSession ? safetyEvents.filter((e) => e.session_id === selectedSession) : [];
@@ -192,7 +250,7 @@ export default function DriverMedia() {
           <Video className="w-7 h-7 text-amber-500" /> Driver Media
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Live dual-camera streams, Safety AI alerts, and dashcam session review from the FleetCo Driver app.
+          Live WebRTC video, 15-day auto-saved recordings, Safety AI alerts, and dashcam session review.
         </p>
       </div>
 
@@ -250,8 +308,20 @@ export default function DriverMedia() {
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold ${activeTab === 'live' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
         >
           <Radio className="w-4 h-4" /> Live Feeds
-          {liveFeeds.length > 0 && (
-            <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">{liveFeeds.length}</span>
+          {(liveVideoSessions.length + liveFeeds.length) > 0 && (
+            <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
+              {liveVideoSessions.length + liveFeeds.length}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('recordings')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold ${activeTab === 'recordings' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+        >
+          <HardDrive className="w-4 h-4" /> Video Library
+          {recordings.length > 0 && activeTab !== 'recordings' && (
+            <span className="bg-slate-200 text-slate-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold">{recordings.length}</span>
           )}
         </button>
         <button
@@ -274,17 +344,115 @@ export default function DriverMedia() {
       </div>
 
       {activeTab === 'live' && (
-        liveFeeds.length === 0 ? (
+        liveVideoSessions.length === 0 && liveFeeds.length === 0 ? (
           <div className="text-center py-16 text-slate-400 bg-white rounded-xl border border-slate-200">
             <Radio className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p>No active live streams</p>
             <p className="text-sm mt-1">Drivers start live stream from Dashcam & Media in the driver app.</p>
+            {!livekitConfigured && (
+              <p className="text-xs mt-3 text-amber-600 max-w-md mx-auto">
+                Live WebRTC requires LiveKit on the server (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET).
+              </p>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {liveFeeds.map((feed) => (
-              <LiveFeedCard key={feed.session.id} feed={feed} />
-            ))}
+          <div className="space-y-4">
+            {liveVideoSessions.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {liveVideoSessions.map((session) => (
+                  <LiveStreamViewer key={session.id} session={session} />
+                ))}
+              </div>
+            )}
+            {liveFeeds.length > 0 && (
+              <>
+                {liveVideoSessions.length > 0 && (
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Photo-based dashcam feeds</p>
+                )}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {liveFeeds.map((feed) => (
+                    <LiveFeedCard key={feed.session.id} feed={feed} />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )
+      )}
+
+      {activeTab === 'recordings' && (
+        recordingsLoading ? (
+          <div className="flex items-center justify-center h-48">
+            <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : recordings.length === 0 ? (
+          <div className="text-center py-16 text-slate-400 bg-white rounded-xl border border-slate-200">
+            <HardDrive className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p>No saved live video yet</p>
+            <p className="text-sm mt-1">Recordings appear here after drivers stop a live stream — kept {retentionDays} days unless you save permanently.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              Live stream recordings auto-delete after <strong>{retentionDays} days</strong>.
+              {canDownloadRecordings ? ' Download or tap Keep to save permanently.' : ' Contact your fleet manager to download or keep recordings.'}
+            </p>
+            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+              {recordings.map((rec) => (
+                <div key={rec.id} className="px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                      <User className="w-4 h-4 text-slate-400" /> {rec.driver_name}
+                      {rec.archived && (
+                        <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">KEPT</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(rec.started_at).toLocaleString()}</span>
+                      {rec.duration_sec != null && <span>{Math.round(rec.duration_sec / 60)} min</span>}
+                      <span className={rec.archived ? 'text-emerald-600' : rec.days_remaining <= 3 ? 'text-amber-600' : 'text-slate-400'}>
+                        {daysRemainingLabel(rec)}
+                      </span>
+                    </div>
+                  </div>
+                  {canDownloadRecordings && (
+                    <div className="flex flex-wrap gap-2 shrink-0">
+                      <button
+                        type="button"
+                        disabled={!!downloadingId}
+                        onClick={() => handleDownloadRecording(rec, 'road')}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 disabled:opacity-50"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        {downloadingId === `${rec.id}-road` ? '…' : 'Road'}
+                      </button>
+                      {rec.cabin_video_url && (
+                        <button
+                          type="button"
+                          disabled={!!downloadingId}
+                          onClick={() => handleDownloadRecording(rec, 'cabin')}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 disabled:opacity-50"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          {downloadingId === `${rec.id}-cabin` ? '…' : 'Driver'}
+                        </button>
+                      )}
+                      {!rec.archived && (
+                        <button
+                          type="button"
+                          disabled={archivingId === rec.id}
+                          onClick={() => handleArchiveRecording(rec)}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-emerald-100 hover:bg-emerald-200 text-emerald-900 disabled:opacity-50"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                          {archivingId === rec.id ? 'Saving…' : 'Keep'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )
       )}

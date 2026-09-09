@@ -2,14 +2,10 @@
  * FleetCo Safety AI — vision analysis of dashcam frames for driving behavior.
  * Uses Gemini vision when configured; falls back gracefully when not.
  */
-import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createEntity, getEntity } from './db.js';
 import { getAiStatus } from './aiProvider.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
+import { readFileBuffer } from './mediaStorage.js';
 
 const SAFETY_EVENT_TYPES = new Set([
   'lane_departure',
@@ -39,13 +35,11 @@ function geminiApiKey() {
   return normalizeEnv(process.env.GEMINI_API_KEY);
 }
 
-function imageUrlToBase64(imageUrl) {
+async function imageUrlToBase64(imageUrl) {
   if (!imageUrl || typeof imageUrl !== 'string') return null;
-  const rel = imageUrl.replace(/^\/uploads\//, '');
-  const filePath = path.join(UPLOADS_DIR, rel);
-  if (!fs.existsSync(filePath)) return null;
-  const buf = fs.readFileSync(filePath);
-  const ext = path.extname(filePath).toLowerCase();
+  const buf = await readFileBuffer(imageUrl);
+  if (!buf) return null;
+  const ext = path.extname(imageUrl).toLowerCase();
   const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
   return { data: buf.toString('base64'), mime };
 }
@@ -144,7 +138,7 @@ export function analyzeDashcamFrameAsync(frame, session, options = {}) {
 
   setImmediate(async () => {
     try {
-      const encoded = imageUrlToBase64(frame.image_url);
+      const encoded = await imageUrlToBase64(frame.image_url);
       if (!encoded) return;
 
       const { events, model } = await analyzeWithGemini({

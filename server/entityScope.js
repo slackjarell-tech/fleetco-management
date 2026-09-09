@@ -177,6 +177,14 @@ export function entityBelongsToCustomer(type, item, customerId, scopeIndex) {
     }
   }
 
+  if (type === 'LiveStreamSession' || type === 'LiveStreamRecording') {
+    if (matchesCustomerField(item, customerId)) return true;
+    if (item.session_id) {
+      const session = getEntity('LiveStreamSession', item.session_id);
+      if (session && matchesCustomerField(session, customerId)) return true;
+    }
+  }
+
   if (type === 'LoadMessage' && item.load_id) {
     const load = getEntity('Load', item.load_id);
     if (!load) return false;

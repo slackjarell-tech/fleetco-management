@@ -156,6 +156,34 @@ export async function invokeFunction(name, body, user, ctx = null) {
       const { getLiveDashcamFeedsHandler } = await import('./drivingSafetyAi.js');
       return getLiveDashcamFeedsHandler(body, user, ctx);
     }
+    case 'startLiveVideoStream': {
+      const { startLiveVideoStream } = await import('./liveStream.js');
+      return startLiveVideoStream(body, user);
+    }
+    case 'stopLiveVideoStream': {
+      const { stopLiveVideoStream } = await import('./liveStream.js');
+      return stopLiveVideoStream(body, user);
+    }
+    case 'getLiveVideoViewerToken': {
+      const { getLiveVideoViewerToken } = await import('./liveStream.js');
+      return getLiveVideoViewerToken(body, user, ctx);
+    }
+    case 'listActiveLiveVideoSessions': {
+      const { listActiveLiveVideoSessions } = await import('./liveStream.js');
+      return listActiveLiveVideoSessions(body, user, ctx);
+    }
+    case 'registerLiveVideoRecording': {
+      const { registerLiveVideoRecording } = await import('./liveStream.js');
+      return registerLiveVideoRecording(body, user);
+    }
+    case 'listLiveVideoRecordings': {
+      const { listLiveVideoRecordings } = await import('./liveStream.js');
+      return listLiveVideoRecordings(body, user, ctx);
+    }
+    case 'archiveLiveVideoRecording': {
+      const { archiveLiveVideoRecording } = await import('./liveStream.js');
+      return archiveLiveVideoRecording(body, user, ctx);
+    }
     case 'createDomainEmail':
       return createDomainEmail(body, user);
     case 'simulateDrivers':

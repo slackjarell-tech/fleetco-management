@@ -8,6 +8,7 @@ import { isCarrierPayoutEnabled } from './stripeCarrierPayouts.js';
 import { isAutopilotEnabled } from './marketingAutopilot.js';
 import { getAiStatus, verifyAiProvider } from './aiProvider.js';
 import { getStoreStats } from './db.js';
+import { getStorageStatus } from './mediaStorage.js';
 
 export async function getProductionReadiness({ verifyAi = false } = {}) {
   const email = getEmailConfigStatus();
@@ -20,6 +21,7 @@ export async function getProductionReadiness({ verifyAi = false } = {}) {
   }
 
   const store = getStoreStats?.() || {};
+  const media = getStorageStatus();
 
   const checks = [
     {
@@ -86,6 +88,17 @@ export async function getProductionReadiness({ verifyAi = false } = {}) {
       live: true,
       detail: 'Broker ↔ carrier threads + SLT oversight (code deployed)',
     },
+    {
+      id: 'media_storage',
+      label: 'Upload & video persistence (redeploy-safe)',
+      live: media.redeploySafe,
+      detail: media.redeploySafe
+        ? [
+            media.persistentDisk ? `Disk: ${media.uploadsPath}` : null,
+            media.objectStorage ? `Object storage: ${media.bucket}` : null,
+          ].filter(Boolean).join(' · ') || 'Uploads survive redeploy'
+        : 'Set UPLOADS_PATH on Render persistent disk and/or R2/S3 bucket env vars — otherwise uploads are lost on redeploy',
+    },
   ];
 
   const liveCount = checks.filter((c) => c.live).length;
@@ -106,6 +119,7 @@ export async function getProductionReadiness({ verifyAi = false } = {}) {
       carrier_payment_scheduler: process.env.CARRIER_PAYMENT_SCHEDULER_DISABLED !== 'true',
     },
     store,
+    media_storage: media,
     stripe_webhook_url: `${(process.env.PUBLIC_APP_URL || process.env.APP_ORIGIN || 'https://fleetcomanagement.org').replace(/\/$/, '')}/api/billing/webhook`,
     connect: {
       enabled: connect.connectEnabled,

@@ -30,6 +30,18 @@ services:
         value: "false"
       - key: DATA_PATH
         value: /opt/render/project/src/server/data
+      # Uploads on the same persistent disk — survives redeploy (increase disk sizeGB for video)
+      - key: UPLOADS_PATH
+        value: /opt/render/project/src/server/data/uploads
+      # Optional: Cloudflare R2 mirror for scalable video (recommended when disk fills)
+      # - key: R2_BUCKET
+      #   sync: false
+      # - key: R2_ENDPOINT
+      #   sync: false
+      # - key: R2_ACCESS_KEY_ID
+      #   sync: false
+      # - key: R2_SECRET_ACCESS_KEY
+      #   sync: false
       # AI — marketing guide + autopilot (console.groq.com)
       - key: GROQ_API_KEY
         sync: false
@@ -62,10 +74,20 @@ services:
         sync: false
       - key: OWNER_FORCE_PASSWORD_RESET
         sync: false
+      # Live video — LiveKit Cloud (cloud.livekit.io) for WebRTC streaming + 15-day recordings
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: LIVE_STREAM_RETENTION_DAYS
+        value: "15"
     disk:
       name: fleetco-data
       mountPath: /opt/render/project/src/server/data
-      sizeGB: 1
+      # Bump to 10+ GB when storing live WebM recordings on disk; or use R2 env vars above
+      sizeGB: 10
     healthCheckPath: /api/public-settings
 
 # Go-live checklist (run after deploy):
