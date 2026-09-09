@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { canManageCustomerTeam } from '@/lib/customerRoles';
 import LiveStreamViewer from '@/components/live/LiveStreamViewer';
+import RecordingSessionCard from '@/components/live/RecordingSessionCard';
 import { daysRemainingLabel, downloadLiveRecording } from '@/lib/liveVideo';
 
 export default function DriverMedia() {
@@ -155,7 +156,7 @@ export default function DriverMedia() {
           <Video className="w-7 h-7 text-amber-500" /> Driver Media
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Live dashcam streaming only — watch drivers in real time and review saved recordings (15-day retention).
+          Dashcam recording — drivers save video from the app; review in the library (15-day retention). Live office viewing when LiveKit is configured.
         </p>
       </div>
 
@@ -209,14 +210,15 @@ export default function DriverMedia() {
 
       {activeTab === 'live' && (
         <div className="space-y-4">
-          {canStartLiveVideo && livekitConfigured && liveDrivers.length > 0 && (
+          {canStartLiveVideo && liveDrivers.length > 0 && (
             <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
               <div>
                 <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <Play className="w-4 h-4 text-red-600" /> Start live dashcam
+                  <Play className="w-4 h-4 text-red-600" /> Request driver recording
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Drivers can tap <strong>Start Recording</strong> in the FleetCo Driver app anytime — or you can request them to go live from here.
+                  Drivers can tap <strong>Start Recording</strong> anytime — or you can request them to start from here.
+                  {!livekitConfigured && ' Live office viewing requires LiveKit; saved video always works.'}
                 </p>
               </div>
               <div className="divide-y divide-slate-100 rounded-lg border border-slate-100">
@@ -250,7 +252,7 @@ export default function DriverMedia() {
                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-red-600 hover:bg-red-500 text-white disabled:opacity-60"
                       >
                         <Video className="w-3.5 h-3.5" />
-                        {startingDriverId === d.id ? 'Requesting…' : 'Start Live Dashcam'}
+                        {startingDriverId === d.id ? 'Requesting…' : 'Request Recording'}
                       </button>
                     )}
                   </div>
@@ -287,19 +289,18 @@ export default function DriverMedia() {
           {liveVideoSessions.length === 0 && requestedVideoSessions.length === 0 ? (
             <div className="text-center py-16 text-slate-400 bg-white rounded-xl border border-slate-200">
               <Radio className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p>No active live dashcam streams</p>
-              <p className="text-sm mt-1">Request a driver above, or they can tap Start Recording on their home screen or Live Dashcam tab.</p>
-              {!livekitConfigured && (
-                <p className="text-xs mt-3 text-amber-600 max-w-md mx-auto">
-                  Requires LiveKit on the server (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET).
-                </p>
-              )}
+              <p>No active dashcam recordings</p>
+              <p className="text-sm mt-1">Request a driver above, or they can tap Start Recording on their home screen or Recording tab.</p>
             </div>
           ) : (
             liveVideoSessions.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {liveVideoSessions.map((session) => (
-                  <LiveStreamViewer key={session.id} session={session} />
+                  session.stream_mode === 'livekit' && livekitConfigured ? (
+                    <LiveStreamViewer key={session.id} session={session} />
+                  ) : (
+                    <RecordingSessionCard key={session.id} session={session} />
+                  )
                 ))}
               </div>
             )

@@ -4,6 +4,7 @@ import { api } from '@/api/apiClient';
 import { useDriverDevice } from '@/components/mobile/DriverDeviceProvider';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import { useLiveVideoPublisher } from '@/hooks/useLiveVideoPublisher';
+import { useLocalVideoRecorder } from '@/hooks/useLocalVideoRecorder';
 import { uploadLiveRecording } from '@/lib/liveVideo';
 import {
   Video, ChevronDown, ChevronUp, Battery, MapPin, AlertTriangle,
@@ -13,9 +14,9 @@ import {
 const SETUP_TIPS = [
   'Mount the phone on the dash — rear camera sees the road, front camera toward the driver.',
   'Keep the phone plugged into a fast car charger the entire trip.',
-  'Keep FleetCo Driver open while streaming — your fleet office watches live in Driver Media.',
+  'Keep FleetCo Driver open while recording — video saves when you tap Stop.',
   'Video auto-saves for 15 days when you stop. Fleet managers can download or keep permanently.',
-  'Some iPhones only support one live camera — road view is always captured.',
+  'Some iPhones only support one camera at a time — road view is always captured.',
   'Texas & some states restrict windshield mounts — use a dash mount if needed.',
 ];
 
@@ -32,6 +33,7 @@ export default function DriverDashcam() {
   const roadPreviewRef = useRef(null);
   const cabinPreviewRef = useRef(null);
   const [session, setSession] = useState(null);
+  const [streamMode, setStreamMode] = useState('local');
   const [recording, setRecording] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -41,14 +43,15 @@ export default function DriverDashcam() {
   const [officeRequest, setOfficeRequest] = useState(null);
   const [startingLive, setStartingLive] = useState(false);
   const livePublisher = useLiveVideoPublisher();
+  const localRecorder = useLocalVideoRecorder();
 
   const livekitReady = !!user?.livekit_configured;
-  const canStream = livekitReady && dualCameraEnabled;
+  const canRecord = dualCameraEnabled;
 
   const { supported: wakeLockSupported } = useWakeLock(recording);
 
   useEffect(() => {
-    if (!livekitReady || recording) {
+    if (!canRecord || recording) {
       setOfficeRequest(null);
       return undefined;
     }
@@ -63,11 +66,11 @@ export default function DriverDashcam() {
     check();
     const t = setInterval(check, 3000);
     return () => clearInterval(t);
-  }, [livekitReady, recording]);
+  }, [canRecord, recording]);
 
   const autoStartHandled = useRef(false);
   useEffect(() => {
-    if (!canStream || recording || startingLive || autoStartHandled.current) return;
+    if (!canRecord || recording || startingLive || autoStartHandled.current) return;
 
     const acceptId = searchParams.get('accept');
     const autostart = searchParams.get('autostart') === '1';
@@ -75,15 +78,13 @@ export default function DriverDashcam() {
     if (acceptId || autostart) {
       autoStartHandled.current = true;
       setSearchParams({}, { replace: true });
-      startLiveVideo(acceptId || null);
+      startRecording(acceptId || null);
     }
-  }, [canStream, recording, startingLive, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [canRecord, recording, startingLive, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const startLiveVideo = async (sessionId = null) => {
-    if (!canStream) {
-      setError(livekitReady
-        ? 'Live dashcam is disabled for your fleet — ask your fleet manager to enable it in Driver Media.'
-        : 'Live dashcam is not configured on the server yet — contact FleetCo support.');
+  const startRecording = async (sessionId = null) => {
+    if (!canRecord) {
+      setError('Dashcam recording is turned off for your fleet — ask your fleet manager to enable it in Driver Media.');
       return;
     }
     setError('');
@@ -91,34 +92,46 @@ export default function DriverDashcam() {
     setStartingLive(true);
     try {
       const result = await api.functions.invoke('startLiveVideoStream', sessionId ? { sessionId } : {});
+      const mode = result.streamMode || result.session?.stream_mode || (result.livekitUrl ? 'livekit' : 'local');
       setSession(result.session);
+      setStreamMode(mode);
       setRecording(true);
       setMessage(result.message);
       setOfficeRequest(null);
       liveStartRef.current = Date.now();
 
-      await livePublisher.start({
-        livekitUrl: result.livekitUrl,
-        token: result.token,
-        roadVideoEl: roadPreviewRef.current,
-        cabinVideoEl: cabinPreviewRef.current,
-        dualCamera: dualCameraEnabled,
-      });
+      if (mode === 'livekit') {
+        await livePublisher.start({
+          livekitUrl: result.livekitUrl,
+          token: result.token,
+          roadVideoEl: roadPreviewRef.current,
+          cabinVideoEl: cabinPreviewRef.current,
+          dualCamera: dualCameraEnabled,
+        });
+      } else {
+        await localRecorder.start({
+          roadVideoEl: roadPreviewRef.current,
+          cabinVideoEl: cabinPreviewRef.current,
+          dualCamera: dualCameraEnabled,
+        });
+      }
     } catch (err) {
-      setError(err?.data?.error || err?.message || 'Could not start live dashcam');
+      setError(err?.data?.error || err?.message || 'Could not start recording');
     } finally {
       setStartingLive(false);
     }
   };
 
-  const stopLiveVideo = async () => {
+  const stopRecording = async () => {
     if (!session) return;
     setUploading(true);
     try {
       const durationSec = liveStartRef.current
         ? Math.round((Date.now() - liveStartRef.current) / 1000)
         : null;
-      const { roadBlob, cabinBlob } = await livePublisher.stop();
+      const { roadBlob, cabinBlob } = streamMode === 'livekit'
+        ? await livePublisher.stop()
+        : await localRecorder.stop();
       await api.functions.invoke('stopLiveVideoStream', { sessionId: session.id });
 
       let lat = null;
@@ -150,12 +163,12 @@ export default function DriverDashcam() {
         });
       }
 
-      setMessage('Live dashcam stopped. Video saved for 15 days — fleet managers can download or keep it permanently.');
+      setMessage('Recording stopped. Video saved for 15 days — fleet managers can download or keep it permanently.');
       setRecording(false);
       setSession(null);
       liveStartRef.current = null;
     } catch (err) {
-      setError(err?.data?.error || err?.message || 'Could not stop live dashcam');
+      setError(err?.data?.error || err?.message || 'Could not stop recording');
     } finally {
       setUploading(false);
     }
@@ -165,7 +178,7 @@ export default function DriverDashcam() {
     <div className="p-4 space-y-4 pb-8">
       <div>
         <h1 className="text-xl font-black text-slate-900 flex items-center gap-2">
-          <Video className="w-6 h-6 text-amber-500" /> Live Dashcam
+          <Video className="w-6 h-6 text-amber-500" /> Dashcam Recording
         </h1>
         <p className="text-slate-500 text-sm mt-1">
           Tap Start Recording anytime — or accept a request from your fleet office. Video saves automatically when you stop.
@@ -174,7 +187,7 @@ export default function DriverDashcam() {
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <button type="button" onClick={() => setGuideOpen(!guideOpen)} className="w-full flex items-center justify-between px-4 py-3 text-left">
-          <span className="font-bold text-slate-900 text-sm">Live Dashcam Setup</span>
+          <span className="font-bold text-slate-900 text-sm">Dashcam Setup</span>
           {guideOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
         </button>
         {guideOpen && (
@@ -188,31 +201,31 @@ export default function DriverDashcam() {
         )}
       </div>
 
-      {!livekitReady && (
+      {!dualCameraEnabled && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
-          <strong>Live dashcam unavailable</strong> — LiveKit is not configured on the server. Contact your FleetCo administrator.
+          Dashcam recording is turned off for your fleet. Ask your fleet manager to enable it in Driver Media.
         </div>
       )}
 
-      {livekitReady && !dualCameraEnabled && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
-          Live dashcam is turned off for your fleet. Ask your fleet manager to enable it in Driver Media.
+      {canRecord && !livekitReady && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-900">
+          Recording works on your phone now — no extra setup. Live office viewing can be added later with LiveKit.
         </div>
       )}
 
-      {canStream && !recording && (
+      {canRecord && !recording && (
         <div className="space-y-3">
           <button
             type="button"
             disabled={startingLive}
-            onClick={() => startLiveVideo()}
+            onClick={() => startRecording()}
             className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-xl shadow-lg disabled:opacity-60"
           >
             <Video className="w-6 h-6" />
             {startingLive ? 'Starting…' : 'Start Recording'}
           </button>
           <p className="text-xs text-center text-slate-500">
-            You start recording here — your fleet office can also request you to go live from Driver Media.
+            You or your fleet office can start recording — saved video appears in Driver Media when you stop.
           </p>
           {officeRequest && (
             <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3">
@@ -226,7 +239,7 @@ export default function DriverDashcam() {
               <button
                 type="button"
                 disabled={startingLive}
-                onClick={() => startLiveVideo(officeRequest.pending?.id)}
+                onClick={() => startRecording(officeRequest.pending?.id)}
                 className="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl disabled:opacity-60"
               >
                 <Play className="w-5 h-5" /> {startingLive ? 'Starting…' : 'Accept & Start Recording'}
@@ -241,7 +254,7 @@ export default function DriverDashcam() {
           <Battery className="w-3 h-3" /> Keep plugged in
         </span>
         <span className="inline-flex items-center gap-1 text-xs font-semibold bg-blue-50 text-blue-800 px-2.5 py-1 rounded-full">
-          <Wind className="w-3 h-3" /> Live WebRTC video only
+          <Wind className="w-3 h-3" /> {livekitReady ? 'Live + saved video' : 'On-device recording'}
         </span>
         <span className="inline-flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
           <AlertTriangle className="w-3 h-3" /> Check local mount laws
@@ -253,9 +266,9 @@ export default function DriverDashcam() {
         )}
       </div>
 
-      {!dualCameraSupported && canStream && (
+      {!dualCameraSupported && canRecord && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
-          This device may only support one live camera (common on iPhone). Road view is always captured; driver view when supported.
+          This device may only support one camera (common on iPhone). Road view is always captured; driver view when supported.
         </div>
       )}
 
@@ -263,11 +276,11 @@ export default function DriverDashcam() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl overflow-hidden border border-slate-200 bg-black">
-              <video ref={roadPreviewRef} className="w-full h-36 object-cover" playsInline muted aria-label="Live road camera" />
+              <video ref={roadPreviewRef} className="w-full h-36 object-cover" playsInline muted aria-label="Road camera" />
               <div className="px-2 py-1.5 bg-slate-900 text-[10px] text-slate-300 font-bold">ROAD</div>
             </div>
             <div className="rounded-xl overflow-hidden border border-slate-200 bg-black">
-              <video ref={cabinPreviewRef} className="w-full h-36 object-cover" playsInline muted aria-label="Live driver camera" />
+              <video ref={cabinPreviewRef} className="w-full h-36 object-cover" playsInline muted aria-label="Driver camera" />
               <div className="px-2 py-1.5 bg-slate-900 text-[10px] text-slate-300 font-bold">
                 DRIVER {dualCameraActive ? '' : '(limited)'}
               </div>
@@ -275,7 +288,7 @@ export default function DriverDashcam() {
             <div className="col-span-2 px-3 py-2 bg-slate-900 text-xs text-slate-300 flex items-center justify-between rounded-lg">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                Live WebRTC stream
+                {streamMode === 'livekit' ? 'Live stream + recording' : 'Recording on device'}
               </span>
               {position && (
                 <span className="flex items-center gap-1 text-slate-400">
@@ -288,15 +301,19 @@ export default function DriverDashcam() {
           <div className="bg-red-600 text-white rounded-xl p-4 flex items-center gap-3">
             <span className={`w-3 h-3 bg-white rounded-full ${uploading ? '' : 'animate-pulse'}`} />
             <div className="flex-1">
-              <div className="font-black text-sm">{uploading ? 'SAVING VIDEO' : 'LIVE — Dashcam Streaming'}</div>
-              <div className="text-xs text-red-100">Fleet office is watching · auto-saved when you stop</div>
+              <div className="font-black text-sm">{uploading ? 'SAVING VIDEO' : 'RECORDING'}</div>
+              <div className="text-xs text-red-100">
+                {streamMode === 'livekit'
+                  ? 'Fleet office is watching · auto-saved when you stop'
+                  : 'Video saves to fleet library when you stop'}
+              </div>
             </div>
           </div>
 
           <button
             type="button"
             disabled={uploading}
-            onClick={stopLiveVideo}
+            onClick={stopRecording}
             className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl disabled:opacity-60"
           >
             <Square className="w-4 h-4" /> {uploading ? 'Uploading video…' : 'Stop & Save Recording'}

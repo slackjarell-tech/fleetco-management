@@ -275,6 +275,7 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
     }
   }
   user.livekit_configured = isLiveKitConfigured();
+  user.dashcam_recording_enabled = true;
   res.json(user);
 });
 
@@ -1332,7 +1333,7 @@ async function startServer() {
       if (isLiveKitConfigured()) {
         console.log('[live-stream] LiveKit configured — live video streaming enabled');
       } else {
-        console.warn('[live-stream] LIVEKIT_URL/API_KEY/API_SECRET not set — live video disabled (photo dashcam still works)');
+        console.log('[live-stream] Local dashcam recording enabled — add LiveKit env vars for live office viewing');
       }
     }).catch((err) => console.warn('[live-stream] scheduler not started', err.message));
   });

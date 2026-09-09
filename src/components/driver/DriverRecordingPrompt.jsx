@@ -7,8 +7,7 @@ import { Video, Radio, Play } from 'lucide-react';
  * Home-screen banner — driver can start recording themselves or accept an office request.
  */
 export default function DriverRecordingPrompt({ user }) {
-  const livekitReady = !!user?.livekit_configured;
-  const canStream = livekitReady && user?.driver_dual_camera_enabled !== false;
+  const canStream = user?.driver_dual_camera_enabled !== false;
   const [officeRequest, setOfficeRequest] = useState(null);
 
   useEffect(() => {
@@ -35,9 +34,9 @@ export default function DriverRecordingPrompt({ user }) {
           <Video className="w-5 h-5 text-red-400" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-white font-black text-sm">Live dashcam recording</div>
+          <div className="text-white font-black text-sm">Dashcam recording</div>
           <p className="text-slate-400 text-xs mt-0.5 leading-relaxed">
-            You can start recording yourself — or your fleet office can request you to go live.
+            Start recording yourself — or accept a request from your fleet office.
           </p>
         </div>
       </div>

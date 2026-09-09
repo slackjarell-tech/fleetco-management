@@ -101,12 +101,18 @@ export async function getProductionReadiness({ verifyAi = false } = {}) {
         : 'Set UPLOADS_PATH on Render persistent disk and/or R2/S3 bucket env vars — otherwise uploads are lost on redeploy',
     },
     {
+      id: 'dashcam_recording',
+      label: 'Dashcam recording (driver app)',
+      live: true,
+      detail: `On-device WebM upload · ${process.env.LIVE_STREAM_RETENTION_DAYS || 15}-day retention · no third-party service required`,
+    },
+    {
       id: 'livekit',
-      label: 'Live dashcam video (LiveKit)',
+      label: 'Live office viewing (LiveKit, optional)',
       live: isLiveKitConfigured(),
       detail: isLiveKitConfigured()
-        ? `WebRTC streaming · ${process.env.LIVE_STREAM_RETENTION_DAYS || 15}-day retention`
-        : 'Set LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET on Render (from cloud.livekit.io → Project → Keys)',
+        ? `WebRTC live feeds enabled · ${process.env.LIVE_STREAM_RETENTION_DAYS || 15}-day retention`
+        : 'Optional — set LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET for real-time office viewing',
     },
   ];
 

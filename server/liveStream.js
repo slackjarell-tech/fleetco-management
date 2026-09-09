@@ -74,6 +74,11 @@ export function isLiveKitConfigured() {
   return !!liveKitConfig();
 }
 
+/** Local on-device recording works without LiveKit; LiveKit only adds real-time office viewing. */
+export function getStreamMode() {
+  return isLiveKitConfigured() ? 'livekit' : 'local';
+}
+
 function roomName(sessionId) {
   return `fleetco-live-${sessionId}`;
 }
@@ -154,6 +159,7 @@ export async function startLiveVideoStream(body, user) {
     updateEntity('LiveStreamSession', session.id, {
       status: 'live',
       started_at: ts,
+      stream_mode: getStreamMode(),
     });
     session = getEntity('LiveStreamSession', session.id);
   } else {
@@ -168,6 +174,7 @@ export async function startLiveVideoStream(body, user) {
       customer_id: user.customer_id || '',
       vehicle_id: body.vehicleId || '',
       status: 'live',
+      stream_mode: getStreamMode(),
       room_name: '',
       started_at: ts,
       ended_at: '',
@@ -178,9 +185,26 @@ export async function startLiveVideoStream(body, user) {
     });
   }
 
+  const streamMode = session.stream_mode || getStreamMode();
+  if (!session.stream_mode) {
+    updateEntity('LiveStreamSession', session.id, { stream_mode: streamMode });
+    session = { ...session, stream_mode: streamMode };
+  }
+
+  if (streamMode === 'local') {
+    return {
+      success: true,
+      session: { ...session, status: 'live', stream_mode: 'local' },
+      streamMode: 'local',
+      message: body.sessionId
+        ? 'Recording started — video saves when you stop.'
+        : 'Recording started — video auto-saves for 15 days when you stop. Fleet managers review in Driver Media.',
+    };
+  }
+
   const room = session.room_name || roomName(session.id);
   if (!session.room_name) {
-    updateEntity('LiveStreamSession', session.id, { room_name: room });
+    updateEntity('LiveStreamSession', session.id, { room_name: room, stream_mode: 'livekit' });
   }
 
   const publisherToken = await buildToken({
@@ -194,7 +218,8 @@ export async function startLiveVideoStream(body, user) {
   const cfg = liveKitConfig();
   return {
     success: true,
-    session: { ...session, room_name: room, status: 'live' },
+    session: { ...session, room_name: room, status: 'live', stream_mode: 'livekit' },
+    streamMode: 'livekit',
     livekitUrl: cfg.url,
     token: publisherToken,
     message: body.sessionId
@@ -364,6 +389,9 @@ export async function getLiveVideoViewerToken(body, user, ctx) {
   assertRecordingAccess({ customer_id: session.customer_id }, user, ctx);
 
   if (session.status !== 'live') throw new Error('This session is no longer live');
+  if (session.stream_mode === 'local' || !isLiveKitConfigured()) {
+    throw new Error('Driver is recording on-device — live viewing is not available. Video will appear in the library when they stop.');
+  }
 
   const token = await buildToken({
     room: session.room_name,
@@ -398,13 +426,19 @@ export async function listActiveLiveVideoSessions(_body, user, ctx) {
     .filter((s) => s.status === 'requested')
     .map((s) => expireStaleRequest(s))
     .filter(Boolean);
-  const liveSessions = sessions.filter((s) => s.status === 'live');
+  const liveSessions = sessions
+    .filter((s) => s.status === 'live')
+    .map((s) => ({
+      ...s,
+      stream_mode: s.stream_mode || (isLiveKitConfigured() ? 'livekit' : 'local'),
+    }));
 
   const cfg = liveKitConfig();
   return {
     sessions: liveSessions,
     requestedSessions,
     livekitConfigured: !!cfg,
+    localRecordingEnabled: true,
     livekitUrl: cfg?.url || null,
     canStart: canStartLiveVideoForDriver(user),
   };
