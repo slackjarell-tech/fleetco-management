@@ -185,6 +185,22 @@ export async function invokeFunction(name, body, user, ctx = null) {
       const { archiveLiveVideoRecording } = await import('./liveStream.js');
       return archiveLiveVideoRecording(body, user, ctx);
     }
+    case 'requestLiveVideoForDriver': {
+      const { requestLiveVideoForDriver } = await import('./liveStream.js');
+      return requestLiveVideoForDriver(body, user, ctx);
+    }
+    case 'getPendingLiveVideoRequest': {
+      const { getPendingLiveVideoRequest } = await import('./liveStream.js');
+      return getPendingLiveVideoRequest(body, user);
+    }
+    case 'cancelLiveVideoRequest': {
+      const { cancelLiveVideoRequest } = await import('./liveStream.js');
+      return cancelLiveVideoRequest(body, user, ctx);
+    }
+    case 'listDriversForLiveVideo': {
+      const { listDriversForLiveVideo } = await import('./liveStream.js');
+      return listDriversForLiveVideo(body, user, ctx);
+    }
     case 'createDomainEmail':
       return createDomainEmail(body, user);
     case 'simulateDrivers':
@@ -1428,147 +1444,19 @@ function assertDriver(user) {
   if (!isDriverCapableUser(user)) throw new Error('Dashcam recording is for driver accounts only');
 }
 
-function startDashcamSession(body, user) {
+function startDashcamSession(_body, user) {
   assertDriver(user);
-
-  const { mode = 'view_ahead', intervalSec = 5, mountNotes = '', vehicleId = '' } = body;
-  if (!DASHCAM_MODES.includes(mode)) {
-    throw new Error('mode must be view_ahead, cabin, broll, dual_monitoring, or live_stream');
-  }
-
-  const isTimelapse = mode === 'view_ahead' || mode === 'dual_monitoring';
-  const isLive = mode === 'live_stream';
-  let interval = Number(intervalSec);
-
-  if (isLive) {
-    interval = LIVE_STREAM_INTERVAL;
-  } else if (isTimelapse && !DASHCAM_INTERVALS.includes(interval)) {
-    throw new Error('intervalSec must be 1, 2, 3, 5, 10, or 15 for time-lapse');
-  }
-
-  if (mode === 'dual_monitoring' || mode === 'live_stream') {
-    const customer = user.customer_id ? getEntity('Customer', user.customer_id) : null;
-    if (!isDualCameraEnabledForCustomer(customer)) {
-      throw new Error('Dual camera monitoring is turned off for your fleet — your fleet manager can re-enable it in Driver Media.');
-    }
-  }
-
-  const active = filterEntities('DashcamSession', { driver_id: user.id, status: 'recording' }, null, 1)[0];
-  if (active) {
-    throw new Error('Stop the current recording session before starting a new one');
-  }
-
-  const ts = nowIso();
-  const session = createEntity('DashcamSession', {
-    driver_id: user.id,
-    driver_name: user.full_name || user.email,
-    customer_id: user.customer_id || '',
-    mode,
-    interval_sec: (isTimelapse || isLive) ? interval : 0,
-    mount_notes: mountNotes,
-    vehicle_id: vehicleId,
-    status: 'recording',
-    frame_count: 0,
-    started_at: ts,
-    ended_at: '',
-    safety_acknowledged: true,
-  });
-
-  return {
-    success: true,
-    session,
-    message: mode === 'live_stream'
-      ? 'Live stream started — road + driver cameras updating every second. Fleet office can watch live in Driver Media.'
-      : mode === 'view_ahead'
-      ? `View-ahead time-lapse started — 1 frame every ${interval}s (photos only, saves memory).`
-      : mode === 'dual_monitoring'
-        ? `Dual ELD monitoring started — road + driver view every ${interval}s. Your fleet office can review both feeds.`
-        : `${mode.replace('_', ' ')} capture session started.`,
-  };
+  throw new Error('Photo dashcam is disabled — use Start Live Dashcam (live WebRTC video only).');
 }
 
-function captureDashcamFrame(body, user) {
+function captureDashcamFrame(_body, user) {
   assertDriver(user);
-
-  const { sessionId, imageUrl, cabinImageUrl, lat, lng, heading, speed } = body;
-  if (!sessionId || !imageUrl) throw new Error('sessionId and imageUrl are required');
-
-  const session = getEntity('DashcamSession', sessionId);
-  if (!session) throw new Error('Session not found');
-  if (session.driver_id !== user.id) throw new Error('Not your recording session');
-  if (session.status !== 'recording') throw new Error('Session is not actively recording');
-
-  const frameIndex = (session.frame_count || 0) + 1;
-  const ts = nowIso();
-  const base = {
-    session_id: sessionId,
-    driver_id: user.id,
-    customer_id: user.customer_id || '',
-    frame_index: frameIndex,
-    lat: lat ?? null,
-    lng: lng ?? null,
-    heading: heading ?? 0,
-    speed: speed ?? 0,
-    captured_at: ts,
-    mode: session.mode,
-  };
-
-  const roadFrame = createEntity('DashcamFrame', {
-    ...base,
-    image_url: imageUrl,
-    camera_facing: 'road',
-  });
-
-  let cabinFrame = null;
-  if (cabinImageUrl) {
-    cabinFrame = createEntity('DashcamFrame', {
-      ...base,
-      image_url: cabinImageUrl,
-      camera_facing: 'cabin',
-      pair_frame_id: roadFrame.id,
-    });
-    updateEntity('DashcamFrame', roadFrame.id, { pair_frame_id: cabinFrame.id });
-  }
-
-  updateEntity('DashcamSession', sessionId, { frame_count: frameIndex });
-
-  const analyzeEvery = session.mode === 'live_stream' ? 3 : 5;
-  if (frameIndex % analyzeEvery === 0) {
-    import('./drivingSafetyAi.js').then(({ analyzeDashcamFrameAsync }) => {
-      analyzeDashcamFrameAsync(roadFrame, session);
-      if (cabinFrame) analyzeDashcamFrameAsync(cabinFrame, session);
-    }).catch(() => {});
-  }
-
-  return { success: true, frame: roadFrame, cabinFrame, frameIndex };
+  throw new Error('Photo dashcam is disabled — use live dashcam streaming only.');
 }
 
-function stopDashcamSession(body, user) {
+function stopDashcamSession(_body, user) {
   assertDriver(user);
-
-  const { sessionId } = body;
-  if (!sessionId) throw new Error('sessionId is required');
-
-  const session = getEntity('DashcamSession', sessionId);
-  if (!session) throw new Error('Session not found');
-  if (session.driver_id !== user.id && !['owner', 'executive', 'fleet_manager'].includes(user.role)) {
-    throw new Error('Not authorized to stop this session');
-  }
-
-  const ts = nowIso();
-  const updated = updateEntity('DashcamSession', sessionId, {
-    status: 'completed',
-    ended_at: ts,
-  });
-
-  const durationMs = new Date(ts) - new Date(session.started_at);
-  const durationMin = Math.round(durationMs / 60000);
-
-  return {
-    success: true,
-    session: updated,
-    message: `Recording saved — ${updated.frame_count} frame(s) over ${durationMin} min. Visible to your fleet office.`,
-  };
+  throw new Error('Photo dashcam is disabled — use live dashcam streaming only.');
 }
 
 function simulateDrivers(body) {

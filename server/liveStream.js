@@ -21,6 +21,8 @@ import {
   listEntities,
   deleteEntity,
   filterEntities,
+  findUserById,
+  listUsers,
   nowIso,
 } from './db.js';
 import { isDriverCapableUser } from './driverAccess.js';
@@ -29,12 +31,36 @@ import {
   isDualCameraEnabledForCustomer,
   canViewDriverMedia,
   canDownloadDriverMedia,
+  canStartLiveVideoForDriver,
 } from './driverMediaAccess.js';
 
 ensureUploadDirs();
 export const LIVE_RECORDINGS_DIR = getLiveRecordingsDir();
 
 export const RETENTION_DAYS = Math.max(1, Number(process.env.LIVE_STREAM_RETENTION_DAYS) || 15);
+const REQUEST_TTL_MS = 30 * 60 * 1000;
+
+function assertDriverCustomerAccess(driver, user, ctx) {
+  const customerId = ctx?.customerId || user?.customer_id;
+  if (isInternalRole(user?.role) && !customerId) return true;
+  if (driver.customer_id && customerId && driver.customer_id !== customerId) {
+    const err = new Error('Access denied');
+    err.status = 403;
+    throw err;
+  }
+  return true;
+}
+
+function expireStaleRequest(session) {
+  if (!session || session.status !== 'requested') return session;
+  const ts = session.requested_at || session.started_at;
+  if (!ts) return session;
+  if (Date.now() - new Date(ts).getTime() > REQUEST_TTL_MS) {
+    updateEntity('LiveStreamSession', session.id, { status: 'cancelled', ended_at: nowIso() });
+    return null;
+  }
+  return session;
+}
 
 function liveKitConfig() {
   const url = (process.env.LIVEKIT_URL || '').trim();
@@ -115,19 +141,47 @@ export async function startLiveVideoStream(body, user) {
   }
 
   const ts = nowIso();
-  const session = createEntity('LiveStreamSession', {
-    driver_id: user.id,
-    driver_name: user.full_name || user.email,
-    customer_id: user.customer_id || '',
-    vehicle_id: body.vehicleId || '',
-    status: 'live',
-    room_name: '',
-    started_at: ts,
-    ended_at: '',
-  });
+  let session;
 
-  const room = roomName(session.id);
-  updateEntity('LiveStreamSession', session.id, { room_name: room });
+  if (body.sessionId) {
+    session = getEntity('LiveStreamSession', body.sessionId);
+    if (!session) throw new Error('Live video request not found');
+    if (session.driver_id !== user.id) throw new Error('Not your live video request');
+    session = expireStaleRequest(session);
+    if (!session || session.status !== 'requested') {
+      throw new Error('This live video request expired or was cancelled');
+    }
+    updateEntity('LiveStreamSession', session.id, {
+      status: 'live',
+      started_at: ts,
+    });
+    session = getEntity('LiveStreamSession', session.id);
+  } else {
+    const pending = filterEntities('LiveStreamSession', { driver_id: user.id, status: 'requested' });
+    for (const p of pending) {
+      updateEntity('LiveStreamSession', p.id, { status: 'cancelled', ended_at: ts });
+    }
+
+    session = createEntity('LiveStreamSession', {
+      driver_id: user.id,
+      driver_name: user.full_name || user.email,
+      customer_id: user.customer_id || '',
+      vehicle_id: body.vehicleId || '',
+      status: 'live',
+      room_name: '',
+      started_at: ts,
+      ended_at: '',
+      requested_by: '',
+      requested_by_name: '',
+      requested_at: '',
+      started_by: 'driver',
+    });
+  }
+
+  const room = session.room_name || roomName(session.id);
+  if (!session.room_name) {
+    updateEntity('LiveStreamSession', session.id, { room_name: room });
+  }
 
   const publisherToken = await buildToken({
     room,
@@ -140,10 +194,140 @@ export async function startLiveVideoStream(body, user) {
   const cfg = liveKitConfig();
   return {
     success: true,
-    session: { ...session, room_name: room },
+    session: { ...session, room_name: room, status: 'live' },
     livekitUrl: cfg.url,
     token: publisherToken,
-    message: 'Live video started — fleet managers can watch in Driver Media. Recording saves automatically for 15 days.',
+    message: body.sessionId
+      ? 'Live video started — your fleet office is now watching.'
+      : 'Live video started — fleet managers can watch in Driver Media. Recording saves automatically for 15 days.',
+  };
+}
+
+export function requestLiveVideoForDriver(body, user, ctx) {
+  if (!canStartLiveVideoForDriver(user)) {
+    throw new Error('Not authorized to request live video for a driver');
+  }
+
+  const { driverId, vehicleId = '' } = body;
+  if (!driverId) throw new Error('driverId is required');
+
+  const driver = findUserById(driverId);
+  if (!driver || !isDriverCapableUser(driver)) {
+    throw new Error('Driver not found');
+  }
+  assertDriverCustomerAccess(driver, user, ctx);
+
+  const customer = driver.customer_id ? getEntity('Customer', driver.customer_id) : null;
+  if (!isDualCameraEnabledForCustomer(customer)) {
+    throw new Error('Live video is turned off for this fleet');
+  }
+
+  const sessions = listEntities('LiveStreamSession', '-started_at', 20)
+    .filter((s) => s.driver_id === driverId && (s.status === 'live' || s.status === 'requested'));
+
+  for (const s of sessions.filter((x) => x.status === 'requested')) {
+    expireStaleRequest(s);
+  }
+
+  const refreshed = listEntities('LiveStreamSession', '-started_at', 20)
+    .filter((s) => s.driver_id === driverId && (s.status === 'live' || s.status === 'requested'));
+
+  if (refreshed.some((s) => s.status === 'live')) {
+    throw new Error(`${driver.full_name || driver.email} is already live on video`);
+  }
+  if (refreshed.some((s) => s.status === 'requested')) {
+    throw new Error(`Already waiting for ${driver.full_name || driver.email} to start live video`);
+  }
+
+  const ts = nowIso();
+  const session = createEntity('LiveStreamSession', {
+    driver_id: driver.id,
+    driver_name: driver.full_name || driver.email,
+    customer_id: driver.customer_id || '',
+    vehicle_id: vehicleId,
+    status: 'requested',
+    room_name: '',
+    started_at: ts,
+    ended_at: '',
+    requested_by: user.id,
+    requested_by_name: user.full_name || user.email,
+    requested_at: ts,
+    started_by: 'office',
+  });
+
+  const room = roomName(session.id);
+  updateEntity('LiveStreamSession', session.id, { room_name: room });
+
+  return {
+    success: true,
+    session: { ...session, room_name: room },
+    message: `Live video requested for ${driver.full_name || driver.email}. They will see a prompt in the FleetCo Driver app.`,
+  };
+}
+
+export function getPendingLiveVideoRequest(_body, user) {
+  assertDriver(user);
+
+  let pending = filterEntities('LiveStreamSession', { driver_id: user.id, status: 'requested' }, null, 1)[0];
+  pending = expireStaleRequest(pending);
+  if (!pending) return { pending: null };
+
+  return {
+    pending,
+    requestedBy: pending.requested_by_name || 'Fleet office',
+    message: `${pending.requested_by_name || 'Your fleet office'} requested live video — tap Start when it is safe.`,
+  };
+}
+
+export function cancelLiveVideoRequest(body, user, ctx) {
+  if (!canStartLiveVideoForDriver(user)) {
+    throw new Error('Not authorized to cancel live video requests');
+  }
+
+  const { sessionId } = body;
+  if (!sessionId) throw new Error('sessionId is required');
+
+  const session = getEntity('LiveStreamSession', sessionId);
+  if (!session || session.status !== 'requested') {
+    throw new Error('Live video request not found');
+  }
+  assertRecordingAccess({ customer_id: session.customer_id }, user, ctx);
+
+  const updated = updateEntity('LiveStreamSession', session.id, {
+    status: 'cancelled',
+    ended_at: nowIso(),
+  });
+
+  return { success: true, session: updated };
+}
+
+export function listDriversForLiveVideo(_body, user, ctx) {
+  if (!canViewLiveVideo(user)) throw new Error('Not authorized');
+
+  const customerId = ctx?.customerId || user?.customer_id;
+  let drivers = listUsers().filter((u) => u.customer_id && u.role === 'driver');
+  if (customerId) {
+    drivers = drivers.filter((d) => d.customer_id === customerId);
+  }
+
+  const sessions = listEntities('LiveStreamSession', '-started_at', 100)
+    .filter((s) => s.status === 'live' || s.status === 'requested');
+
+  return {
+    drivers: drivers.map((d) => {
+      const live = sessions.find((s) => s.driver_id === d.id && s.status === 'live');
+      let pending = sessions.find((s) => s.driver_id === d.id && s.status === 'requested');
+      pending = expireStaleRequest(pending);
+      return {
+        id: d.id,
+        name: d.full_name || d.email,
+        email: d.email,
+        liveSession: live || null,
+        pendingSession: pending || null,
+      };
+    }),
+    canStart: canStartLiveVideoForDriver(user),
+    livekitConfigured: isLiveKitConfigured(),
   };
 }
 
@@ -201,7 +385,7 @@ export async function listActiveLiveVideoSessions(_body, user, ctx) {
   if (!canViewLiveVideo(user)) throw new Error('Not authorized');
 
   let sessions = listEntities('LiveStreamSession', '-started_at', 50)
-    .filter((s) => s.status === 'live');
+    .filter((s) => s.status === 'live' || s.status === 'requested');
 
   const customerId = ctx?.customerId || user?.customer_id;
   if (customerId && !isInternalRole(user?.role)) {
@@ -210,11 +394,19 @@ export async function listActiveLiveVideoSessions(_body, user, ctx) {
     sessions = sessions.filter((s) => s.customer_id === customerId);
   }
 
+  const requestedSessions = sessions
+    .filter((s) => s.status === 'requested')
+    .map((s) => expireStaleRequest(s))
+    .filter(Boolean);
+  const liveSessions = sessions.filter((s) => s.status === 'live');
+
   const cfg = liveKitConfig();
   return {
-    sessions,
+    sessions: liveSessions,
+    requestedSessions,
     livekitConfigured: !!cfg,
     livekitUrl: cfg?.url || null,
+    canStart: canStartLiveVideoForDriver(user),
   };
 }
 

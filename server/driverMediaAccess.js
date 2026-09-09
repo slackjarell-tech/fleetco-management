@@ -55,6 +55,11 @@ export function canDownloadDriverMedia(user) {
   return CUSTOMER_DOWNLOAD_MEDIA_ROLES.includes(normalizeCustomerRole(user.role));
 }
 
+/** Fleet office staff who may request a driver start live video remotely. */
+export function canStartLiveVideoForDriver(user) {
+  return canDownloadDriverMedia(user);
+}
+
 /** Enable live video for all customer fleets (one-time), then backfill any unset records. */
 export function ensureDriverMediaDefaults() {
   const customers = listEntities('Customer');

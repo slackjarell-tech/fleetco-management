@@ -18,7 +18,7 @@ import { canAccessDriverApp, isDriverCapableUser } from '@/lib/driverAccess';
 const TABS = [
   { path: '/driver', label: 'Home', icon: LayoutDashboard, end: true },
   { path: '/driver/clock', label: 'Clock', icon: Clock },
-  { path: '/driver/dashcam', label: 'Dashcam', icon: Video },
+  { path: '/driver/dashcam', label: 'Live Dashcam', icon: Video },
   { path: '/driver/route', label: 'Route', icon: Route },
   { path: '/driver/scan', label: 'Scan', icon: ScanLine },
 ];
