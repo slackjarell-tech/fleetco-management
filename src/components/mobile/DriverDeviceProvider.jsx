@@ -32,7 +32,7 @@ export function DriverDeviceProvider({ user, children }) {
   const cabinStreamRef = useRef(null);
   const locationCleanupRef = useRef(null);
 
-  const dualCameraEnabled = !!user?.driver_dual_camera_enabled;
+  const dualCameraEnabled = user?.driver_dual_camera_enabled !== false;
 
   const [permissionsReady, setPermissionsReady] = useState(() => hasCompletedPermissionSetup(user?.id));
   const [activating, setActivating] = useState(false);

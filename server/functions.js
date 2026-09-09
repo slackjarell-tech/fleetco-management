@@ -57,6 +57,7 @@ import { vehiclePartsLookup, accessorySerialLookup } from './vehiclePartsLookup.
 import { isDriverCapableUser, ensureDriverNumber } from './driverAccess.js';
 import { stampCustomerNumber } from './entityNumbers.js';
 import { isBrokerAccount } from './brokerAccounts.js';
+import { isDualCameraEnabledForCustomer } from './driverMediaAccess.js';
 
 const SIM_ROUTES = [
   { name: 'I-80 Westbound', id: 'sim_driver_01', userName: '👤 Mike R. (Sim)', steps: [
@@ -821,6 +822,8 @@ async function provisionCustomer(body, user) {
     system_paused: false,
     provisioned_by: user.email,
     notification_prefs: notificationPrefs,
+    driver_dual_camera_enabled: true,
+    driver_safety_ai_enabled: true,
   }));
 
   createEntity('Subscription', {
@@ -1445,8 +1448,8 @@ function startDashcamSession(body, user) {
 
   if (mode === 'dual_monitoring' || mode === 'live_stream') {
     const customer = user.customer_id ? getEntity('Customer', user.customer_id) : null;
-    if (!customer?.driver_dual_camera_enabled) {
-      throw new Error('Dual camera monitoring is not enabled for your fleet — ask your fleet manager to turn it on in Driver Media.');
+    if (!isDualCameraEnabledForCustomer(customer)) {
+      throw new Error('Dual camera monitoring is turned off for your fleet — your fleet manager can re-enable it in Driver Media.');
     }
   }
 

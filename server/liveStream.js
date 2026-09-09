@@ -25,6 +25,11 @@ import {
 } from './db.js';
 import { isDriverCapableUser } from './driverAccess.js';
 import { isInternalRole } from './entityScope.js';
+import {
+  isDualCameraEnabledForCustomer,
+  canViewDriverMedia,
+  canDownloadDriverMedia,
+} from './driverMediaAccess.js';
 
 ensureUploadDirs();
 export const LIVE_RECORDINGS_DIR = getLiveRecordingsDir();
@@ -71,22 +76,12 @@ function assertDriver(user) {
   if (!isDriverCapableUser(user)) throw new Error('Live video is for driver accounts only');
 }
 
-function fleetManagerRoles() {
-  return ['customer_owner', 'customer_fleet_manager', 'customer_hr', 'user'];
-}
-
 export function canViewLiveVideo(user) {
-  if (!user) return false;
-  if (isInternalRole(user.role)) return true;
-  if (user.customer_id && fleetManagerRoles().includes(user.role)) return true;
-  return user.customer_id && user.role === 'customer_fleet_coordinator';
+  return canViewDriverMedia(user);
 }
 
 export function canDownloadLiveVideo(user) {
-  if (!user) return false;
-  if (isInternalRole(user.role)) return true;
-  const r = user.role === 'user' ? 'customer_owner' : user.role;
-  return user.customer_id && ['customer_owner', 'customer_fleet_manager'].includes(r);
+  return canDownloadDriverMedia(user);
 }
 
 function assertRecordingAccess(recording, user, ctx) {
@@ -110,8 +105,8 @@ export async function startLiveVideoStream(body, user) {
   assertDriver(user);
 
   const customer = user.customer_id ? getEntity('Customer', user.customer_id) : null;
-  if (!customer?.driver_dual_camera_enabled) {
-    throw new Error('Dual camera / live video is not enabled for your fleet — ask your fleet manager to turn it on in Driver Media.');
+  if (!isDualCameraEnabledForCustomer(customer)) {
+    throw new Error('Dual camera / live video is turned off for your fleet — your fleet manager can re-enable it in Driver Media.');
   }
 
   const active = filterEntities('LiveStreamSession', { driver_id: user.id, status: 'live' }, null, 1)[0];

@@ -215,7 +215,8 @@ export default function DriverMedia() {
     if (!customer) return;
     setSavingDual(true);
     try {
-      const next = !customer.driver_dual_camera_enabled;
+      const enabled = customer.driver_dual_camera_enabled !== false;
+      const next = !enabled;
       await api.entities.Customer.update(customer.id, { driver_dual_camera_enabled: next });
       setCustomer({ ...customer, driver_dual_camera_enabled: next });
     } finally {
@@ -262,7 +263,7 @@ export default function DriverMedia() {
                 <Eye className="w-4 h-4 text-amber-600" /> Dual camera monitoring
               </div>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Enables live stream and dual ELD modes — road + driver cameras at the same time.
+                Included for all fleets by default — live stream and dual ELD (road + driver cameras). Turn off only if your fleet opts out.
               </p>
             </div>
             <button
@@ -270,10 +271,10 @@ export default function DriverMedia() {
               disabled={savingDual}
               onClick={toggleDualCamera}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm shrink-0 ${
-                customer.driver_dual_camera_enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                customer.driver_dual_camera_enabled !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
               }`}
             >
-              {customer.driver_dual_camera_enabled ? <><ToggleRight className="w-5 h-5" /> Enabled</> : <><ToggleLeft className="w-5 h-5" /> Disabled</>}
+              {customer.driver_dual_camera_enabled !== false ? <><ToggleRight className="w-5 h-5" /> Enabled</> : <><ToggleLeft className="w-5 h-5" /> Disabled</>}
             </button>
           </div>
 

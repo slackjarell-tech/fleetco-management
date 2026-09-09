@@ -27,7 +27,7 @@ export const DEFAULT_SIDEBAR_BY_CUSTOMER_ROLE = {
   customer_owner: ['Dashboard', 'Operations', 'Fleet', 'Maintenance', 'Drivers & Payroll', 'Compliance', 'Finance', 'Other'],
   customer_hr: ['Dashboard', 'Drivers & Payroll', 'Compliance', 'Other'],
   customer_fleet_manager: ['Dashboard', 'Operations', 'Fleet', 'Maintenance', 'Drivers & Payroll', 'Compliance', 'Other'],
-  customer_fleet_coordinator: ['Dashboard', 'Operations', 'Fleet', 'Other'],
+  customer_fleet_coordinator: ['Dashboard', 'Operations', 'Fleet', 'Drivers & Payroll', 'Other'],
   customer_parts_manager: ['Dashboard', 'Maintenance', 'Fleet', 'Finance', 'Other'],
   driver: ['Dashboard', 'Operations', 'Other'],
   user: ['Dashboard', 'Operations', 'Fleet', 'Maintenance', 'Drivers & Payroll', 'Compliance', 'Finance', 'Other'],

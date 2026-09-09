@@ -267,7 +267,7 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
       user.system_paused = !!customer.system_paused;
       user.customer_name = customer.company_name;
       user.notification_prefs = getCustomerNotificationPrefs(customer);
-      user.driver_dual_camera_enabled = !!customer.driver_dual_camera_enabled;
+      user.driver_dual_camera_enabled = customer.driver_dual_camera_enabled !== false;
       user.driver_safety_ai_enabled = customer.driver_safety_ai_enabled !== false;
       user.max_stops_per_route = Number(customer.max_stops_per_route) || 200;
       user.require_pod_signature = !!customer.require_pod_signature;
@@ -1006,7 +1006,11 @@ app.post('/api/entities/:type', requireAuth, (req, res) => {
   const ctx = getEntityContext(req);
   let payload = stampEntityForCreate(type, req.body, ctx);
   if (type === 'Customer') {
-    payload = stampCustomerNumber(payload);
+    payload = stampCustomerNumber({
+      driver_dual_camera_enabled: true,
+      driver_safety_ai_enabled: true,
+      ...payload,
+    });
   }
   if (type === 'Load') {
     try {
@@ -1320,6 +1324,9 @@ async function startServer() {
       startCarrierPaymentScheduler();
     }).catch((err) => console.warn('[carrier-payments] scheduler not started', err.message));
     logStorageStartup();
+    import('./driverMediaAccess.js').then(({ ensureDriverMediaDefaults }) => {
+      ensureDriverMediaDefaults();
+    }).catch((err) => console.warn('[driver-media] defaults migration skipped:', err.message));
     import('./liveStream.js').then(({ startLiveStreamRetentionScheduler, isLiveKitConfigured }) => {
       startLiveStreamRetentionScheduler();
       if (isLiveKitConfigured()) {
