@@ -9,6 +9,7 @@ import { isAutopilotEnabled } from './marketingAutopilot.js';
 import { getAiStatus, verifyAiProvider } from './aiProvider.js';
 import { getStoreStats } from './db.js';
 import { getStorageStatus } from './mediaStorage.js';
+import { isLiveKitConfigured } from './liveStream.js';
 
 export async function getProductionReadiness({ verifyAi = false } = {}) {
   const email = getEmailConfigStatus();
@@ -98,6 +99,14 @@ export async function getProductionReadiness({ verifyAi = false } = {}) {
             media.objectStorage ? `Object storage: ${media.bucket}` : null,
           ].filter(Boolean).join(' · ') || 'Uploads survive redeploy'
         : 'Set UPLOADS_PATH on Render persistent disk and/or R2/S3 bucket env vars — otherwise uploads are lost on redeploy',
+    },
+    {
+      id: 'livekit',
+      label: 'Live dashcam video (LiveKit)',
+      live: isLiveKitConfigured(),
+      detail: isLiveKitConfigured()
+        ? `WebRTC streaming · ${process.env.LIVE_STREAM_RETENTION_DAYS || 15}-day retention`
+        : 'Set LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET on Render (from cloud.livekit.io → Project → Keys)',
     },
   ];
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useDriverDevice } from '@/components/mobile/DriverDeviceProvider';
 import { useWakeLock } from '@/hooks/useWakeLock';
@@ -21,6 +21,7 @@ const SETUP_TIPS = [
 
 export default function DriverDashcam() {
   const { user } = useOutletContext();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     position,
     dualCameraEnabled,
@@ -47,7 +48,7 @@ export default function DriverDashcam() {
   const { supported: wakeLockSupported } = useWakeLock(recording);
 
   useEffect(() => {
-    if (!canStream || recording) {
+    if (!livekitReady || recording) {
       setOfficeRequest(null);
       return undefined;
     }
@@ -62,7 +63,21 @@ export default function DriverDashcam() {
     check();
     const t = setInterval(check, 3000);
     return () => clearInterval(t);
-  }, [canStream, recording]);
+  }, [livekitReady, recording]);
+
+  const autoStartHandled = useRef(false);
+  useEffect(() => {
+    if (!canStream || recording || startingLive || autoStartHandled.current) return;
+
+    const acceptId = searchParams.get('accept');
+    const autostart = searchParams.get('autostart') === '1';
+
+    if (acceptId || autostart) {
+      autoStartHandled.current = true;
+      setSearchParams({}, { replace: true });
+      startLiveVideo(acceptId || null);
+    }
+  }, [canStream, recording, startingLive, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startLiveVideo = async (sessionId = null) => {
     if (!canStream) {
@@ -153,7 +168,7 @@ export default function DriverDashcam() {
           <Video className="w-6 h-6 text-amber-500" /> Live Dashcam
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Stream road + driver cameras live to your fleet office. Recording saves automatically when you stop.
+          Tap Start Recording anytime — or accept a request from your fleet office. Video saves automatically when you stop.
         </p>
       </div>
 
@@ -187,25 +202,6 @@ export default function DriverDashcam() {
 
       {canStream && !recording && (
         <div className="space-y-3">
-          {officeRequest && (
-            <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3">
-              <div className="flex items-start gap-2 text-amber-900 text-sm">
-                <Radio className="w-5 h-5 flex-shrink-0 mt-0.5 animate-pulse" />
-                <div>
-                  <div className="font-bold">Fleet office requested live dashcam</div>
-                  <p className="text-xs mt-1 text-amber-800">{officeRequest.message}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                disabled={startingLive}
-                onClick={() => startLiveVideo(officeRequest.pending?.id)}
-                className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl disabled:opacity-60"
-              >
-                <Play className="w-5 h-5" /> {startingLive ? 'Starting…' : 'Start Live Dashcam Now'}
-              </button>
-            </div>
-          )}
           <button
             type="button"
             disabled={startingLive}
@@ -213,9 +209,30 @@ export default function DriverDashcam() {
             className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-xl shadow-lg disabled:opacity-60"
           >
             <Video className="w-6 h-6" />
-            {startingLive ? 'Starting…' : 'Start Live Dashcam'}
+            {startingLive ? 'Starting…' : 'Start Recording'}
           </button>
-          <p className="text-xs text-center text-slate-500">Road + driver cameras · live to fleet office · auto-saved 15 days</p>
+          <p className="text-xs text-center text-slate-500">
+            You start recording here — your fleet office can also request you to go live from Driver Media.
+          </p>
+          {officeRequest && (
+            <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3">
+              <div className="flex items-start gap-2 text-amber-900 text-sm">
+                <Radio className="w-5 h-5 flex-shrink-0 mt-0.5 animate-pulse" />
+                <div>
+                  <div className="font-bold">Fleet office requested recording</div>
+                  <p className="text-xs mt-1 text-amber-800">{officeRequest.message}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={startingLive}
+                onClick={() => startLiveVideo(officeRequest.pending?.id)}
+                className="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl disabled:opacity-60"
+              >
+                <Play className="w-5 h-5" /> {startingLive ? 'Starting…' : 'Accept & Start Recording'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

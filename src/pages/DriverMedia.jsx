@@ -216,7 +216,7 @@ export default function DriverMedia() {
                   <Play className="w-4 h-4 text-red-600" /> Start live dashcam
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Request a driver to go live from the office, or they tap Start Live Dashcam in the driver app.
+                  Drivers can tap <strong>Start Recording</strong> in the FleetCo Driver app anytime — or you can request them to go live from here.
                 </p>
               </div>
               <div className="divide-y divide-slate-100 rounded-lg border border-slate-100">
@@ -288,7 +288,7 @@ export default function DriverMedia() {
             <div className="text-center py-16 text-slate-400 bg-white rounded-xl border border-slate-200">
               <Radio className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p>No active live dashcam streams</p>
-              <p className="text-sm mt-1">Start from the list above or ask the driver to tap Start Live Dashcam in the app.</p>
+              <p className="text-sm mt-1">Request a driver above, or they can tap Start Recording on their home screen or Live Dashcam tab.</p>
               {!livekitConfigured && (
                 <p className="text-xs mt-3 text-amber-600 max-w-md mx-auto">
                   Requires LiveKit on the server (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET).

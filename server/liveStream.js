@@ -305,7 +305,7 @@ export function listDriversForLiveVideo(_body, user, ctx) {
   if (!canViewLiveVideo(user)) throw new Error('Not authorized');
 
   const customerId = ctx?.customerId || user?.customer_id;
-  let drivers = listUsers().filter((u) => u.customer_id && u.role === 'driver');
+  let drivers = listUsers().filter((u) => u.customer_id && isDriverCapableUser(u));
   if (customerId) {
     drivers = drivers.filter((d) => d.customer_id === customerId);
   }
