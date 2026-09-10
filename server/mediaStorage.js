@@ -44,6 +44,10 @@ export function getLiveRecordingsDir() {
   return path.join(getUploadsRoot(), 'live-recordings');
 }
 
+export function getLiveChunksDir() {
+  return path.join(getUploadsRoot(), 'live-chunks');
+}
+
 function objectStorageConfig() {
   const bucket = env('S3_BUCKET') || env('R2_BUCKET');
   if (!bucket) return null;
@@ -91,9 +95,11 @@ export function isPersistentUploadsPath() {
 export function ensureUploadDirs() {
   const root = getUploadsRoot();
   const live = getLiveRecordingsDir();
+  const chunks = getLiveChunksDir();
   fs.mkdirSync(root, { recursive: true });
   fs.mkdirSync(live, { recursive: true });
-  return { root, live };
+  fs.mkdirSync(chunks, { recursive: true });
+  return { root, live, chunks };
 }
 
 /** Stored URL `/uploads/foo` → object key `uploads/foo`. */
@@ -183,6 +189,16 @@ export async function getReadableStream(url) {
       console.warn('[media-storage] S3 stream failed:', key, err.message);
     }
     return null;
+  }
+}
+
+/** Remove a session chunk directory (best-effort). */
+export function deleteLocalDirectory(dirPath) {
+  if (!dirPath || !fs.existsSync(dirPath)) return;
+  try {
+    fs.rmSync(dirPath, { recursive: true, force: true });
+  } catch (err) {
+    console.warn('[media-storage] directory delete failed:', dirPath, err.message);
   }
 }
 

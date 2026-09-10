@@ -70,6 +70,7 @@ import { isLiveKitConfigured } from './liveKitSettings.js';
 import {
   ensureUploadDirs,
   getLiveRecordingsDir,
+  getLiveChunksDir,
   getReadableStream,
   replicateToObjectStorage,
   logStorageStartup,
@@ -81,6 +82,7 @@ const PORT = process.env.PORT || 3001;
 
 const { root: uploadsDir } = ensureUploadDirs();
 const liveRecordingsDir = getLiveRecordingsDir();
+const liveChunksDir = getLiveChunksDir();
 
 const app = express();
 
@@ -159,6 +161,23 @@ const liveVideoUpload = multer({
     },
   }),
   limits: { fileSize: 512 * 1024 * 1024 },
+});
+
+const liveChunkUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, _file, cb) => {
+      const sessionId = String(req.body?.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!sessionId) return cb(new Error('sessionId is required'));
+      const dir = path.join(liveChunksDir, sessionId);
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, _file, cb) => {
+      const seq = String(Number(req.body?.seq) || 0).padStart(6, '0');
+      cb(null, `chunk-${seq}.webm`);
+    },
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
 });
 
 function signToken(userId) {
@@ -1167,6 +1186,44 @@ app.post('/api/live-recordings/upload', requireAuth, liveVideoUpload.single('fil
     file_size: req.file.size,
     filename: req.file.filename,
   });
+});
+
+app.post('/api/live-recordings/chunk', requireAuth, liveChunkUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No chunk uploaded' });
+  const sessionId = String(req.body?.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  const seq = Number(req.body?.seq);
+  if (!sessionId || !Number.isFinite(seq)) {
+    return res.status(400).json({ error: 'sessionId and seq are required' });
+  }
+  const fileUrl = `/uploads/live-chunks/${sessionId}/chunk-${String(seq).padStart(6, '0')}.webm`;
+  try {
+    await replicateToObjectStorage(req.file.path, fileUrl, req.file.mimetype || 'video/webm');
+  } catch (err) {
+    console.warn('[live-chunks] object storage mirror failed:', err.message);
+  }
+  res.json({
+    file_url: fileUrl,
+    file_size: req.file.size,
+    seq,
+    sessionId,
+  });
+});
+
+app.get('/api/live-recordings/chunk/:sessionId/:seq', requireAuth, async (req, res) => {
+  try {
+    const { getLiveVideoChunkPath } = await import('./liveStream.js');
+    const { filePath } = getLiveVideoChunkPath(
+      req.params.sessionId,
+      req.params.seq,
+      req.user,
+      getEntityContext(req),
+    );
+    res.type('.webm');
+    return res.sendFile(filePath);
+  } catch (err) {
+    const status = err.status || (err.message?.includes('not found') ? 404 : 403);
+    return res.status(status).json({ error: err.message || 'Chunk not found' });
+  }
 });
 
 app.get('/api/live-recordings/:id/download', requireAuth, async (req, res) => {

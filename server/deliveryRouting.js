@@ -7,7 +7,11 @@ import {
   nowIso,
 } from './db.js';
 import { isDriverCapableUser, canManageCustomerTeam } from './roles.js';
-import { parseDeliveryBarcode, hasDeliverableAddress } from './barcodeParsers.js';
+import {
+  parseDeliveryBarcode,
+  hasDeliverableAddress,
+  mergeParsedDelivery,
+} from './barcodeParsers.js';
 
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -113,12 +117,56 @@ export function parseDeliveryBarcodeHandler(body, user) {
   };
 }
 
+export async function parseDeliveryLabelHandler(body, user) {
+  assertDriver(user);
+  const { imageUrl, barcode } = body;
+  if (!imageUrl) throw new Error('imageUrl is required');
+
+  const { parseShippingLabelImage, isLabelVisionConfigured } = await import('./labelVision.js');
+  if (!isLabelVisionConfigured()) {
+    throw new Error('Label photo reading requires GEMINI_API_KEY on the server.');
+  }
+
+  const fromLabel = await parseShippingLabelImage(imageUrl, { barcodeHint: barcode });
+  const fromBarcode = barcode ? parseDeliveryBarcode(barcode) : null;
+  const parsed = mergeParsedDelivery(fromLabel, fromBarcode) || fromLabel;
+
+  if (!parsed.recipient_name && parsed.address) {
+    parsed.recipient_name = 'Recipient';
+  }
+
+  const match = matchExistingStop(user, parsed);
+
+  return {
+    success: true,
+    parsed,
+    matchedStop: match.stop,
+    matchType: match.matchType,
+    labelImageUrl: imageUrl,
+    deliverySettings: getCustomerDeliverySettings(user.customer_id),
+  };
+}
+
 export function addDeliveryStopFromScan(body, user) {
   assertDriver(user);
-  const { barcode, routeId, lat, lng } = body;
-  if (!barcode) throw new Error('barcode is required');
+  const { barcode, parsed: parsedInput, routeId, lat, lng, labelImageUrl } = body;
 
-  const parsed = parseDeliveryBarcode(barcode);
+  let parsed;
+  if (parsedInput?.address && parsedInput?.city) {
+    parsed = {
+      ...parsedInput,
+      recipient_name: parsedInput.recipient_name || 'Recipient',
+      raw: parsedInput.raw || barcode || labelImageUrl || '',
+    };
+    if (barcode) {
+      const fromBarcode = parseDeliveryBarcode(barcode);
+      parsed = mergeParsedDelivery(parsed, fromBarcode) || parsed;
+    }
+  } else if (barcode) {
+    parsed = parseDeliveryBarcode(barcode);
+  } else {
+    throw new Error('barcode or parsed delivery data is required');
+  }
 
   const existing = matchExistingStop(user, parsed);
   if (existing.stop) {
@@ -133,9 +181,11 @@ export function addDeliveryStopFromScan(body, user) {
 
   if (!hasDeliverableAddress(parsed)) {
     throw new Error(
-      'This barcode is a tracking number only — no name/address embedded. Dispatch must assign the stop, or scan a manifest QR with full delivery data.'
+      'Tracking number only — snap a photo of the whole label (Ship To block) so we can read the delivery address, or scan a manifest QR with full data.'
     );
   }
+
+  if (!parsed.recipient_name) parsed.recipient_name = 'Recipient';
 
   const route = routeId ? getEntity('DeliveryRoute', routeId) : getOrCreateTodayRoute(user);
   if (!route) throw new Error('Route not found');
@@ -166,6 +216,7 @@ export function addDeliveryStopFromScan(body, user) {
     lat: lat ?? null,
     lng: lng ?? null,
     barcode_format: parsed.barcode_format,
+    label_image_url: labelImageUrl || '',
     created_from_scan: true,
   });
 

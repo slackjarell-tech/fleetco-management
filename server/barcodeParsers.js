@@ -64,6 +64,78 @@ function detectTrackingFormat(raw) {
   return null;
 }
 
+/** Multi-line label text (PDF417, Data Matrix, or pasted label block). */
+function tryMultiLineLabelText(rawInput) {
+  const normalized = String(rawInput || '')
+    .replace(/[\x1d\x1e\x1f]/g, '\n')
+    .replace(/\r/g, '\n');
+  const lines = normalized.split(/\n+/).map(clean).filter(Boolean);
+  if (lines.length < 2) return null;
+
+  const headerRe = /^(ship\s*to|deliver\s*to|send\s*to|consignee|recipient):?$/i;
+  const skipRe = /^(from|return|sender|shipper|billing):?$/i;
+  const cszRe = /^(.+?)[,\s]+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i;
+
+  let startIdx = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (headerRe.test(lines[i])) {
+      startIdx = i + 1;
+      break;
+    }
+  }
+
+  let cszIdx = -1;
+  let cszMatch = null;
+  for (let i = startIdx; i < lines.length; i += 1) {
+    const m = lines[i].match(cszRe);
+    if (m) {
+      cszIdx = i;
+      cszMatch = m;
+      break;
+    }
+  }
+  if (cszIdx < 1 || !cszMatch) return null;
+
+  const city = clean(cszMatch[1]);
+  const state = clean(cszMatch[2]).toUpperCase();
+  const zip = clean(cszMatch[3]);
+
+  const block = lines.slice(startIdx, cszIdx).filter((l) => !skipRe.test(l));
+  if (!block.length) return null;
+
+  let recipient_name = '';
+  let address = '';
+  if (block.length >= 2) {
+    recipient_name = block[0];
+    address = block.slice(1).join(', ');
+  } else {
+    recipient_name = 'Recipient';
+    address = block[0];
+  }
+
+  let tracking_number = '';
+  for (const line of lines) {
+    const t = detectTrackingFormat(line);
+    if (t?.tracking_number) {
+      tracking_number = t.tracking_number;
+      break;
+    }
+  }
+
+  if (!address || !city) return null;
+
+  return {
+    tracking_number,
+    recipient_name,
+    address,
+    city,
+    state,
+    zip,
+    barcode_format: 'label_multiline',
+    raw: rawInput,
+  };
+}
+
 export function parseDeliveryBarcode(rawInput) {
   const raw = clean(rawInput);
   if (!raw) return { raw: '', barcode_format: 'empty' };
@@ -73,6 +145,9 @@ export function parseDeliveryBarcode(rawInput) {
 
   const delimited = tryDelimited(raw);
   if (delimited?.recipient_name && delimited?.address) return delimited;
+
+  const multiline = tryMultiLineLabelText(raw);
+  if (multiline?.address && multiline?.city) return multiline;
 
   const tracking = detectTrackingFormat(raw);
   if (tracking) return { ...tracking, raw };
@@ -98,7 +173,26 @@ export function parseDeliveryBarcode(rawInput) {
 }
 
 export function hasDeliverableAddress(parsed) {
-  return !!(parsed?.recipient_name && parsed?.address && parsed?.city);
+  return !!(parsed?.address && parsed?.city && (parsed?.recipient_name || parsed?.state || parsed?.zip));
+}
+
+export function mergeParsedDelivery(primary, secondary) {
+  if (!primary && !secondary) return null;
+  const a = primary || {};
+  const b = secondary || {};
+  return {
+    tracking_number: a.tracking_number || b.tracking_number || '',
+    recipient_name: a.recipient_name || b.recipient_name || '',
+    recipient_phone: a.recipient_phone || b.recipient_phone || '',
+    address: a.address || b.address || '',
+    city: a.city || b.city || '',
+    state: a.state || b.state || '',
+    zip: a.zip || b.zip || '',
+    package_description: a.package_description || b.package_description || '',
+    notes: a.notes || b.notes || '',
+    barcode_format: a.barcode_format || b.barcode_format || 'merged',
+    raw: a.raw || b.raw || '',
+  };
 }
 
 export function formatStopAddress(stop) {

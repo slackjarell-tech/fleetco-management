@@ -48,11 +48,10 @@ export default function LiveKitSetupCard() {
     <div className="bg-white rounded-xl border border-indigo-200 p-4 space-y-4">
       <div>
         <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
-          <Radio className="w-4 h-4 text-indigo-600" /> Live office viewing (LiveKit)
+          <Radio className="w-4 h-4 text-indigo-600" /> LiveKit upgrade (optional)
         </div>
         <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-          Paste your LiveKit Cloud credentials here — saved securely in FleetCo (no Render dashboard needed).
-          Drivers still record the road camera; the office watches live when LiveKit is connected.
+          Live office viewing already works without LiveKit (~3–5 sec delay). Connect LiveKit here for lower-latency WebRTC — saved securely in FleetCo (no Render dashboard needed).
         </p>
       </div>
 
@@ -74,7 +73,7 @@ export default function LiveKitSetupCard() {
           <div>
             <div className="font-semibold">LiveKit not connected</div>
             <div className="text-xs mt-0.5">
-              Recording still works on-device. Add LiveKit below for real-time live feeds in this portal.
+              Chunked live viewing is active now. Add LiveKit below only if you want lower-latency WebRTC.
             </div>
           </div>
         </div>

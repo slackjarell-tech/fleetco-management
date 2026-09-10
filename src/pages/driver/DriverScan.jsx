@@ -2,27 +2,30 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import {
-  ScanLine, Package, CheckCircle, X, Plus, MapPin, ListOrdered, CloudOff,
+  ScanLine, Package, CheckCircle, X, Plus, MapPin, ListOrdered, CloudOff, Camera,
 } from 'lucide-react';
 import { startBarcodeScanner, stopBarcodeScanner, getCurrentPosition } from '@/lib/nativeBridge';
-import { formatStopAddress, hasDeliverableAddress } from '@/lib/barcodeParsers';
+import { formatStopAddress, hasDeliverableAddress, parseDeliveryBarcode } from '@/lib/barcodeParsers';
+import CameraCapture from '@/components/driver/CameraCapture';
 
 const MODES = [
   { id: 'deliver', label: 'Deliver Package', desc: 'Scan label → confirm stop → proof of delivery' },
-  { id: 'build', label: 'Build Route', desc: 'Scan manifest QR with name & address → add stop to today\'s route' },
+  { id: 'build', label: 'Build Route', desc: 'Scan label → read Ship To address → add stop → optimize sequence' },
   { id: 'log', label: 'Log Scan', desc: 'Record barcode for office audit trail' },
 ];
 
 export default function DriverScan() {
   const { user } = useOutletContext();
   const navigate = useNavigate();
-  const [mode, setMode] = useState('deliver');
+  const [mode, setMode] = useState('build');
   const [scanning, setScanning] = useState(false);
-  const [continuous, setContinuous] = useState(false);
+  const [continuous, setContinuous] = useState(true);
   const [lastResult, setLastResult] = useState(null);
   const [error, setError] = useState('');
   const [routeStops, setRouteStops] = useState(0);
   const [maxStops, setMaxStops] = useState(user?.max_stops_per_route || 200);
+  const [pendingBarcode, setPendingBarcode] = useState('');
+  const [labelParsing, setLabelParsing] = useState(false);
   const scannerRef = useRef(null);
   const scanAreaId = 'fleetco-barcode-reader';
 
@@ -39,15 +42,67 @@ export default function DriverScan() {
     });
   }, [user?.id]);
 
-  const handleScan = async (code) => {
-    setError('');
-    let lat = null;
-    let lng = null;
+  const getGps = async () => {
     try {
       const pos = await getCurrentPosition();
-      lat = pos.lat;
-      lng = pos.lng;
-    } catch { /* optional */ }
+      return { lat: pos.lat, lng: pos.lng };
+    } catch {
+      return { lat: null, lng: null };
+    }
+  };
+
+  const addStopToRoute = async ({ barcode, parsed, labelImageUrl, lat, lng }) => {
+    const result = await api.functions.invoke('addDeliveryStopFromScan', {
+      barcode,
+      parsed,
+      labelImageUrl,
+      lat,
+      lng,
+    });
+    if (result._offlineQueued) {
+      setRouteStops((n) => n + 1);
+      setLastResult({ type: 'build', offline: true, barcode, message: result.message });
+    } else {
+      setRouteStops((n) => n + (result.created ? 1 : 0));
+      setLastResult({ type: 'build', ...result });
+    }
+    return result;
+  };
+
+  const handleLabelPhoto = async (imageUrl) => {
+    setError('');
+    setLabelParsing(true);
+    try {
+      const { lat, lng } = await getGps();
+      const labelResult = await api.functions.invoke('parseDeliveryLabel', {
+        imageUrl,
+        barcode: pendingBarcode || undefined,
+      });
+
+      const parsed = labelResult.parsed;
+      if (!hasDeliverableAddress(parsed)) {
+        throw new Error('Could not read delivery address — include the full Ship To block in the photo.');
+      }
+
+      await addStopToRoute({
+        barcode: pendingBarcode || parsed.tracking_number,
+        parsed,
+        labelImageUrl: imageUrl,
+        lat,
+        lng,
+      });
+
+      setPendingBarcode('');
+    } catch (err) {
+      setError(err?.data?.error || err?.message || 'Label read failed');
+    } finally {
+      setLabelParsing(false);
+    }
+  };
+
+  const handleScan = async (code) => {
+    setError('');
+    const { lat, lng } = await getGps();
 
     try {
       if (mode === 'deliver') {
@@ -72,14 +127,27 @@ export default function DriverScan() {
       }
 
       if (mode === 'build') {
-        const result = await api.functions.invoke('addDeliveryStopFromScan', { barcode: code, lat, lng });
-        if (result._offlineQueued) {
-          setRouteStops((n) => n + 1);
-          setLastResult({ type: 'build', offline: true, barcode: code, message: result.message });
-        } else {
-          setRouteStops((n) => n + (result.created ? 1 : 0));
-          setLastResult({ type: 'build', ...result });
+        const parsed = parseDeliveryBarcode(code);
+
+        if (!hasDeliverableAddress(parsed)) {
+          setPendingBarcode(code);
+          setLastResult({
+            type: 'label_needed',
+            barcode: code,
+            parsed,
+            message: 'Tracking scanned — snap the whole label so we can read the Ship To address.',
+          });
+          if (!continuous) {
+            await stopBarcodeScanner(scannerRef.current);
+            scannerRef.current = null;
+            setScanning(false);
+          }
+          return;
         }
+
+        await addStopToRoute({ barcode: code, parsed, lat, lng });
+        setPendingBarcode('');
+
         if (!continuous) {
           await stopBarcodeScanner(scannerRef.current);
           scannerRef.current = null;
@@ -123,6 +191,7 @@ export default function DriverScan() {
     setScanning(true);
     setError('');
     setLastResult(null);
+    setPendingBarcode('');
     try {
       scannerRef.current = await startBarcodeScanner(
         scanAreaId,
@@ -176,7 +245,7 @@ export default function DriverScan() {
           <ScanLine className="w-6 h-6 text-amber-500" /> Package Scanner
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Supports QR, Code 128/39, UPC, ITF, PDF417, Data Matrix, and standard carrier tracking labels.
+          Scan the barcode, then snap the whole label if needed — we read the Ship To address to build and sequence your route.
         </p>
       </div>
 
@@ -190,7 +259,7 @@ export default function DriverScan() {
           <button
             key={m.id}
             type="button"
-            onClick={() => setMode(m.id)}
+            onClick={() => { setMode(m.id); setPendingBarcode(''); setError(''); }}
             className={`text-left px-4 py-3 rounded-xl border ${mode === m.id ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-white'}`}
           >
             <div className="font-bold text-sm text-slate-900">{m.label}</div>
@@ -202,7 +271,7 @@ export default function DriverScan() {
       {mode === 'build' && (
         <label className="flex items-center gap-2 text-xs text-slate-600">
           <input type="checkbox" checked={continuous} onChange={(e) => setContinuous(e.target.checked)} />
-          Continuous scan (multiple stops without restarting)
+          Continuous scan (keep adding stops — snap label when prompted)
         </label>
       )}
 
@@ -215,7 +284,7 @@ export default function DriverScan() {
         {!scanning && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-6 text-center pointer-events-none">
             <ScanLine className="w-12 h-12 mb-3 opacity-40" />
-            <p className="text-sm">Point camera at package label</p>
+            <p className="text-sm">Point camera at package barcode</p>
           </div>
         )}
       </div>
@@ -224,7 +293,7 @@ export default function DriverScan() {
         {!scanning ? (
           <button type="button" onClick={beginScan}
             className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3 rounded-xl">
-            {mode === 'deliver' ? 'Scan to Deliver' : mode === 'build' ? 'Scan to Add Stop' : 'Start Scanner'}
+            {mode === 'deliver' ? 'Scan to Deliver' : mode === 'build' ? 'Scan Package Label' : 'Start Scanner'}
           </button>
         ) : (
           <button type="button" onClick={stopScan}
@@ -234,13 +303,35 @@ export default function DriverScan() {
         )}
       </div>
 
-      {mode === 'build' && routeStops > 1 && (
+      {(pendingBarcode || lastResult?.type === 'label_needed') && mode === 'build' && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3">
+          <div className="flex items-start gap-2 text-amber-900">
+            <Camera className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <div className="font-bold text-sm">Snap the whole label</div>
+              <p className="text-xs mt-1">
+                Barcode captured{pendingBarcode ? `: ${pendingBarcode.slice(0, 24)}${pendingBarcode.length > 24 ? '…' : ''}` : ''}.
+                Photograph the full label with the <strong>Ship To</strong> name and address visible.
+              </p>
+            </div>
+          </div>
+          <CameraCapture
+            buttonLabel={labelParsing ? 'Reading label…' : 'Photograph Whole Label'}
+            onCapture={(url) => handleLabelPhoto(url)}
+          />
+          {labelParsing && (
+            <p className="text-xs text-amber-800 animate-pulse">Reading delivery address from label…</p>
+          )}
+        </div>
+      )}
+
+      {mode === 'build' && routeStops > 0 && (
         <button
           type="button"
           onClick={optimizeRoute}
           className="w-full flex items-center justify-center gap-2 border-2 border-slate-300 text-slate-800 font-bold py-3 rounded-xl"
         >
-          <ListOrdered className="w-5 h-5" /> Map & Optimize Route
+          <ListOrdered className="w-5 h-5" /> Sequence Stops (Optimize Route)
         </button>
       )}
 
@@ -258,7 +349,7 @@ export default function DriverScan() {
         <div className="bg-white border border-green-200 rounded-xl p-4 space-y-2">
           <div className="flex items-center gap-2 text-green-700 font-bold text-sm">
             <Plus className="w-4 h-4" />
-            {lastResult.alreadyOnRoute ? 'Stop already on route' : 'Stop added to route'}
+            {lastResult.alreadyOnRoute ? 'Stop already on route' : `Stop #${lastResult.stop.sequence} added`}
           </div>
           <div className="font-bold text-slate-900">{lastResult.stop.recipient_name}</div>
           <div className="text-xs text-slate-600 flex items-start gap-1">
@@ -304,7 +395,7 @@ export default function DriverScan() {
       )}
 
       <p className="text-[11px] text-slate-400 leading-relaxed">
-        Manifest QR must include real customer name and address. Tracking-only labels work when dispatch pre-loads the stop. Map data from OpenStreetMap contributors.
+        Build Route: scan barcode → if tracking-only, photograph the full label → tap Sequence Stops to optimize delivery order. Label reading uses FleetCo AI when GEMINI_API_KEY is configured.
       </p>
     </div>
   );

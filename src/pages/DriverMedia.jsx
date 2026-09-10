@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { canManageCustomerTeam } from '@/lib/customerRoles';
 import LiveStreamViewer from '@/components/live/LiveStreamViewer';
-import RecordingSessionCard from '@/components/live/RecordingSessionCard';
+import ChunkedLiveViewer from '@/components/live/ChunkedLiveViewer';
 import LiveKitSetupCard from '@/components/live/LiveKitSetupCard';
 import { daysRemainingLabel, downloadLiveRecording } from '@/lib/liveVideo';
 
@@ -161,7 +161,7 @@ export default function DriverMedia() {
           <Video className="w-7 h-7 text-amber-500" /> Driver Media
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Road dashcam — drivers record from the app; review saved video in the library (15-day retention). Connect LiveKit below for live office viewing.
+          Road dashcam — live office viewing works out of the box (~3–5 sec delay). Saved video stays in the library for 15 days. LiveKit below is optional for lower latency.
         </p>
       </div>
 
@@ -225,7 +225,7 @@ export default function DriverMedia() {
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
                   Drivers can tap <strong>Start Recording</strong> anytime — or you can request them to start from here.
-                  {!livekitConfigured && ' Live office viewing requires LiveKit; saved video always works.'}
+                  {!livekitConfigured && ' Live office viewing works now without LiveKit (~3–5 sec delay).'}
                 </p>
               </div>
               <div className="divide-y divide-slate-100 rounded-lg border border-slate-100">
@@ -302,13 +302,13 @@ export default function DriverMedia() {
           ) : (
             liveVideoSessions.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {liveVideoSessions.map((session) => (
-                  session.stream_mode === 'livekit' && livekitConfigured ? (
-                    <LiveStreamViewer key={session.id} session={session} />
-                  ) : (
-                    <RecordingSessionCard key={session.id} session={session} />
-                  )
-                ))}
+                {liveVideoSessions.map((session) => {
+                  const mode = session.stream_mode === 'local' ? 'chunked' : session.stream_mode;
+                  if (mode === 'livekit' && livekitConfigured) {
+                    return <LiveStreamViewer key={session.id} session={session} />;
+                  }
+                  return <ChunkedLiveViewer key={session.id} session={session} />;
+                })}
               </div>
             )
           )}

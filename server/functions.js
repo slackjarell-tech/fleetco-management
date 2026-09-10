@@ -127,6 +127,10 @@ export async function invokeFunction(name, body, user, ctx = null) {
       const { scanDeliveryPackage } = await import('./deliveryRouting.js');
       return scanDeliveryPackage(body, user);
     }
+    case 'parseDeliveryLabel': {
+      const { parseDeliveryLabelHandler } = await import('./deliveryRouting.js');
+      return parseDeliveryLabelHandler(body, user);
+    }
     case 'optimizeDeliveryRoute': {
       const { optimizeDeliveryRoute } = await import('./deliveryRouting.js');
       return optimizeDeliveryRoute(body, user);
@@ -200,6 +204,14 @@ export async function invokeFunction(name, body, user, ctx = null) {
     case 'listDriversForLiveVideo': {
       const { listDriversForLiveVideo } = await import('./liveStream.js');
       return listDriversForLiveVideo(body, user, ctx);
+    }
+    case 'registerLiveVideoChunk': {
+      const { registerLiveVideoChunk } = await import('./liveStream.js');
+      return registerLiveVideoChunk(body, user);
+    }
+    case 'getLiveVideoPreview': {
+      const { getLiveVideoPreview } = await import('./liveStream.js');
+      return getLiveVideoPreview(body, user, ctx);
     }
     case 'getLiveKitSetupStatus': {
       const { getLiveKitSetupStatus } = await import('./liveKitSettings.js');

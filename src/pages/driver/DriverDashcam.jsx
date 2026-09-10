@@ -4,7 +4,7 @@ import { api } from '@/api/apiClient';
 import { useDriverDevice } from '@/components/mobile/DriverDeviceProvider';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import { useLiveVideoPublisher } from '@/hooks/useLiveVideoPublisher';
-import { useLocalVideoRecorder } from '@/hooks/useLocalVideoRecorder';
+import { useChunkedLiveRecorder } from '@/hooks/useChunkedLiveRecorder';
 import { uploadLiveRecording } from '@/lib/liveVideo';
 import {
   Video, ChevronDown, ChevronUp, Battery, MapPin, AlertTriangle,
@@ -25,7 +25,7 @@ export default function DriverDashcam() {
   const { position, dualCameraEnabled, refreshPosition } = useDriverDevice();
   const roadPreviewRef = useRef(null);
   const [session, setSession] = useState(null);
-  const [streamMode, setStreamMode] = useState('local');
+  const [streamMode, setStreamMode] = useState('chunked');
   const [recording, setRecording] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -35,7 +35,7 @@ export default function DriverDashcam() {
   const [officeRequest, setOfficeRequest] = useState(null);
   const [startingLive, setStartingLive] = useState(false);
   const livePublisher = useLiveVideoPublisher();
-  const localRecorder = useLocalVideoRecorder();
+  const chunkedRecorder = useChunkedLiveRecorder();
 
   const livekitReady = !!user?.livekit_configured;
   const canRecord = dualCameraEnabled;
@@ -84,7 +84,7 @@ export default function DriverDashcam() {
     setStartingLive(true);
     try {
       const result = await api.functions.invoke('startLiveVideoStream', sessionId ? { sessionId } : {});
-      const mode = result.streamMode || result.session?.stream_mode || (result.livekitUrl ? 'livekit' : 'local');
+      const mode = result.streamMode || result.session?.stream_mode || (result.livekitUrl ? 'livekit' : 'chunked');
       setSession(result.session);
       setStreamMode(mode);
       setRecording(true);
@@ -99,7 +99,10 @@ export default function DriverDashcam() {
           roadVideoEl: roadPreviewRef.current,
         });
       } else {
-        await localRecorder.start({ roadVideoEl: roadPreviewRef.current });
+        await chunkedRecorder.start({
+          roadVideoEl: roadPreviewRef.current,
+          sessionId: result.session.id,
+        });
       }
     } catch (err) {
       setError(err?.data?.error || err?.message || 'Could not start recording');
@@ -117,7 +120,7 @@ export default function DriverDashcam() {
         : null;
       const { roadBlob } = streamMode === 'livekit'
         ? await livePublisher.stop()
-        : await localRecorder.stop();
+        : await chunkedRecorder.stop();
       await api.functions.invoke('stopLiveVideoStream', { sessionId: session.id });
 
       let lat = null;
@@ -190,7 +193,7 @@ export default function DriverDashcam() {
 
       {canRecord && !livekitReady && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-900">
-          Road recording works now — no extra setup. Live office viewing can be added later with LiveKit.
+          Live office viewing works now — fleet managers watch in Driver Media with a few seconds delay. No LiveKit required.
         </div>
       )}
 
@@ -268,7 +271,7 @@ export default function DriverDashcam() {
               <div className="text-xs text-red-100">
                 {streamMode === 'livekit'
                   ? 'Fleet office may be watching live · auto-saved when you stop'
-                  : 'Video saves to fleet library when you stop'}
+                  : 'Fleet office can watch live · full video saves when you stop'}
               </div>
             </div>
           </div>

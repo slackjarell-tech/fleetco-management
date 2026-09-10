@@ -107,17 +107,26 @@ export async function getProductionReadiness({ verifyAi = false } = {}) {
       detail: `On-device WebM upload · ${process.env.LIVE_STREAM_RETENTION_DAYS || 15}-day retention · no third-party service required`,
     },
     {
-      id: 'livekit',
-      label: 'Live office viewing (LiveKit, optional)',
-      live: isLiveKitConfigured(),
+      id: 'live_office_viewing',
+      label: 'Live office viewing (dashcam)',
+      live: true,
       detail: isLiveKitConfigured()
-        ? `WebRTC live feeds · source: ${getLiveKitConfigSource() || 'unknown'}`
-        : 'Optional — paste keys in Driver Media (executive) or set LIVEKIT_* env vars on Render',
+        ? `LiveKit WebRTC (optional) · source: ${getLiveKitConfigSource() || 'unknown'}`
+        : 'FleetCo chunked live (~3–5s delay) — works without LiveKit',
+    },
+    {
+      id: 'livekit',
+      label: 'LiveKit low-latency upgrade (optional)',
+      live: true,
+      optional: true,
+      detail: isLiveKitConfigured()
+        ? `Configured · source: ${getLiveKitConfigSource() || 'unknown'}`
+        : 'Not configured — chunked live already works; add keys in Driver Media for sub-second WebRTC',
     },
   ];
 
   const liveCount = checks.filter((c) => c.live).length;
-  const pending = checks.filter((c) => !c.live);
+  const pending = checks.filter((c) => !c.live && !c.optional);
 
   return {
     ok: pending.length === 0,

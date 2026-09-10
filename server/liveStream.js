@@ -13,10 +13,14 @@ import {
   isLiveKitConfigured,
   getLiveKitConfigSource,
 } from './liveKitSettings.js';
+import fs from 'fs';
+import path from 'path';
 import {
   getLiveRecordingsDir,
+  getLiveChunksDir,
   ensureUploadDirs,
   deleteStoredFile,
+  deleteLocalDirectory,
   localPathFromUrl,
 } from './mediaStorage.js';
 import {
@@ -41,9 +45,28 @@ import {
 
 ensureUploadDirs();
 export const LIVE_RECORDINGS_DIR = getLiveRecordingsDir();
+export const LIVE_CHUNKS_DIR = getLiveChunksDir();
 
 export const RETENTION_DAYS = Math.max(1, Number(process.env.LIVE_STREAM_RETENTION_DAYS) || 15);
 const REQUEST_TTL_MS = 30 * 60 * 1000;
+const CHUNK_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+function sessionChunksDir(sessionId) {
+  const safe = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safe) return null;
+  return path.join(LIVE_CHUNKS_DIR, safe);
+}
+
+function chunkFilePath(sessionId, seq) {
+  const dir = sessionChunksDir(sessionId);
+  if (!dir) return null;
+  return path.join(dir, `chunk-${String(seq).padStart(6, '0')}.webm`);
+}
+
+export function deleteSessionLiveChunks(sessionId) {
+  const dir = sessionChunksDir(sessionId);
+  if (dir) deleteLocalDirectory(dir);
+}
 
 function assertDriverCustomerAccess(driver, user, ctx) {
   const customerId = ctx?.customerId || user?.customer_id;
@@ -73,9 +96,14 @@ function liveKitConfig() {
 
 export { isLiveKitConfigured };
 
-/** Local on-device recording works without LiveKit; LiveKit enables live office viewing. */
+/** Chunked upload to FleetCo server — live office view without LiveKit. LiveKit is optional. */
 export function getStreamMode() {
-  return isLiveKitConfigured() ? 'livekit' : 'local';
+  return isLiveKitConfigured() ? 'livekit' : 'chunked';
+}
+
+function normalizeStreamMode(mode) {
+  if (mode === 'local') return 'chunked';
+  return mode || getStreamMode();
 }
 
 function roomName(sessionId) {
@@ -190,14 +218,14 @@ export async function startLiveVideoStream(body, user) {
     session = { ...session, stream_mode: streamMode };
   }
 
-  if (streamMode === 'local') {
+  if (streamMode === 'chunked' || streamMode === 'local') {
     return {
       success: true,
-      session: { ...session, status: 'live', stream_mode: 'local' },
-      streamMode: 'local',
+      session: { ...session, status: 'live', stream_mode: 'chunked' },
+      streamMode: 'chunked',
       message: body.sessionId
-        ? 'Recording started — video saves when you stop.'
-        : 'Recording started — video auto-saves for 15 days when you stop. Fleet managers review in Driver Media.',
+        ? 'Live dashcam started — fleet office can watch now. Full video saves when you stop.'
+        : 'Live dashcam started — fleet managers can watch in Driver Media (~3–5 sec delay). Full video saves for 15 days when you stop.',
     };
   }
 
@@ -370,6 +398,9 @@ export async function stopLiveVideoStream(body, user) {
     ended_at: ts,
   });
 
+  // Chunks are temporary — full recording upload follows; purge after a grace period.
+  setTimeout(() => deleteSessionLiveChunks(sessionId), 30 * 60 * 1000);
+
   return {
     success: true,
     session: updated,
@@ -388,8 +419,9 @@ export async function getLiveVideoViewerToken(body, user, ctx) {
   assertRecordingAccess({ customer_id: session.customer_id }, user, ctx);
 
   if (session.status !== 'live') throw new Error('This session is no longer live');
-  if (session.stream_mode === 'local' || !isLiveKitConfigured()) {
-    throw new Error('Driver is recording on-device — live viewing is not available. Video will appear in the library when they stop.');
+  const mode = normalizeStreamMode(session.stream_mode);
+  if (mode === 'chunked' || !isLiveKitConfigured()) {
+    throw new Error('This session uses FleetCo chunked live view — use the live preview player instead of LiveKit.');
   }
 
   const token = await buildToken({
@@ -429,7 +461,7 @@ export async function listActiveLiveVideoSessions(_body, user, ctx) {
     .filter((s) => s.status === 'live')
     .map((s) => ({
       ...s,
-      stream_mode: s.stream_mode || (isLiveKitConfigured() ? 'livekit' : 'local'),
+      stream_mode: normalizeStreamMode(s.stream_mode || getStreamMode()),
     }));
 
   const cfg = liveKitConfig();
@@ -438,10 +470,135 @@ export async function listActiveLiveVideoSessions(_body, user, ctx) {
     requestedSessions,
     livekitConfigured: !!cfg,
     livekitSource: getLiveKitConfigSource(),
-    localRecordingEnabled: true,
+    chunkedLiveEnabled: true,
     livekitUrl: cfg?.url || null,
     canStart: canStartLiveVideoForDriver(user),
   };
+}
+
+export function registerLiveVideoChunk(body, user) {
+  assertDriver(user);
+
+  const { sessionId, seq, fileUrl, fileSizeBytes } = body;
+  if (!sessionId || seq == null || !fileUrl) {
+    throw new Error('sessionId, seq, and fileUrl are required');
+  }
+
+  const session = getEntity('LiveStreamSession', sessionId);
+  if (!session) throw new Error('Session not found');
+  if (session.driver_id !== user.id) throw new Error('Not your session');
+  if (session.status !== 'live') throw new Error('Session is not live');
+
+  const chunkSeq = Number(seq);
+  const ts = nowIso();
+  updateEntity('LiveStreamSession', sessionId, {
+    latest_chunk_url: fileUrl,
+    latest_chunk_seq: chunkSeq,
+    latest_chunk_at: ts,
+    stream_mode: normalizeStreamMode(session.stream_mode),
+  });
+
+  return {
+    success: true,
+    seq: chunkSeq,
+    latest_chunk_at: ts,
+    file_size: fileSizeBytes ? Number(fileSizeBytes) : null,
+  };
+}
+
+export function getLiveVideoPreview(body, user, ctx) {
+  if (!canViewLiveVideo(user)) throw new Error('Not authorized to view live video');
+
+  const { sessionId, afterSeq = -1 } = body;
+  if (!sessionId) throw new Error('sessionId is required');
+
+  const session = getEntity('LiveStreamSession', sessionId);
+  if (!session) throw new Error('Session not found');
+  assertRecordingAccess({ customer_id: session.customer_id }, user, ctx);
+
+  if (session.status !== 'live') {
+    return {
+      live: false,
+      session,
+      chunks: [],
+      latestSeq: session.latest_chunk_seq ?? -1,
+    };
+  }
+
+  const mode = normalizeStreamMode(session.stream_mode);
+  const dir = sessionChunksDir(sessionId);
+  const chunks = [];
+  const startSeq = Math.max(0, Number(afterSeq) + 1);
+  const latestSeq = session.latest_chunk_seq ?? -1;
+
+  if (dir && fs.existsSync(dir)) {
+    for (let s = startSeq; s <= latestSeq; s += 1) {
+      const fp = chunkFilePath(sessionId, s);
+      if (fp && fs.existsSync(fp)) {
+        chunks.push({
+          seq: s,
+          url: `/uploads/live-chunks/${path.basename(dir)}/chunk-${String(s).padStart(6, '0')}.webm`,
+          size: fs.statSync(fp).size,
+        });
+      }
+    }
+  }
+
+  return {
+    live: true,
+    session: {
+      ...session,
+      stream_mode: mode,
+    },
+    chunks,
+    latestSeq,
+    latestChunkAt: session.latest_chunk_at || null,
+    previewDelaySec: 3,
+  };
+}
+
+export function getLiveVideoChunkPath(sessionId, seq, user, ctx) {
+  const session = getEntity('LiveStreamSession', sessionId);
+  if (!session) throw new Error('Session not found');
+  assertRecordingAccess({ customer_id: session.customer_id }, user, ctx);
+
+  const chunkSeq = Number(seq);
+  if (!Number.isFinite(chunkSeq) || chunkSeq < 0) throw new Error('Invalid chunk sequence');
+
+  const fp = chunkFilePath(sessionId, chunkSeq);
+  if (!fp || !fs.existsSync(fp)) throw new Error('Chunk not found');
+
+  return { filePath: fp, session };
+}
+
+export async function purgeStaleLiveChunks() {
+  const cutoff = Date.now() - CHUNK_RETENTION_MS;
+  let removed = 0;
+
+  if (!fs.existsSync(LIVE_CHUNKS_DIR)) return { removed };
+
+  for (const name of fs.readdirSync(LIVE_CHUNKS_DIR)) {
+    const dir = path.join(LIVE_CHUNKS_DIR, name);
+    if (!fs.statSync(dir).isDirectory()) continue;
+
+    const session = listEntities('LiveStreamSession').find((s) => s.id === name);
+    const endedAt = session?.ended_at ? new Date(session.ended_at).getTime() : 0;
+    const isLive = session?.status === 'live';
+    if (isLive) continue;
+    if (session && endedAt && endedAt > cutoff) continue;
+    if (!session) {
+      const mtime = fs.statSync(dir).mtimeMs;
+      if (mtime > cutoff) continue;
+    }
+
+    deleteLocalDirectory(dir);
+    removed += 1;
+  }
+
+  if (removed > 0) {
+    console.log(`[live-stream] Purged ${removed} stale live-chunk folder(s)`);
+  }
+  return { removed };
 }
 
 export function registerLiveVideoRecording(body, user) {
@@ -557,10 +714,16 @@ export function startLiveStreamRetentionScheduler() {
   purgeExpiredLiveRecordings().catch((err) => {
     console.warn('[live-stream] initial retention purge failed:', err.message);
   });
+  purgeStaleLiveChunks().catch((err) => {
+    console.warn('[live-stream] initial chunk purge failed:', err.message);
+  });
   const intervalMs = 6 * 60 * 60 * 1000;
   setInterval(() => {
     purgeExpiredLiveRecordings().catch((err) => {
       console.warn('[live-stream] retention purge failed:', err.message);
+    });
+    purgeStaleLiveChunks().catch((err) => {
+      console.warn('[live-stream] chunk purge failed:', err.message);
     });
   }, intervalMs);
   console.log(`[live-stream] Retention scheduler started (${RETENTION_DAYS}-day auto-delete)`);

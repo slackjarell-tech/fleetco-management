@@ -1,6 +1,31 @@
 import { getToken } from '@/api/apiClient';
 import { apiUrl } from '@/lib/nativeBridge';
 
+/** Upload a live preview segment while recording (FleetCo chunked mode — no LiveKit). */
+export async function uploadLiveChunk(blob, { sessionId, seq } = {}) {
+  const form = new FormData();
+  form.append('file', blob, `chunk-${String(seq).padStart(6, '0')}.webm`);
+  form.append('sessionId', sessionId);
+  form.append('seq', String(seq));
+
+  const headers = {};
+  const token = getToken?.() || localStorage.getItem('fleet_pulse_access_token');
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(apiUrl('/live-recordings/chunk'), {
+    method: 'POST',
+    headers,
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Chunk upload failed');
+  return data;
+}
+
+export function liveChunkUrl(sessionId, seq) {
+  return apiUrl(`/live-recordings/chunk/${sessionId}/${seq}`);
+}
+
 /** Upload WebM recording after live stream ends. */
 export async function uploadLiveRecording(blob, { sessionId, track = 'road' } = {}) {
   const form = new FormData();
