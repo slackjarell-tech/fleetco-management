@@ -9,6 +9,7 @@ import {
 import { isDriverCapableUser, canManageCustomerTeam } from './roles.js';
 import {
   parseDeliveryBarcode,
+  parseLabelText,
   hasDeliverableAddress,
   mergeParsedDelivery,
 } from './barcodeParsers.js';
@@ -117,19 +118,17 @@ export function parseDeliveryBarcodeHandler(body, user) {
   };
 }
 
-export async function parseDeliveryLabelHandler(body, user) {
+export function parseDeliveryLabelHandler(body, user) {
   assertDriver(user);
-  const { imageUrl, barcode } = body;
-  if (!imageUrl) throw new Error('imageUrl is required');
+  const { labelText, barcode } = body;
+  if (!labelText) throw new Error('labelText is required');
 
-  const { parseShippingLabelImage, isLabelVisionConfigured } = await import('./labelVision.js');
-  if (!isLabelVisionConfigured()) {
-    throw new Error('Label photo reading requires GEMINI_API_KEY on the server.');
+  let parsed = parseLabelText(labelText);
+  if (!parsed) throw new Error('Could not find Ship To address in label text');
+
+  if (barcode) {
+    parsed = mergeParsedDelivery(parsed, parseDeliveryBarcode(barcode)) || parsed;
   }
-
-  const fromLabel = await parseShippingLabelImage(imageUrl, { barcodeHint: barcode });
-  const fromBarcode = barcode ? parseDeliveryBarcode(barcode) : null;
-  const parsed = mergeParsedDelivery(fromLabel, fromBarcode) || fromLabel;
 
   if (!parsed.recipient_name && parsed.address) {
     parsed.recipient_name = 'Recipient';
@@ -142,7 +141,6 @@ export async function parseDeliveryLabelHandler(body, user) {
     parsed,
     matchedStop: match.stop,
     matchType: match.matchType,
-    labelImageUrl: imageUrl,
     deliverySettings: getCustomerDeliverySettings(user.customer_id),
   };
 }

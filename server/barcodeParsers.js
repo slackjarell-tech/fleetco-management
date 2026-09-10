@@ -176,6 +176,100 @@ export function hasDeliverableAddress(parsed) {
   return !!(parsed?.address && parsed?.city && (parsed?.recipient_name || parsed?.state || parsed?.zip));
 }
 
+function normalizeOcrText(text) {
+  return String(text || '')
+    .replace(/\r/g, '\n')
+    .replace(/SHIP\s*T[0O]/gi, 'SHIP TO')
+    .replace(/DELIVER\s*T[0O]/gi, 'DELIVER TO')
+    .replace(/SEND\s*T[0O]/gi, 'SEND TO');
+}
+
+function tryCszLine(line) {
+  const attempts = [line, line.replace(/O/g, '0'), line.replace(/I/g, '1')];
+  const cszRe = /^(.+?)[,\s]+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i;
+  for (const attempt of attempts) {
+    const m = attempt.match(cszRe);
+    if (m) {
+      return {
+        city: clean(m[1]),
+        state: clean(m[2]).toUpperCase(),
+        zip: clean(m[3]),
+      };
+    }
+  }
+  return null;
+}
+
+/** Parse OCR or pasted label text into delivery fields (no AI). */
+export function parseLabelText(rawText) {
+  const normalized = normalizeOcrText(rawText);
+  const multiline = tryMultiLineLabelText(normalized);
+  if (multiline?.address && multiline?.city) {
+    return { ...multiline, barcode_format: 'label_ocr' };
+  }
+
+  const lines = normalized.split(/\n+/).map(clean).filter(Boolean);
+  if (lines.length < 2) return null;
+
+  const headerRe = /^(ship\s*to|deliver\s*to|send\s*to|consignee|recipient|to):?$/i;
+  const skipRe = /^(from|return|sender|shipper|billing|sold\s*to):?$/i;
+  const stopRe = /^(return|from|sender|shipper|billing|tracking|barcode|ups|usps|fedex|amazon)/i;
+
+  let startIdx = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (headerRe.test(lines[i])) {
+      startIdx = i + 1;
+      break;
+    }
+  }
+
+  let cszIdx = -1;
+  let csz = null;
+  for (let i = startIdx; i < lines.length; i += 1) {
+    if (stopRe.test(lines[i])) break;
+    const hit = tryCszLine(lines[i].toUpperCase());
+    if (hit) {
+      cszIdx = i;
+      csz = hit;
+    }
+  }
+
+  if (cszIdx < 1 || !csz) return null;
+
+  const block = lines.slice(startIdx, cszIdx).filter((l) => !skipRe.test(l) && l.length > 1);
+  if (!block.length) return null;
+
+  let recipient_name = '';
+  let address = '';
+  if (block.length >= 2) {
+    recipient_name = block[0];
+    address = block.slice(1).join(', ');
+  } else {
+    recipient_name = 'Recipient';
+    address = block[0];
+  }
+
+  let tracking_number = '';
+  for (const line of lines) {
+    const t = detectTrackingFormat(line);
+    if (t?.tracking_number) {
+      tracking_number = t.tracking_number;
+      break;
+    }
+  }
+
+  return {
+    tracking_number,
+    recipient_name,
+    address,
+    city: csz.city,
+    state: csz.state,
+    zip: csz.zip,
+    barcode_format: 'label_ocr',
+    raw: rawText,
+  };
+}
+
 export function mergeParsedDelivery(primary, secondary) {
   if (!primary && !secondary) return null;
   const a = primary || {};

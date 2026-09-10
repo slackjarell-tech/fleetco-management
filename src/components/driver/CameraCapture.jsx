@@ -3,7 +3,12 @@ import { Camera, X, RefreshCw } from 'lucide-react';
 import { api } from '@/api/apiClient';
 import { takePhoto } from '@/lib/nativeBridge';
 
-export default function CameraCapture({ onCapture, buttonLabel = 'Take Photo', className = '' }) {
+export default function CameraCapture({
+  onCapture,
+  onPhotoTaken,
+  buttonLabel = 'Take Photo',
+  className = '',
+}) {
   const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
 
@@ -12,6 +17,7 @@ export default function CameraCapture({ onCapture, buttonLabel = 'Take Photo', c
     try {
       const { file, previewUrl } = await takePhoto();
       setPreview(previewUrl);
+      onPhotoTaken?.(file, previewUrl);
       const res = await api.integrations.Core.UploadFile({ file });
       onCapture?.(res.file_url, file);
     } catch (err) {

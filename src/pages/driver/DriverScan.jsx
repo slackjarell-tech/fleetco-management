@@ -26,6 +26,8 @@ export default function DriverScan() {
   const [maxStops, setMaxStops] = useState(user?.max_stops_per_route || 200);
   const [pendingBarcode, setPendingBarcode] = useState('');
   const [labelParsing, setLabelParsing] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const ocrPromiseRef = useRef(null);
   const scannerRef = useRef(null);
   const scanAreaId = 'fleetco-barcode-reader';
 
@@ -69,19 +71,36 @@ export default function DriverScan() {
     return result;
   };
 
-  const handleLabelPhoto = async (imageUrl) => {
+  const startLabelOcr = (file) => {
+    setOcrProgress(0);
+    ocrPromiseRef.current = (async () => {
+      const { readLabelFromPhoto } = await import('@/lib/labelOcr');
+      return readLabelFromPhoto(file, {
+        barcode: pendingBarcode || undefined,
+        onProgress: (p) => setOcrProgress(Math.round(p * 100)),
+      });
+    })();
+  };
+
+  const handleLabelPhoto = async (imageUrl, file) => {
     setError('');
     setLabelParsing(true);
     try {
       const { lat, lng } = await getGps();
-      const labelResult = await api.functions.invoke('parseDeliveryLabel', {
-        imageUrl,
-        barcode: pendingBarcode || undefined,
-      });
+      const ocrResult = ocrPromiseRef.current
+        ? await ocrPromiseRef.current
+        : await (async () => {
+          const { readLabelFromPhoto } = await import('@/lib/labelOcr');
+          return readLabelFromPhoto(file || imageUrl, {
+            barcode: pendingBarcode || undefined,
+            onProgress: (p) => setOcrProgress(Math.round(p * 100)),
+          });
+        })();
 
-      const parsed = labelResult.parsed;
-      if (!hasDeliverableAddress(parsed)) {
-        throw new Error('Could not read delivery address — include the full Ship To block in the photo.');
+      ocrPromiseRef.current = null;
+      const parsed = ocrResult.parsed;
+      if (!parsed || !hasDeliverableAddress(parsed)) {
+        throw new Error('Could not read delivery address — frame the full Ship To block and try again.');
       }
 
       await addStopToRoute({
@@ -93,10 +112,12 @@ export default function DriverScan() {
       });
 
       setPendingBarcode('');
+      setOcrProgress(0);
     } catch (err) {
       setError(err?.data?.error || err?.message || 'Label read failed');
     } finally {
       setLabelParsing(false);
+      ocrPromiseRef.current = null;
     }
   };
 
@@ -317,10 +338,13 @@ export default function DriverScan() {
           </div>
           <CameraCapture
             buttonLabel={labelParsing ? 'Reading label…' : 'Photograph Whole Label'}
-            onCapture={(url) => handleLabelPhoto(url)}
+            onPhotoTaken={(file) => startLabelOcr(file)}
+            onCapture={(url, file) => handleLabelPhoto(url, file)}
           />
           {labelParsing && (
-            <p className="text-xs text-amber-800 animate-pulse">Reading delivery address from label…</p>
+            <p className="text-xs text-amber-800 animate-pulse">
+              Reading label on your phone{ocrProgress > 0 ? `… ${ocrProgress}%` : '…'}
+            </p>
           )}
         </div>
       )}
@@ -395,7 +419,7 @@ export default function DriverScan() {
       )}
 
       <p className="text-[11px] text-slate-400 leading-relaxed">
-        Build Route: scan barcode → if tracking-only, photograph the full label → tap Sequence Stops to optimize delivery order. Label reading uses FleetCo AI when GEMINI_API_KEY is configured.
+        Build Route: scan barcode → if tracking-only, photograph the full label → tap Sequence Stops to optimize delivery order. Label reading runs on your phone — no API keys required.
       </p>
     </div>
   );
