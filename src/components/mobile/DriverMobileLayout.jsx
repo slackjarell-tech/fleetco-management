@@ -24,6 +24,7 @@ const TABS = [
 ];
 
 const MORE_LINKS = [
+  { path: '/driver/videos', label: 'Video Reviews', icon: Video },
   { path: '/driver/loads', label: 'My Loads', icon: Package },
   { path: '/driver/navigation', label: 'Navigation', icon: Navigation },
   { path: '/driver/messages', label: 'Messages', icon: MessageCircle },

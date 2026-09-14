@@ -1295,30 +1295,47 @@ app.get('/api/live-recordings/preview/:sessionId/:seq', requireAuth, async (req,
   }
 });
 
+async function serveLiveRecordingFile(req, res, { attachment = false } = {}) {
+  const { getLiveRecordingUrl, assertRecordingStreamAccess } = await import('./liveStream.js');
+  const recording = getEntity('LiveStreamRecording', req.params.id);
+  if (!recording) return res.status(404).json({ error: 'Recording not found' });
+  const ctx = getEntityContext(req);
+  try {
+    assertRecordingStreamAccess(recording, req.user, ctx);
+  } catch (err) {
+    return res.status(err.status || 403).json({ error: err.message || 'Access denied' });
+  }
+  const which = req.query.track === 'cabin' ? 'cabin' : 'road';
+  const fileUrl = getLiveRecordingUrl(recording, which);
+  if (!fileUrl) return res.status(404).json({ error: 'Video file not found or expired' });
+  const stream = await getReadableStream(fileUrl);
+  if (!stream) return res.status(404).json({ error: 'Video file not found or expired' });
+  const ext = path.extname(fileUrl) || '.webm';
+  const name = `FleetCo-${recording.driver_name || 'driver'}-${recording.started_at?.slice(0, 10) || 'recording'}${ext}`;
+  if (attachment) {
+    res.setHeader('Content-Disposition', `attachment; filename="${name.replace(/[^\w.-]+/g, '_')}"`);
+  } else {
+    res.setHeader('Content-Disposition', 'inline');
+  }
+  res.type(ext);
+  return stream.pipe(res);
+}
+
+app.get('/api/live-recordings/:id/stream', requireAuth, async (req, res) => {
+  try {
+    await serveLiveRecordingFile(req, res, { attachment: false });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 app.get('/api/live-recordings/:id/download', requireAuth, async (req, res) => {
   try {
-    const { getLiveRecordingUrl, canDownloadLiveVideo } = await import('./liveStream.js');
+    const { canDownloadLiveVideo } = await import('./liveStream.js');
     if (!canDownloadLiveVideo(req.user)) {
       return res.status(403).json({ error: 'Only fleet managers can download recordings' });
     }
-    const recording = getEntity('LiveStreamRecording', req.params.id);
-    if (!recording) return res.status(404).json({ error: 'Recording not found' });
-    const ctx = getEntityContext(req);
-    if (ctx.customerId && recording.customer_id !== ctx.customerId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    if (req.user.customer_id && recording.customer_id !== req.user.customer_id) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    const which = req.query.track === 'cabin' ? 'cabin' : 'road';
-    const fileUrl = getLiveRecordingUrl(recording, which);
-    if (!fileUrl) return res.status(404).json({ error: 'Video file not found or expired' });
-    const stream = await getReadableStream(fileUrl);
-    if (!stream) return res.status(404).json({ error: 'Video file not found or expired' });
-    const name = `FleetCo-${recording.driver_name || 'driver'}-${recording.started_at?.slice(0, 10) || 'recording'}.webm`;
-    res.setHeader('Content-Disposition', `attachment; filename="${name.replace(/[^\w.-]+/g, '_')}"`);
-    res.type('.webm');
-    stream.pipe(res);
+    await serveLiveRecordingFile(req, res, { attachment: true });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }

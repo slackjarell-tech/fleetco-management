@@ -2,11 +2,12 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { api } from '@/api/apiClient';
 import {
   Video, User, Clock, Eye, ToggleLeft, ToggleRight, Radio,
-  Download, Archive, HardDrive, Play, X,
+  Download, Archive, HardDrive, Play, X, FileText,
 } from 'lucide-react';
 import { canManageCustomerTeam } from '@/lib/customerRoles';
 import LiveSessionPanel from '@/components/live/LiveSessionPanel';
 import LiveKitSetupCard from '@/components/live/LiveKitSetupCard';
+import RecordingReviewModal from '@/components/live/RecordingReviewModal';
 import { daysRemainingLabel, downloadLiveRecording } from '@/lib/liveVideo';
 
 function canManageLiveKit(role) {
@@ -32,6 +33,7 @@ export default function DriverMedia() {
   const [recordingsLoading, setRecordingsLoading] = useState(false);
   const [archivingId, setArchivingId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
+  const [reviewRecording, setReviewRecording] = useState(null);
 
   const load = async () => {
     const u = await api.auth.me();
@@ -364,12 +366,23 @@ export default function DriverMedia() {
               {recordings.map((rec) => (
                 <div key={rec.id} className="px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <div className="font-bold text-slate-900 text-sm flex items-center flex-wrap gap-2">
                       <User className="w-4 h-4 text-slate-400" /> {rec.driver_name}
                       {rec.archived && (
                         <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">KEPT</span>
                       )}
+                      {rec.review_status === 'reviewed' && (
+                        <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">REVIEWED</span>
+                      )}
+                      {rec.shared_with_driver && (
+                        <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">SHARED</span>
+                      )}
                     </div>
+                    {rec.manager_notes && (
+                      <p className="text-xs text-slate-600 mt-1 line-clamp-2 flex items-start gap-1">
+                        <FileText className="w-3 h-3 mt-0.5 shrink-0" /> {rec.manager_notes}
+                      </p>
+                    )}
                     <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-3 gap-y-1">
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(rec.started_at).toLocaleString()}</span>
                       {rec.duration_sec != null && <span>{Math.round(rec.duration_sec / 60)} min</span>}
@@ -378,8 +391,16 @@ export default function DriverMedia() {
                       </span>
                     </div>
                   </div>
+                  <div className="flex flex-wrap gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setReviewRecording(rec)}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-950"
+                    >
+                      <Play className="w-3.5 h-3.5" /> Review
+                    </button>
                   {canDownloadRecordings && (
-                    <div className="flex flex-wrap gap-2 shrink-0">
+                    <>
                       <button
                         type="button"
                         disabled={!!downloadingId}
@@ -411,13 +432,27 @@ export default function DriverMedia() {
                           {archivingId === rec.id ? 'Saving…' : 'Keep'}
                         </button>
                       )}
-                    </div>
+                    </>
                   )}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )
+      )}
+
+      {reviewRecording && (
+        <RecordingReviewModal
+          recording={reviewRecording}
+          canDownload={canDownloadRecordings}
+          canShare={canDownloadRecordings}
+          onClose={() => setReviewRecording(null)}
+          onUpdated={(updated) => {
+            setRecordings((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+            setReviewRecording(updated);
+          }}
+        />
       )}
     </div>
   );

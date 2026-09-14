@@ -193,6 +193,26 @@ export async function invokeFunction(name, body, user, ctx = null) {
       const { archiveLiveVideoRecording } = await import('./liveStream.js');
       return archiveLiveVideoRecording(body, user, ctx);
     }
+    case 'getLiveVideoRecording': {
+      const { getLiveVideoRecording } = await import('./liveStream.js');
+      return getLiveVideoRecording(body, user, ctx);
+    }
+    case 'updateLiveVideoRecordingReview': {
+      const { updateLiveVideoRecordingReview } = await import('./liveStream.js');
+      return updateLiveVideoRecordingReview(body, user, ctx);
+    }
+    case 'shareLiveVideoRecordingWithDriver': {
+      const { shareLiveVideoRecordingWithDriver } = await import('./liveStream.js');
+      return shareLiveVideoRecordingWithDriver(body, user, ctx);
+    }
+    case 'unshareLiveVideoRecordingWithDriver': {
+      const { unshareLiveVideoRecordingWithDriver } = await import('./liveStream.js');
+      return unshareLiveVideoRecordingWithDriver(body, user, ctx);
+    }
+    case 'listDriverSharedRecordings': {
+      const { listDriverSharedRecordings } = await import('./liveStream.js');
+      return listDriverSharedRecordings(body, user);
+    }
     case 'requestLiveVideoForDriver': {
       const { requestLiveVideoForDriver } = await import('./liveStream.js');
       return requestLiveVideoForDriver(body, user, ctx);

@@ -88,6 +88,7 @@ import DriverMobileLayout from './components/mobile/DriverMobileLayout';
 import DriverMobileHome from './pages/driver/DriverMobileHome';
 import DriverScan from './pages/driver/DriverScan';
 import DriverDashcam from './pages/driver/DriverDashcam';
+import DriverSharedVideos from './pages/driver/DriverSharedVideos';
 import DriverFuelStations from './pages/driver/DriverFuelStations';
 import DriverFuelCards from './pages/driver/DriverFuelCards';
 import DriverWorkOrders from './pages/driver/DriverWorkOrders';
@@ -141,6 +142,7 @@ const AuthenticatedApp = () => {
           <Route path="route" element={<MyDeliveryRoute />} />
           <Route path="scan" element={<DriverScan />} />
           <Route path="dashcam" element={<DriverDashcam />} />
+          <Route path="videos" element={<DriverSharedVideos />} />
           <Route path="loads" element={<LoadBoard />} />
           <Route path="navigation" element={<Navigation />} />
           <Route path="messages" element={<Messages />} />

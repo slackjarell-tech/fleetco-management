@@ -226,6 +226,28 @@ function assertRecordingAccess(recording, user, ctx) {
   return true;
 }
 
+function assertDriverSharedRecordingAccess(recording, user) {
+  if (!recording) throw new Error('Recording not found');
+  if (!isDriverCapableUser(user)) {
+    const err = new Error('Access denied');
+    err.status = 403;
+    throw err;
+  }
+  if (recording.driver_id !== user.id || !recording.shared_with_driver) {
+    const err = new Error('Recording not shared with you');
+    err.status = 403;
+    throw err;
+  }
+  return true;
+}
+
+function assertRecordingStreamAccess(recording, user, ctx) {
+  if (isDriverCapableUser(user) && recording?.driver_id === user.id && recording.shared_with_driver) {
+    return true;
+  }
+  return assertRecordingAccess(recording, user, ctx);
+}
+
 async function finalizeLiveSessionStart(session, body, user, { resumed = false } = {}) {
   const streamMode = session.stream_mode || getStreamMode();
   if (!session.stream_mode) {
@@ -847,6 +869,13 @@ export function registerLiveVideoRecording(body, user) {
     archived: false,
     archived_at: '',
     archived_by: '',
+    manager_notes: '',
+    review_status: 'pending',
+    shared_with_driver: false,
+    shared_at: '',
+    shared_by: '',
+    shared_by_name: '',
+    share_message: '',
   });
 
   return { success: true, recording };
@@ -875,6 +904,100 @@ export function listLiveVideoRecordings(_body, user, ctx) {
     retentionDays: RETENTION_DAYS,
     canDownload: canDownloadLiveVideo(user),
   };
+}
+
+export function getLiveVideoRecording(body, user, ctx) {
+  const { recordingId } = body;
+  if (!recordingId) throw new Error('recordingId is required');
+
+  const recording = getEntity('LiveStreamRecording', recordingId);
+  if (isDriverCapableUser(user)) {
+    assertDriverSharedRecordingAccess(recording, user);
+  } else {
+    assertRecordingAccess(recording, user, ctx);
+  }
+
+  return { recording };
+}
+
+export function updateLiveVideoRecordingReview(body, user, ctx) {
+  if (!canViewLiveVideo(user)) throw new Error('Not authorized');
+
+  const { recordingId, managerNotes, reviewStatus } = body;
+  if (!recordingId) throw new Error('recordingId is required');
+
+  const recording = getEntity('LiveStreamRecording', recordingId);
+  assertRecordingAccess(recording, user, ctx);
+
+  const patch = {
+    manager_notes: typeof managerNotes === 'string' ? managerNotes : recording.manager_notes || '',
+    reviewed_at: nowIso(),
+    reviewed_by: user.id,
+    reviewed_by_name: user.full_name || user.email,
+  };
+  if (reviewStatus === 'reviewed' || reviewStatus === 'pending') {
+    patch.review_status = reviewStatus;
+  } else if (patch.manager_notes?.trim()) {
+    patch.review_status = 'reviewed';
+  }
+
+  const updated = updateEntity('LiveStreamRecording', recordingId, patch);
+  return { success: true, recording: updated };
+}
+
+export function shareLiveVideoRecordingWithDriver(body, user, ctx) {
+  if (!canDownloadLiveVideo(user)) {
+    throw new Error('Only fleet managers can share recordings with drivers');
+  }
+
+  const { recordingId, shareMessage = '' } = body;
+  if (!recordingId) throw new Error('recordingId is required');
+
+  const recording = getEntity('LiveStreamRecording', recordingId);
+  assertRecordingAccess(recording, user, ctx);
+
+  const updated = updateEntity('LiveStreamRecording', recordingId, {
+    shared_with_driver: true,
+    shared_at: nowIso(),
+    shared_by: user.id,
+    shared_by_name: user.full_name || user.email,
+    share_message: String(shareMessage || '').trim(),
+  });
+
+  return {
+    success: true,
+    recording: updated,
+    message: 'Recording shared — the driver can view it in FleetCo Driver under Video Reviews.',
+  };
+}
+
+export function unshareLiveVideoRecordingWithDriver(body, user, ctx) {
+  if (!canDownloadLiveVideo(user)) throw new Error('Not authorized');
+
+  const { recordingId } = body;
+  if (!recordingId) throw new Error('recordingId is required');
+
+  const recording = getEntity('LiveStreamRecording', recordingId);
+  assertRecordingAccess(recording, user, ctx);
+
+  const updated = updateEntity('LiveStreamRecording', recordingId, {
+    shared_with_driver: false,
+    shared_at: '',
+    shared_by: '',
+    shared_by_name: '',
+    share_message: '',
+  });
+
+  return { success: true, recording: updated };
+}
+
+export function listDriverSharedRecordings(_body, user) {
+  assertDriver(user);
+
+  const recordings = listEntities('LiveStreamRecording', '-shared_at', 100)
+    .filter((r) => r.driver_id === user.id && r.shared_with_driver);
+
+  return { recordings };
 }
 
 export function archiveLiveVideoRecording(body, user, ctx) {
@@ -938,6 +1061,8 @@ export function getLiveRecordingUrl(recording, which = 'road') {
   const url = which === 'cabin' ? recording.cabin_video_url : recording.video_url;
   return url || null;
 }
+
+export { assertRecordingStreamAccess };
 
 /** @deprecated Use getLiveRecordingUrl + getReadableStream */
 export function getLiveRecordingFilePath(recording, which = 'road') {

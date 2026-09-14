@@ -85,6 +85,26 @@ export function liveRecordingDownloadUrl(recordingId, track = 'road') {
   return apiUrl(`/live-recordings/${recordingId}/download${q}`);
 }
 
+export function liveRecordingStreamUrl(recordingId, track = 'road') {
+  const q = track === 'cabin' ? '?track=cabin' : '';
+  return apiUrl(`/live-recordings/${recordingId}/stream${q}`);
+}
+
+/** Load recording for in-browser playback (fleet review or driver shared view). */
+export async function loadLiveRecordingVideoUrl(recordingId, track = 'road') {
+  const headers = {};
+  const token = getToken?.() || localStorage.getItem('fleet_pulse_access_token');
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(liveRecordingStreamUrl(recordingId, track), { headers });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Could not load video');
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
 export function daysRemainingLabel(rec) {
   if (rec.archived) return 'Saved permanently';
   if (rec.days_remaining == null) return '';
