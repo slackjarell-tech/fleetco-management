@@ -99,14 +99,38 @@ async function openCameraStream(facingMode = 'environment') {
 
 async function waitForVideoFrame(videoEl, timeoutMs = 8000) {
   if (!videoEl) throw new Error('Camera preview not ready');
-  if (videoEl.videoWidth > 0) return;
+  if (videoEl.videoWidth > 0 && videoEl.readyState >= 2) return;
+
   await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Camera preview did not start — check permissions')), timeoutMs);
-    videoEl.onloadedmetadata = () => {
-      clearTimeout(timeout);
-      resolve();
+    const timeout = setTimeout(
+      () => reject(new Error('Camera preview did not start — check permissions')),
+      timeoutMs,
+    );
+    const done = () => {
+      if (videoEl.videoWidth > 0) {
+        clearTimeout(timeout);
+        videoEl.removeEventListener('loadedmetadata', done);
+        videoEl.removeEventListener('playing', done);
+        resolve();
+      }
     };
+    videoEl.addEventListener('loadedmetadata', done);
+    videoEl.addEventListener('playing', done);
+    done();
   });
+}
+
+/** Attach an existing MediaStream to a preview element (iOS-safe). */
+export async function attachStreamToVideo(videoEl, stream) {
+  if (!videoEl || !stream) throw new Error('Camera preview not ready');
+  videoEl.srcObject = stream;
+  videoEl.playsInline = true;
+  videoEl.muted = true;
+  videoEl.autoplay = true;
+  videoEl.setAttribute('playsinline', '');
+  videoEl.setAttribute('webkit-playsinline', 'true');
+  await videoEl.play().catch(() => {});
+  await waitForVideoFrame(videoEl);
 }
 
 /** Live camera stream — environment (road) or user (in-cabin / driver face) */
@@ -117,12 +141,7 @@ export async function startCameraStream(videoEl, facingMode = 'environment', { s
   if (!skipPermission) await requestCameraPermission();
   const stream = await openCameraStream(facingMode);
   if (videoEl) {
-    videoEl.srcObject = stream;
-    videoEl.playsInline = true;
-    videoEl.muted = true;
-    videoEl.autoplay = true;
-    await videoEl.play();
-    await waitForVideoFrame(videoEl);
+    await attachStreamToVideo(videoEl, stream);
   }
   return stream;
 }

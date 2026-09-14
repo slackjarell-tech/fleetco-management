@@ -1,5 +1,5 @@
 import { useRef, useCallback } from 'react';
-import { startCameraStream, stopCameraStream, captureFrameFromVideo } from '@/lib/nativeBridge';
+import { attachStreamToVideo, startCameraStream, stopCameraStream, captureFrameFromVideo } from '@/lib/nativeBridge';
 import { uploadLiveChunk, uploadLivePreviewFrame } from '@/lib/liveVideo';
 import { api } from '@/api/apiClient';
 
@@ -25,6 +25,7 @@ export function useChunkedLiveRecorder() {
   const uploadQueueRef = useRef(Promise.resolve());
   const previewTimerRef = useRef(null);
   const getTelemetryRef = useRef(null);
+  const ownsStreamRef = useRef(false);
 
   const enqueue = useCallback((task) => {
     uploadQueueRef.current = uploadQueueRef.current.then(task).catch((err) => {
@@ -71,25 +72,51 @@ export function useChunkedLiveRecorder() {
     });
   }, []);
 
-  const start = useCallback(async ({ roadVideoEl, sessionId, getTelemetry }) => {
+  const start = useCallback(async ({ roadVideoEl, sessionId, getTelemetry, existingStream = null }) => {
     if (!roadVideoEl) {
       throw new Error('Camera preview not ready — try again');
     }
+    if (recorderRef.current?.state === 'recording') {
+      return;
+    }
+
     sessionIdRef.current = sessionId;
     videoElRef.current = roadVideoEl;
     getTelemetryRef.current = getTelemetry;
     seqRef.current = 0;
     frameSeqRef.current = 0;
 
-    const roadStream = await startCameraStream(roadVideoEl, 'environment');
+    let roadStream = existingStream;
+    const trackLive = roadStream?.getVideoTracks?.().some((t) => t.readyState === 'live');
+    if (trackLive) {
+      ownsStreamRef.current = false;
+      await attachStreamToVideo(roadVideoEl, roadStream);
+    } else {
+      roadStream = await startCameraStream(roadVideoEl, 'environment');
+      ownsStreamRef.current = true;
+    }
     roadStreamRef.current = roadStream;
+
+    const videoTrack = roadStream.getVideoTracks()[0];
+    if (!videoTrack || videoTrack.readyState !== 'live') {
+      throw new Error('Camera is not active — allow camera access and try again');
+    }
+
+    if (typeof MediaRecorder === 'undefined') {
+      throw new Error('Video recording is not supported in this browser — use the FleetCo Driver app or Chrome on Android.');
+    }
 
     const mime = pickMimeType();
     chunksRef.current = [];
-    const recorder = new MediaRecorder(roadStream, {
-      mimeType: mime,
-      videoBitsPerSecond: 2_000_000,
-    });
+    let recorder;
+    try {
+      recorder = new MediaRecorder(roadStream, {
+        mimeType: mime,
+        videoBitsPerSecond: 2_000_000,
+      });
+    } catch {
+      recorder = new MediaRecorder(roadStream);
+    }
 
     recorder.ondataavailable = (e) => {
       if (!e.data?.size) return;
@@ -124,7 +151,10 @@ export function useChunkedLiveRecorder() {
     }
     const blobs = await stopRecorder();
     await uploadQueueRef.current;
-    stopCameraStream(roadStreamRef.current);
+    if (ownsStreamRef.current) {
+      stopCameraStream(roadStreamRef.current);
+    }
+    ownsStreamRef.current = false;
     roadStreamRef.current = null;
     recorderRef.current = null;
     videoElRef.current = null;

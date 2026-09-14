@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
+  attachStreamToVideo,
   captureFrameFromVideo,
   getCurrentPosition,
   requestDriverPermissions,
@@ -150,6 +151,14 @@ export function DriverDeviceProvider({ user, children }) {
     return pos;
   }, []);
 
+  const getRoadStream = useCallback(() => roadStreamRef.current, []);
+
+  const bindRoadPreview = useCallback((el) => {
+    if (el && roadStreamRef.current) {
+      attachStreamToVideo(el, roadStreamRef.current).catch(() => {});
+    }
+  }, []);
+
   useEffect(() => {
     if (!permissionsReady) return;
     return onAppVisible(() => { refreshPosition().catch(() => {}); });
@@ -170,14 +179,8 @@ export function DriverDeviceProvider({ user, children }) {
     captureEldFrame,
     captureDualEldFrames,
     refreshPosition,
-    bindRoadPreview(el) {
-      if (el && roadStreamRef.current) {
-        el.srcObject = roadStreamRef.current;
-        el.playsInline = true;
-        el.muted = true;
-        el.play().catch(() => {});
-      }
-    },
+    getRoadStream,
+    bindRoadPreview,
     bindCabinPreview(el) {
       if (el && cabinStreamRef.current) {
         el.srcObject = cabinStreamRef.current;

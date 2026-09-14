@@ -28,7 +28,15 @@ const SETUP_TIPS = [
 export default function DriverDashcam() {
   const { user } = useOutletContext();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { position, dualCameraEnabled, refreshPosition } = useDriverDevice();
+  const {
+    position,
+    dualCameraEnabled,
+    refreshPosition,
+    getRoadStream,
+    bindRoadPreview,
+    cameraActive,
+    activateDevices,
+  } = useDriverDevice();
   const { shift, clockedIn } = useActiveShift(user?.id);
   const roadPreviewRef = useRef(null);
   const positionRef = useRef(position);
@@ -46,7 +54,7 @@ export default function DriverDashcam() {
   const [autoStartPaused, setAutoStartPaused] = useState(false);
   const livePublisher = useLiveVideoPublisher();
   const chunkedRecorder = useChunkedLiveRecorder();
-  const cameraBootRef = useRef(null);
+  const [cameraBootKey, setCameraBootKey] = useState(0);
 
   const livekitReady = !!user?.livekit_configured;
   const canRecord = dualCameraEnabled;
@@ -114,18 +122,21 @@ export default function DriverDashcam() {
         trailerUnitNumber: shift?.trailer_unit_number || '',
       });
       const mode = result.streamMode || result.session?.stream_mode || (result.livekitUrl ? 'livekit' : 'chunked');
-      setSession(result.session);
       setStreamMode(mode);
       setMessage(result.message);
       setOfficeRequest(null);
       liveStartRef.current = Date.now();
-      cameraBootRef.current = {
-        mode,
-        result,
-        unitLabel: shift?.vehicle_unit_number
-          ? `Unit ${shift.vehicle_unit_number}`
-          : 'Road cam active',
-      };
+      setSession({
+        ...result.session,
+        _boot: {
+          mode,
+          result,
+          unitLabel: shift?.vehicle_unit_number
+            ? `Unit ${shift.vehicle_unit_number}`
+            : 'Road cam active',
+        },
+      });
+      setCameraBootKey((k) => k + 1);
       setRecording(true);
     } catch (err) {
       setError(err?.data?.error || err?.message || 'Could not start recording');
@@ -134,14 +145,24 @@ export default function DriverDashcam() {
   }, [canRecord, shift]);
 
   useLayoutEffect(() => {
-    if (!recording || !session || !cameraBootRef.current || !roadPreviewRef.current) return undefined;
+    const boot = session?._boot;
+    if (!recording || !session?.id || !boot || !roadPreviewRef.current) return undefined;
 
-    const boot = cameraBootRef.current;
-    cameraBootRef.current = null;
     let cancelled = false;
 
     (async () => {
       try {
+        if (!cameraActive) {
+          const ok = await activateDevices();
+          if (!ok) throw new Error('Camera access required — allow camera in Settings and try again');
+        }
+        if (cancelled) return;
+
+        let existingStream = getRoadStream();
+        if (existingStream) {
+          bindRoadPreview(roadPreviewRef.current);
+        }
+
         await startDashcamForegroundService(`${boot.unitLabel} — live to fleet`);
         if (cancelled) return;
 
@@ -156,7 +177,12 @@ export default function DriverDashcam() {
             roadVideoEl: roadPreviewRef.current,
             sessionId: session.id,
             getTelemetry,
+            existingStream: existingStream || undefined,
           });
+        }
+
+        if (!cancelled && session._boot) {
+          setSession((prev) => (prev?.id === session.id ? { ...prev, _boot: undefined } : prev));
         }
       } catch (err) {
         if (cancelled) return;
@@ -174,7 +200,18 @@ export default function DriverDashcam() {
     })();
 
     return () => { cancelled = true; };
-  }, [recording, session, getTelemetry, livePublisher, chunkedRecorder]);
+  }, [
+    recording,
+    session,
+    cameraBootKey,
+    cameraActive,
+    activateDevices,
+    getRoadStream,
+    bindRoadPreview,
+    getTelemetry,
+    livePublisher,
+    chunkedRecorder,
+  ]);
 
   const endStuckStream = useCallback(async () => {
     setError('');
@@ -409,7 +446,10 @@ export default function DriverDashcam() {
         <div className="space-y-3">
           <div className="rounded-xl overflow-hidden border-2 border-red-600 bg-black relative">
             <video
-              ref={roadPreviewRef}
+              ref={(el) => {
+                roadPreviewRef.current = el;
+                if (el && recording) bindRoadPreview(el);
+              }}
               className="w-full aspect-video object-cover landscape:aspect-[16/9]"
               playsInline
               muted
