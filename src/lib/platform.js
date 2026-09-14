@@ -22,6 +22,35 @@ export function isDriverAppContext() {
     || new URLSearchParams(window.location.search).get('app') === 'driver';
 }
 
+/** iPhone/iPad Safari (not Chrome/Firefox on iOS — they use WebKit too but detect Safari specifically). */
+export function isIosSafari() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const isIos = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!isIos) return false;
+  return /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+}
+
+/** iOS mobile browser — Safari and all WebKit wrappers (Chrome on iOS uses WebKit). */
+export function isIosMobileBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+/** Safari on iOS requires getUserMedia during a user tap — not after async API calls. */
+export function needsGestureCamera() {
+  return isIosMobileBrowser() && !isNativeApp();
+}
+
+export function supportsMediaRecorder() {
+  if (typeof MediaRecorder === 'undefined') return false;
+  const types = ['video/mp4', 'video/webm;codecs=vp8', 'video/webm'];
+  return types.some((t) => {
+    try { return MediaRecorder.isTypeSupported(t); } catch { return false; }
+  });
+}
+
 const DEFAULT_ANDROID_URL = 'https://play.google.com/apps/internaltest/4701271726337402202';
 
 /**

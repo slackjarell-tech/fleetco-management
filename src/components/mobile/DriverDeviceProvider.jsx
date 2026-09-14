@@ -3,13 +3,16 @@ import {
   attachStreamToVideo,
   captureFrameFromVideo,
   getCurrentPosition,
+  requestCameraPermission,
   requestDriverPermissions,
+  requestLocationPermission,
   startCameraStream,
   startDualCameraStreams,
   stopCameraStream,
   takePhoto,
   watchPosition,
 } from '@/lib/nativeBridge';
+import { needsGestureCamera } from '@/lib/platform';
 import { onAppVisible } from '@/lib/driverBackground';
 import {
   hasCompletedPermissionSetup,
@@ -66,6 +69,33 @@ export function DriverDeviceProvider({ user, children }) {
     setActivating(true);
     setActivationError('');
     try {
+      /** iPhone Safari: camera must open on Dashcam tap — not on a hidden element at login. */
+      if (needsGestureCamera()) {
+        const initialPos = await requestLocationPermission();
+        setPosition(initialPos);
+        try { await requestCameraPermission(); } catch { /* opened on Dashcam Start */ }
+
+        const cleanup = await watchPosition(
+          (pos) => {
+            const coords = pos.coords || pos;
+            setPosition({
+              lat: coords.latitude ?? coords.lat,
+              lng: coords.longitude ?? coords.lng,
+              accuracy: coords.accuracy,
+              speed: coords.speed || 0,
+              heading: coords.heading || 0,
+              timestamp: pos.timestamp || Date.now(),
+            });
+          },
+          () => {},
+        );
+        locationCleanupRef.current = cleanup;
+        setCameraActive(false);
+        markPermissionSetupComplete(user.id);
+        setPermissionsReady(true);
+        return true;
+      }
+
       const { position: initialPos } = await requestDriverPermissions();
       setPosition(initialPos);
 

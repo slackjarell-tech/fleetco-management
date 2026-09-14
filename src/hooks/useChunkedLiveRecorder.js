@@ -8,6 +8,7 @@ import {
 } from '@/lib/nativeBridge';
 import { uploadLiveChunk, uploadLivePreviewFrame } from '@/lib/liveVideo';
 import { api } from '@/api/apiClient';
+import { supportsMediaRecorder } from '@/lib/platform';
 
 function pickMimeType() {
   const types = [
@@ -39,6 +40,8 @@ export function useChunkedLiveRecorder() {
   const previewTimerRef = useRef(null);
   const getTelemetryRef = useRef(null);
   const ownsStreamRef = useRef(false);
+  const previewOnlyRef = useRef(false);
+  const recorderMimeRef = useRef('video/webm');
 
   const enqueue = useCallback((task) => {
     uploadQueueRef.current = uploadQueueRef.current.then(task).catch((err) => {
@@ -80,7 +83,9 @@ export function useChunkedLiveRecorder() {
       }
       recorderRef.current.onstop = () => {
         resolve({
-          roadBlob: new Blob(chunksRef.current, { type: pickMimeType() }),
+          roadBlob: chunksRef.current.length
+            ? new Blob(chunksRef.current, { type: recorderMimeRef.current || 'video/webm' })
+            : null,
           cabinBlob: null,
         });
       };
@@ -88,7 +93,14 @@ export function useChunkedLiveRecorder() {
     });
   }, []);
 
-  const start = useCallback(async ({ roadVideoEl, sessionId, getTelemetry, existingStream = null }) => {
+  const start = useCallback(async ({
+    roadVideoEl,
+    sessionId,
+    getTelemetry,
+    existingStream = null,
+    ownsExistingStream = false,
+    previewOnly = false,
+  }) => {
     if (!roadVideoEl) {
       throw new Error('Camera preview not ready — try again');
     }
@@ -105,7 +117,7 @@ export function useChunkedLiveRecorder() {
     let roadStream = existingStream;
     const trackLive = roadStream?.getVideoTracks?.().some((t) => t.readyState === 'live');
     if (trackLive) {
-      ownsStreamRef.current = false;
+      ownsStreamRef.current = ownsExistingStream;
       await attachStreamToVideo(roadVideoEl, roadStream);
     } else {
       roadStream = await startCameraStream(roadVideoEl, 'environment');
@@ -118,44 +130,58 @@ export function useChunkedLiveRecorder() {
       throw new Error('Camera is not active — allow camera access and try again');
     }
 
-    if (typeof MediaRecorder === 'undefined') {
-      throw new Error('Video recording is not supported in this browser — use the FleetCo Driver app or Chrome on Android.');
-    }
-
-    const mime = pickMimeType();
+    previewOnlyRef.current = previewOnly || !supportsMediaRecorder();
     chunksRef.current = [];
-    let recorder;
-    if (mime) {
+
+    if (!previewOnlyRef.current) {
+      const mime = pickMimeType();
+      recorderMimeRef.current = mime || 'video/webm';
+      let recorder;
       try {
-        recorder = new MediaRecorder(roadStream, {
-          mimeType: mime,
-          videoBitsPerSecond: 2_000_000,
-        });
+        if (mime) {
+          recorder = new MediaRecorder(roadStream, {
+            mimeType: mime,
+            videoBitsPerSecond: 1_500_000,
+          });
+        } else {
+          recorder = new MediaRecorder(roadStream);
+          recorderMimeRef.current = recorder.mimeType || 'video/webm';
+        }
       } catch {
-        recorder = new MediaRecorder(roadStream);
+        previewOnlyRef.current = true;
+        recorder = null;
       }
-    } else {
-      recorder = new MediaRecorder(roadStream);
+
+      if (recorder) {
+        recorder.ondataavailable = (e) => {
+          if (!e.data?.size) return;
+          chunksRef.current.push(e.data);
+          const seq = seqRef.current;
+          seqRef.current += 1;
+          enqueue(async () => {
+            const upload = await uploadLiveChunk(e.data, { sessionId: sessionIdRef.current, seq });
+            await api.functions.invoke('registerLiveVideoChunk', {
+              sessionId: sessionIdRef.current,
+              seq,
+              fileUrl: upload.file_url,
+              fileSizeBytes: upload.file_size,
+            });
+          });
+        };
+
+        recorder.onerror = () => {
+          previewOnlyRef.current = true;
+        };
+
+        try {
+          recorder.start(CHUNK_MS);
+          recorderRef.current = recorder;
+        } catch {
+          previewOnlyRef.current = true;
+          recorderRef.current = null;
+        }
+      }
     }
-
-    recorder.ondataavailable = (e) => {
-      if (!e.data?.size) return;
-      chunksRef.current.push(e.data);
-      const seq = seqRef.current;
-      seqRef.current += 1;
-      enqueue(async () => {
-        const upload = await uploadLiveChunk(e.data, { sessionId: sessionIdRef.current, seq });
-        await api.functions.invoke('registerLiveVideoChunk', {
-          sessionId: sessionIdRef.current,
-          seq,
-          fileUrl: upload.file_url,
-          fileSizeBytes: upload.file_size,
-        });
-      });
-    };
-
-    recorder.start(CHUNK_MS);
-    recorderRef.current = recorder;
 
     previewTimerRef.current = setInterval(() => {
       enqueue(() => uploadPreviewFrame());

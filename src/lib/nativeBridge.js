@@ -1,4 +1,4 @@
-import { isNativeApp } from '@/lib/platform';
+import { isIosMobileBrowser, isNativeApp } from '@/lib/platform';
 
 const API_ROOT = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
 
@@ -83,6 +83,25 @@ export async function requestDriverPermissions() {
 }
 
 async function openCameraStream(facingMode = 'environment') {
+  if (isIosMobileBrowser()) {
+    const attempts = facingMode === 'environment'
+      ? [
+          { video: { facingMode: { ideal: 'environment' } }, audio: false },
+          { video: { facingMode: 'environment' }, audio: false },
+          { video: true, audio: false },
+        ]
+      : [{ video: { facingMode: { ideal: facingMode } }, audio: false }, { video: true, audio: false }];
+    let lastErr;
+    for (const constraints of attempts) {
+      try {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr || new Error('Could not access camera — check Safari camera permission');
+  }
+
   const preferred = {
     video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
     audio: false,
@@ -138,7 +157,7 @@ export async function startCameraStream(videoEl, facingMode = 'environment', { s
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error('Camera stream not supported');
   }
-  if (!skipPermission) await requestCameraPermission();
+  if (!skipPermission && !isIosMobileBrowser()) await requestCameraPermission();
   const stream = await openCameraStream(facingMode);
   if (videoEl) {
     await attachStreamToVideo(videoEl, stream);

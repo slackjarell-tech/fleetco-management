@@ -9,6 +9,8 @@ import { useActiveShift } from '@/hooks/useActiveShift';
 import { useDashcamAutoStart } from '@/hooks/useDashcamAutoStart';
 import { uploadLiveRecording } from '@/lib/liveVideo';
 import { startDashcamForegroundService, stopDashcamForegroundService, mpsToMph } from '@/lib/dashcamForeground';
+import { startCameraStream, stopCameraStream } from '@/lib/nativeBridge';
+import { isIosMobileBrowser, needsGestureCamera, supportsMediaRecorder } from '@/lib/platform';
 import { getDriverDuty, subscribeDriverDuty } from '@/lib/driverDuty';
 import DriverDutyBar from '@/components/driver/DriverDutyBar';
 import {
@@ -112,6 +114,26 @@ export default function DriverDashcam() {
     setError('');
     setMessage('');
     setStartingLive(true);
+
+    let preOpenedStream = null;
+    if (needsGestureCamera()) {
+      try {
+        releaseRoadPreviewForLive();
+        if (!roadPreviewRef.current) {
+          throw new Error('Camera preview not ready — try again');
+        }
+        preOpenedStream = await startCameraStream(
+          roadPreviewRef.current,
+          'environment',
+          { skipPermission: true },
+        );
+      } catch (err) {
+        setStartingLive(false);
+        setError(err?.message || 'Could not open camera — allow Safari camera access for this site');
+        return;
+      }
+    }
+
     try {
       const result = await api.functions.invoke('startLiveVideoStream', sessionId ? {
         sessionId,
@@ -133,6 +155,8 @@ export default function DriverDashcam() {
         _boot: {
           mode,
           result,
+          preOpenedStream,
+          gestureCamera: needsGestureCamera(),
           unitLabel: shift?.vehicle_unit_number
             ? `Unit ${shift.vehicle_unit_number}`
             : 'Road cam active',
@@ -140,11 +164,15 @@ export default function DriverDashcam() {
       });
       setCameraBootKey((k) => k + 1);
       setRecording(true);
+      if (needsGestureCamera() && !supportsMediaRecorder()) {
+        setMessage('Live photo feed started (~1 sec refresh). Fleet office can watch now.');
+      }
     } catch (err) {
+      if (preOpenedStream) stopCameraStream(preOpenedStream);
       setError(err?.data?.error || err?.message || 'Could not start recording');
       setStartingLive(false);
     }
-  }, [canRecord, shift]);
+  }, [canRecord, shift, releaseRoadPreviewForLive]);
 
   useLayoutEffect(() => {
     const boot = session?._boot;
@@ -154,16 +182,19 @@ export default function DriverDashcam() {
 
     (async () => {
       try {
-        if (!cameraActive) {
+        if (!cameraActive && !boot.gestureCamera) {
           const ok = await activateDevices();
           if (!ok) throw new Error('Camera access required — allow camera in Settings and try again');
         }
         if (cancelled) return;
 
-        releaseRoadPreviewForLive();
-        const existingStream = getRoadStream();
-        if (existingStream) {
-          await bindRoadPreview(roadPreviewRef.current);
+        let existingStream = boot.preOpenedStream || null;
+        if (!existingStream && !boot.gestureCamera) {
+          releaseRoadPreviewForLive();
+          existingStream = getRoadStream();
+          if (existingStream) {
+            await bindRoadPreview(roadPreviewRef.current);
+          }
         }
 
         await startDashcamForegroundService(`${boot.unitLabel} — live to fleet`);
@@ -181,6 +212,8 @@ export default function DriverDashcam() {
             sessionId: session.id,
             getTelemetry,
             existingStream: existingStream || undefined,
+            ownsExistingStream: !!boot.preOpenedStream,
+            previewOnly: boot.gestureCamera && !supportsMediaRecorder(),
           });
         }
 
@@ -292,7 +325,7 @@ export default function DriverDashcam() {
   }, [session, streamMode, livePublisher, chunkedRecorder, refreshPosition, restoreRoadPreviewToHidden]);
 
   useDashcamAutoStart({
-    enabled: autoDashcam && !autoStartPaused,
+    enabled: autoDashcam && !autoStartPaused && !needsGestureCamera(),
     duty,
     clockedIn,
     canRecord,
@@ -304,7 +337,7 @@ export default function DriverDashcam() {
 
   const serverSyncRef = useRef(false);
   useEffect(() => {
-    if (!canRecord || recording || startingLive || serverSyncRef.current) return undefined;
+    if (!canRecord || recording || startingLive || serverSyncRef.current || needsGestureCamera()) return undefined;
     let cancelled = false;
     (async () => {
       try {
@@ -392,6 +425,13 @@ export default function DriverDashcam() {
         </div>
       )}
 
+      {isIosMobileBrowser() && !recording && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-900">
+          <strong>iPhone Safari:</strong> Tap <strong>Start Road Cam</strong> below and allow camera access.
+          Keep this tab open and screen on — fleet office sees live photos (~1 sec refresh).
+        </div>
+      )}
+
       {canRecord && !recording && (
         <div className="space-y-3">
           <button
@@ -447,48 +487,52 @@ export default function DriverDashcam() {
         </div>
       )}
 
-      {recording && (
-        <div className="space-y-3">
-          <div className="rounded-xl overflow-hidden border-2 border-red-600 bg-black relative">
-            <video
-              ref={(el) => {
-                roadPreviewRef.current = el;
-                if (el && recording) bindRoadPreview(el);
-              }}
-              className="w-full aspect-video object-cover landscape:aspect-[16/9]"
-              playsInline
-              muted
-              autoPlay
-              aria-label="Road camera"
-            />
-            <div className="absolute top-2 left-2 flex flex-wrap gap-2">
-              <span className="px-2 py-1 bg-red-600 text-white text-[10px] font-black rounded animate-pulse">● LIVE</span>
-              {unitLine && (
-                <span className="px-2 py-1 bg-black/70 text-white text-[10px] font-bold rounded">{unitLine}</span>
-              )}
-            </div>
-            <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
-              {mph != null && (
-                <span className="px-2 py-1 bg-black/70 text-white text-xs font-black flex items-center gap-1 rounded">
-                  <Gauge className="w-3.5 h-3.5" /> {mph} MPH
-                </span>
-              )}
-              {position && (
-                <span className="px-2 py-1 bg-black/60 text-slate-300 text-[10px] rounded flex items-center gap-1">
-                  <MapPin className="w-3 h-3" /> ±{Math.round(position.accuracy || 0)}m
-                </span>
-              )}
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-gradient-to-t from-black/90 to-transparent text-xs text-slate-200 flex justify-between">
-              <span className="font-bold">ROAD AHEAD · FLEET WATCHING</span>
-              {wakeLockSupported && (
-                <span className="flex items-center gap-1 text-slate-400">
-                  <Sun className="w-3 h-3" /> Screen on
-                </span>
-              )}
-            </div>
-          </div>
+      {/* Always mounted — iPhone Safari must open camera during the Start tap */}
+      <div className={recording ? 'space-y-3' : 'fixed w-px h-px opacity-0 overflow-hidden pointer-events-none'} aria-hidden={!recording}>
+        <div className={recording ? 'rounded-xl overflow-hidden border-2 border-red-600 bg-black relative' : ''}>
+          <video
+            ref={roadPreviewRef}
+            className={recording
+              ? 'w-full aspect-video object-cover landscape:aspect-[16/9]'
+              : 'w-px h-px'}
+            playsInline
+            muted
+            autoPlay
+            aria-label="Road camera"
+          />
+          {recording && (
+            <>
+              <div className="absolute top-2 left-2 flex flex-wrap gap-2">
+                <span className="px-2 py-1 bg-red-600 text-white text-[10px] font-black rounded animate-pulse">● LIVE</span>
+                {unitLine && (
+                  <span className="px-2 py-1 bg-black/70 text-white text-[10px] font-bold rounded">{unitLine}</span>
+                )}
+              </div>
+              <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                {mph != null && (
+                  <span className="px-2 py-1 bg-black/70 text-white text-xs font-black flex items-center gap-1 rounded">
+                    <Gauge className="w-3.5 h-3.5" /> {mph} MPH
+                  </span>
+                )}
+                {position && (
+                  <span className="px-2 py-1 bg-black/60 text-slate-300 text-[10px] rounded flex items-center gap-1">
+                    <MapPin className="w-3 h-3" /> ±{Math.round(position.accuracy || 0)}m
+                  </span>
+                )}
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-gradient-to-t from-black/90 to-transparent text-xs text-slate-200 flex justify-between">
+                <span className="font-bold">ROAD AHEAD · FLEET WATCHING</span>
+                {wakeLockSupported && (
+                  <span className="flex items-center gap-1 text-slate-400">
+                    <Sun className="w-3 h-3" /> Screen on
+                  </span>
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
+        {recording && (
           <button
             type="button"
             disabled={uploading}
@@ -497,8 +541,8 @@ export default function DriverDashcam() {
           >
             <Square className="w-4 h-4" /> {uploading ? 'Saving video…' : 'Stop Road Cam'}
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {message && !recording && (
         <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl p-3">{message}</div>
