@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useDriverDevice } from '@/components/mobile/DriverDeviceProvider';
@@ -46,6 +46,7 @@ export default function DriverDashcam() {
   const [autoStartPaused, setAutoStartPaused] = useState(false);
   const livePublisher = useLiveVideoPublisher();
   const chunkedRecorder = useChunkedLiveRecorder();
+  const cameraBootRef = useRef(null);
 
   const livekitReady = !!user?.livekit_configured;
   const canRecord = dualCameraEnabled;
@@ -115,35 +116,65 @@ export default function DriverDashcam() {
       const mode = result.streamMode || result.session?.stream_mode || (result.livekitUrl ? 'livekit' : 'chunked');
       setSession(result.session);
       setStreamMode(mode);
-      setRecording(true);
       setMessage(result.message);
       setOfficeRequest(null);
       liveStartRef.current = Date.now();
-
-      const unitLabel = shift?.vehicle_unit_number
-        ? `Unit ${shift.vehicle_unit_number}`
-        : 'Road cam active';
-      await startDashcamForegroundService(`${unitLabel} — live to fleet`);
-
-      if (mode === 'livekit') {
-        await livePublisher.start({
-          livekitUrl: result.livekitUrl,
-          token: result.token,
-          roadVideoEl: roadPreviewRef.current,
-        });
-      } else {
-        await chunkedRecorder.start({
-          roadVideoEl: roadPreviewRef.current,
-          sessionId: result.session.id,
-          getTelemetry,
-        });
-      }
+      cameraBootRef.current = {
+        mode,
+        result,
+        unitLabel: shift?.vehicle_unit_number
+          ? `Unit ${shift.vehicle_unit_number}`
+          : 'Road cam active',
+      };
+      setRecording(true);
     } catch (err) {
       setError(err?.data?.error || err?.message || 'Could not start recording');
-    } finally {
       setStartingLive(false);
     }
-  }, [canRecord, shift, livePublisher, chunkedRecorder, getTelemetry]);
+  }, [canRecord, shift]);
+
+  useLayoutEffect(() => {
+    if (!recording || !session || !cameraBootRef.current || !roadPreviewRef.current) return undefined;
+
+    const boot = cameraBootRef.current;
+    cameraBootRef.current = null;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        await startDashcamForegroundService(`${boot.unitLabel} — live to fleet`);
+        if (cancelled) return;
+
+        if (boot.mode === 'livekit') {
+          await livePublisher.start({
+            livekitUrl: boot.result.livekitUrl,
+            token: boot.result.token,
+            roadVideoEl: roadPreviewRef.current,
+          });
+        } else {
+          await chunkedRecorder.start({
+            roadVideoEl: roadPreviewRef.current,
+            sessionId: session.id,
+            getTelemetry,
+          });
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setError(err?.data?.error || err?.message || 'Could not start camera');
+        try {
+          await api.functions.invoke('stopLiveVideoStream', { sessionId: session.id });
+        } catch { /* ignore */ }
+        await stopDashcamForegroundService().catch(() => {});
+        setRecording(false);
+        setSession(null);
+        liveStartRef.current = null;
+      } finally {
+        if (!cancelled) setStartingLive(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [recording, session, getTelemetry, livePublisher, chunkedRecorder]);
 
   const endStuckStream = useCallback(async () => {
     setError('');
@@ -382,6 +413,7 @@ export default function DriverDashcam() {
               className="w-full aspect-video object-cover landscape:aspect-[16/9]"
               playsInline
               muted
+              autoPlay
               aria-label="Road camera"
             />
             <div className="absolute top-2 left-2 flex flex-wrap gap-2">

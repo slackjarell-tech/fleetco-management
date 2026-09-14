@@ -65,10 +65,7 @@ export async function requestCameraPermission() {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error('Camera not supported on this device');
   }
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: { ideal: 'environment' } },
-    audio: false,
-  });
+  const stream = await openCameraStream('environment');
   stream.getTracks().forEach((t) => t.stop());
   return true;
 }
@@ -85,21 +82,47 @@ export async function requestDriverPermissions() {
   return { camera: true, location: true, position };
 }
 
+async function openCameraStream(facingMode = 'environment') {
+  const preferred = {
+    video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false,
+  };
+  try {
+    return await navigator.mediaDevices.getUserMedia(preferred);
+  } catch (err) {
+    if (facingMode === 'environment') {
+      return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+    throw err;
+  }
+}
+
+async function waitForVideoFrame(videoEl, timeoutMs = 8000) {
+  if (!videoEl) throw new Error('Camera preview not ready');
+  if (videoEl.videoWidth > 0) return;
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Camera preview did not start — check permissions')), timeoutMs);
+    videoEl.onloadedmetadata = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+  });
+}
+
 /** Live camera stream — environment (road) or user (in-cabin / driver face) */
 export async function startCameraStream(videoEl, facingMode = 'environment', { skipPermission = false } = {}) {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error('Camera stream not supported');
   }
   if (!skipPermission) await requestCameraPermission();
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
-    audio: false,
-  });
+  const stream = await openCameraStream(facingMode);
   if (videoEl) {
     videoEl.srcObject = stream;
     videoEl.playsInline = true;
     videoEl.muted = true;
+    videoEl.autoplay = true;
     await videoEl.play();
+    await waitForVideoFrame(videoEl);
   }
   return stream;
 }

@@ -72,6 +72,9 @@ export function useChunkedLiveRecorder() {
   }, []);
 
   const start = useCallback(async ({ roadVideoEl, sessionId, getTelemetry }) => {
+    if (!roadVideoEl) {
+      throw new Error('Camera preview not ready — try again');
+    }
     sessionIdRef.current = sessionId;
     videoElRef.current = roadVideoEl;
     getTelemetryRef.current = getTelemetry;
