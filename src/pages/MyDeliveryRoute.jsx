@@ -104,6 +104,7 @@ export default function MyDeliveryRoute() {
   const optimizeRoute = async () => {
     if (!route) return;
     setOptimizing(true);
+    setGeocoding(stops.some((s) => s.lat == null));
     try {
       let lat;
       let lng;
@@ -112,23 +113,23 @@ export default function MyDeliveryRoute() {
         lat = pos.lat;
         lng = pos.lng;
       } catch { /* ok */ }
-      if (stops.filter((s) => s.lat == null).length > 0) {
-        setGeocoding(true);
-        try {
-          const geo = await api.functions.invoke('geocodeDeliveryRoute', { routeId: route.id });
-          if (geo.stops) setStops(geo.stops.sort((a, b) => a.sequence - b.sequence));
-        } finally {
-          setGeocoding(false);
-        }
-      }
       const result = await api.functions.invoke('optimizeDeliveryRoute', {
         routeId: route.id,
         startLat: lat,
         startLng: lng,
+        geocodeFirst: true,
       });
       if (result.stops) setStops(result.stops.sort((a, b) => a.sequence - b.sequence));
+      if (result.optimizationMethod) {
+        setRoute((prev) => ({
+          ...prev,
+          optimization_method: result.optimizationMethod,
+          optimized_at: new Date().toISOString(),
+        }));
+      }
     } finally {
       setOptimizing(false);
+      setGeocoding(false);
     }
   };
 
@@ -222,6 +223,15 @@ export default function MyDeliveryRoute() {
             />
           </div>
         </div>
+        {route.optimization_method && route.optimization_method !== 'single_stop' && (
+          <div className="text-[10px] text-slate-400 mt-2">
+            Sequence: {route.optimization_method === 'osrm_drive_time'
+              ? 'shortest drive time (roads)'
+              : route.optimization_method === 'nearest_neighbor_gps'
+                ? 'shortest distance (GPS)'
+                : 'sorted by address'}
+          </div>
+        )}
         <div className="flex gap-2 mt-3">
           <Link to="/driver/scan" className="flex-1">
             <Button size="sm" variant="outline" className="w-full border-slate-600 text-slate-200 hover:bg-slate-800">
@@ -231,7 +241,8 @@ export default function MyDeliveryRoute() {
           {remaining > 1 && (
             <Button size="sm" variant="outline" disabled={optimizing} onClick={optimizeRoute}
               className="flex-1 border-amber-500/50 text-amber-300 hover:bg-slate-800">
-              <ListOrdered className="w-3.5 h-3.5 mr-1" /> {optimizing || geocoding ? 'Working…' : 'Optimize'}
+              <ListOrdered className="w-3.5 h-3.5 mr-1" />
+              {optimizing ? (geocoding ? 'Mapping…' : 'Sequencing…') : 'Optimize'}
             </Button>
           )}
         </div>

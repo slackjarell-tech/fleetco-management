@@ -29,7 +29,10 @@ export default function DriverScan() {
   const [ocrProgress, setOcrProgress] = useState(0);
   const ocrPromiseRef = useRef(null);
   const scannerRef = useRef(null);
+  const autoOptimizeTimerRef = useRef(null);
   const scanAreaId = 'fleetco-barcode-reader';
+  const [autoSequence, setAutoSequence] = useState(true);
+  const [sequencing, setSequencing] = useState(false);
 
   useEffect(() => {
     api.auth.me().then((u) => {
@@ -53,6 +56,46 @@ export default function DriverScan() {
     }
   };
 
+  const runOptimize = async () => {
+    setError('');
+    setSequencing(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const routes = await api.entities.DeliveryRoute.filter({ driver_id: user.id });
+      const route = routes.find((r) => r.route_date === today && r.status !== 'cancelled');
+      if (!route) return null;
+      let lat;
+      let lng;
+      try {
+        const pos = await getCurrentPosition();
+        lat = pos.lat;
+        lng = pos.lng;
+      } catch { /* ok */ }
+      const result = await api.functions.invoke('optimizeDeliveryRoute', {
+        routeId: route.id,
+        startLat: lat,
+        startLng: lng,
+        geocodeFirst: true,
+      });
+      setLastResult({ type: 'optimize', message: result.message, method: result.optimizationMethod });
+      return result;
+    } catch (err) {
+      setError(err?.data?.error || err?.message || 'Optimize failed');
+      return null;
+    } finally {
+      setSequencing(false);
+    }
+  };
+
+  const scheduleAutoOptimize = () => {
+    if (!autoSequence || mode !== 'build') return;
+    if (autoOptimizeTimerRef.current) clearTimeout(autoOptimizeTimerRef.current);
+    autoOptimizeTimerRef.current = setTimeout(() => {
+      autoOptimizeTimerRef.current = null;
+      runOptimize();
+    }, 2000);
+  };
+
   const addStopToRoute = async ({ barcode, parsed, labelImageUrl, lat, lng }) => {
     const result = await api.functions.invoke('addDeliveryStopFromScan', {
       barcode,
@@ -67,6 +110,7 @@ export default function DriverScan() {
     } else {
       setRouteStops((n) => n + (result.created ? 1 : 0));
       setLastResult({ type: 'build', ...result });
+      if (autoSequence && result.created) scheduleAutoOptimize();
     }
     return result;
   };
@@ -229,35 +273,21 @@ export default function DriverScan() {
     await stopBarcodeScanner(scannerRef.current);
     scannerRef.current = null;
     setScanning(false);
-  };
-
-  useEffect(() => () => { stopBarcodeScanner(scannerRef.current); }, []);
-
-  const optimizeRoute = async () => {
-    setError('');
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const routes = await api.entities.DeliveryRoute.filter({ driver_id: user.id });
-      const route = routes.find((r) => r.route_date === today && r.status !== 'cancelled');
-      if (!route) throw new Error('No route for today — scan packages in Build Route mode first.');
-      let lat;
-      let lng;
-      try {
-        const pos = await getCurrentPosition();
-        lat = pos.lat;
-        lng = pos.lng;
-      } catch { /* ok */ }
-      await api.functions.invoke('geocodeDeliveryRoute', { routeId: route.id });
-      const result = await api.functions.invoke('optimizeDeliveryRoute', {
-        routeId: route.id,
-        startLat: lat,
-        startLng: lng,
-      });
-      setLastResult({ type: 'optimize', message: result.message });
-    } catch (err) {
-      setError(err?.data?.error || err?.message || 'Optimize failed');
+    if (mode === 'build' && routeStops > 0 && autoSequence) {
+      if (autoOptimizeTimerRef.current) {
+        clearTimeout(autoOptimizeTimerRef.current);
+        autoOptimizeTimerRef.current = null;
+      }
+      await runOptimize();
     }
   };
+
+  useEffect(() => () => {
+    stopBarcodeScanner(scannerRef.current);
+    if (autoOptimizeTimerRef.current) clearTimeout(autoOptimizeTimerRef.current);
+  }, []);
+
+  const optimizeRoute = () => runOptimize();
 
   return (
     <div className="p-4 space-y-4 pb-8">
@@ -290,10 +320,16 @@ export default function DriverScan() {
       </div>
 
       {mode === 'build' && (
-        <label className="flex items-center gap-2 text-xs text-slate-600">
-          <input type="checkbox" checked={continuous} onChange={(e) => setContinuous(e.target.checked)} />
-          Continuous scan (keep adding stops — snap label when prompted)
-        </label>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-xs text-slate-600">
+            <input type="checkbox" checked={continuous} onChange={(e) => setContinuous(e.target.checked)} />
+            Continuous scan (keep adding stops — snap label when prompted)
+          </label>
+          <label className="flex items-center gap-2 text-xs text-slate-600">
+            <input type="checkbox" checked={autoSequence} onChange={(e) => setAutoSequence(e.target.checked)} />
+            Auto-sequence stops for shortest drive time (updates after each scan & when you stop scanning)
+          </label>
+        </div>
       )}
 
       {error && (
@@ -352,10 +388,12 @@ export default function DriverScan() {
       {mode === 'build' && routeStops > 0 && (
         <button
           type="button"
+          disabled={sequencing}
           onClick={optimizeRoute}
-          className="w-full flex items-center justify-center gap-2 border-2 border-slate-300 text-slate-800 font-bold py-3 rounded-xl"
+          className="w-full flex items-center justify-center gap-2 border-2 border-slate-300 text-slate-800 font-bold py-3 rounded-xl disabled:opacity-60"
         >
-          <ListOrdered className="w-5 h-5" /> Sequence Stops (Optimize Route)
+          <ListOrdered className="w-5 h-5" />
+          {sequencing ? 'Sequencing…' : 'Sequence Stops Now'}
         </button>
       )}
 
@@ -401,6 +439,9 @@ export default function DriverScan() {
       {lastResult?.type === 'optimize' && (
         <div className="bg-green-50 border border-green-200 text-green-800 text-sm rounded-xl p-3">
           {lastResult.message}
+          {lastResult.method === 'osrm_drive_time' && (
+            <div className="text-xs text-green-700 mt-1">Sequenced using real road drive times.</div>
+          )}
         </div>
       )}
 

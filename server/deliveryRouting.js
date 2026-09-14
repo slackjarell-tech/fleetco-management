@@ -24,6 +24,150 @@ function haversine(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+const OSRM_TRIP_URL = process.env.OSRM_TRIP_URL || 'https://router.project-osrm.org/trip/v1/driving';
+
+function nearestNeighborOrder(stops, startLat, startLng) {
+  const pool = [...stops];
+  const ordered = [];
+  let curLat = Number(startLat);
+  let curLng = Number(startLng);
+  while (pool.length) {
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < pool.length; i += 1) {
+      const d = haversine(curLat, curLng, pool[i].lat, pool[i].lng);
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = i;
+      }
+    }
+    const next = pool.splice(bestIdx, 1)[0];
+    ordered.push(next);
+    curLat = next.lat;
+    curLng = next.lng;
+  }
+  return ordered;
+}
+
+/** Free drive-time sequencing via OSRM (no API key). Falls back to nearest-neighbor. */
+async function osrmDriveTimeOrder(stops, startLat, startLng) {
+  if (stops.length < 2 || startLat == null || startLng == null) return null;
+
+  const coordStr = [
+    `${Number(startLng)},${Number(startLat)}`,
+    ...stops.map((s) => `${Number(s.lng)},${Number(s.lat)}`),
+  ].join(';');
+
+  const url = `${OSRM_TRIP_URL}/${coordStr}?source=first&roundtrip=false&destination=any&overview=false`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    const data = await res.json();
+    if (data.code !== 'Ok' || !Array.isArray(data.waypoints) || data.waypoints.length < 3) {
+      return null;
+    }
+
+    const ordered = [];
+    for (const wp of data.waypoints) {
+      const inputIdx = wp.waypoint_index;
+      if (inputIdx === 0) continue;
+      const stop = stops[inputIdx - 1];
+      if (stop) ordered.push(stop);
+    }
+
+    if (ordered.length !== stops.length) return null;
+    return ordered;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function geocodePendingStops(routeId) {
+  const stops = filterEntities('DeliveryStop', { route_id: routeId })
+    .filter((s) => (s.lat == null || s.lng == null) && s.status !== 'delivered' && s.status !== 'failed');
+  if (!stops.length) return 0;
+
+  const { geocodeStopList } = await import('./geocoding.js');
+  const { results, geocoded } = await geocodeStopList(stops);
+  for (const r of results) {
+    if (r.lat != null && r.lng != null && !r.skipped) {
+      updateEntity('DeliveryStop', r.id, {
+        lat: r.lat,
+        lng: r.lng,
+        geocoded_at: nowIso(),
+      });
+    }
+  }
+  return geocoded;
+}
+
+async function sequencePendingStops(routeId, startLat, startLng) {
+  const route = getEntity('DeliveryRoute', routeId);
+  if (!route) throw new Error('Route not found');
+
+  let pending = filterEntities('DeliveryStop', { route_id: routeId })
+    .filter((s) => s.status === 'pending' || s.status === 'attempted');
+
+  const done = filterEntities('DeliveryStop', { route_id: routeId })
+    .filter((s) => s.status === 'delivered' || s.status === 'failed');
+
+  const withCoords = pending.filter((s) => s.lat != null && s.lng != null);
+  const withoutCoords = pending.filter((s) => s.lat == null || s.lng == null);
+
+  let ordered = [];
+  let method = 'zip_city_sort';
+
+  if (withCoords.length > 1 && startLat != null && startLng != null) {
+    const osrmOrdered = await osrmDriveTimeOrder(withCoords, startLat, startLng);
+    if (osrmOrdered?.length) {
+      ordered = osrmOrdered;
+      method = 'osrm_drive_time';
+    } else {
+      ordered = nearestNeighborOrder(withCoords, startLat, startLng);
+      method = 'nearest_neighbor_gps';
+    }
+  } else if (withCoords.length) {
+    ordered = [...withCoords].sort(
+      (a, b) => String(a.zip).localeCompare(String(b.zip)) || String(a.city).localeCompare(String(b.city)),
+    );
+    method = withCoords.length > 1 ? 'zip_city_sort' : 'single_stop';
+  }
+
+  withoutCoords.sort(
+    (a, b) => String(a.zip).localeCompare(String(b.zip))
+      || String(a.city).localeCompare(String(b.city))
+      || String(a.address).localeCompare(String(b.address)),
+  );
+  ordered.push(...withoutCoords);
+
+  const finalOrder = [...done, ...ordered];
+  finalOrder.forEach((stop, idx) => {
+    updateEntity('DeliveryStop', stop.id, { sequence: idx + 1 });
+  });
+
+  updateEntity('DeliveryRoute', routeId, {
+    optimized_at: nowIso(),
+    optimization_method: method,
+  });
+
+  const methodLabel = method === 'osrm_drive_time'
+    ? 'shortest drive time (road network)'
+    : method === 'nearest_neighbor_gps'
+      ? 'shortest distance (GPS)'
+      : 'address sort';
+
+  return {
+    success: true,
+    message: `Route optimized — ${ordered.length} stop(s) sequenced for ${methodLabel}.`,
+    optimizationMethod: method,
+    stops: finalOrder.map((s, idx) => ({ ...s, sequence: idx + 1 })),
+  };
+}
+
 function getCustomerDeliverySettings(customerId) {
   const customer = customerId ? getEntity('Customer', customerId) : null;
   return {
@@ -145,7 +289,7 @@ export function parseDeliveryLabelHandler(body, user) {
   };
 }
 
-export function addDeliveryStopFromScan(body, user) {
+export async function addDeliveryStopFromScan(body, user) {
   assertDriver(user);
   const { barcode, parsed: parsedInput, routeId, lat, lng, labelImageUrl } = body;
 
@@ -236,7 +380,20 @@ export function addDeliveryStopFromScan(body, user) {
     scanned_at: nowIso(),
   });
 
-  return { success: true, stop, route, parsed, created: true };
+  const result = { success: true, stop, route, parsed, created: true };
+
+  if (body.autoOptimize) {
+    await geocodePendingStops(route.id);
+    const opt = await sequencePendingStops(route.id, lat ?? null, lng ?? null);
+    return {
+      ...result,
+      ...opt,
+      route: getEntity('DeliveryRoute', route.id),
+      stop: getEntity('DeliveryStop', stop.id),
+    };
+  }
+
+  return result;
 }
 
 export function scanDeliveryPackage(body, user) {
@@ -276,9 +433,9 @@ export function scanDeliveryPackage(body, user) {
   };
 }
 
-export function optimizeDeliveryRoute(body, user) {
+export async function optimizeDeliveryRoute(body, user) {
   assertDriver(user);
-  const { routeId, startLat, startLng } = body;
+  const { routeId, startLat, startLng, geocodeFirst = true } = body;
   if (!routeId) throw new Error('routeId is required');
 
   const route = getEntity('DeliveryRoute', routeId);
@@ -287,65 +444,11 @@ export function optimizeDeliveryRoute(body, user) {
     throw new Error('Not authorized');
   }
 
-  let stops = filterEntities('DeliveryStop', { route_id: routeId })
-    .filter((s) => s.status === 'pending' || s.status === 'attempted');
-
-  const done = filterEntities('DeliveryStop', { route_id: routeId })
-    .filter((s) => s.status === 'delivered' || s.status === 'failed');
-
-  const withCoords = stops.filter((s) => s.lat != null && s.lng != null);
-  const withoutCoords = stops.filter((s) => s.lat == null || s.lng == null);
-
-  const ordered = [];
-
-  if (withCoords.length > 1 && startLat != null && startLng != null) {
-    const pool = [...withCoords];
-    let curLat = Number(startLat);
-    let curLng = Number(startLng);
-    while (pool.length) {
-      let bestIdx = 0;
-      let bestDist = Infinity;
-      for (let i = 0; i < pool.length; i += 1) {
-        const d = haversine(curLat, curLng, pool[i].lat, pool[i].lng);
-        if (d < bestDist) {
-          bestDist = d;
-          bestIdx = i;
-        }
-      }
-      const next = pool.splice(bestIdx, 1)[0];
-      ordered.push(next);
-      curLat = next.lat;
-      curLng = next.lng;
-    }
-  } else {
-    // Zip / city sort when GPS pins unavailable
-    ordered.push(
-      ...withCoords.sort((a, b) => String(a.zip).localeCompare(String(b.zip)) || String(a.city).localeCompare(String(b.city)))
-    );
+  if (geocodeFirst) {
+    await geocodePendingStops(routeId);
   }
 
-  withoutCoords.sort(
-    (a, b) => String(a.zip).localeCompare(String(b.zip))
-      || String(a.city).localeCompare(String(b.city))
-      || String(a.address).localeCompare(String(b.address))
-  );
-  ordered.push(...withoutCoords);
-
-  const finalOrder = [...done, ...ordered];
-  finalOrder.forEach((stop, idx) => {
-    updateEntity('DeliveryStop', stop.id, { sequence: idx + 1 });
-  });
-
-  updateEntity('DeliveryRoute', routeId, {
-    optimized_at: nowIso(),
-    optimization_method: withCoords.length > 1 && startLat != null ? 'nearest_neighbor_gps' : 'zip_city_sort',
-  });
-
-  return {
-    success: true,
-    message: `Route optimized — ${ordered.length} stop(s) resequenced for fastest path.`,
-    stops: finalOrder.map((s, idx) => ({ ...s, sequence: idx + 1 })),
-  };
+  return sequencePendingStops(routeId, startLat ?? null, startLng ?? null);
 }
 
 export async function geocodeDeliveryRoute(body, user) {
@@ -459,14 +562,26 @@ export async function importDeliveryManifest(body, user) {
     }
   }
 
+  let optimizationMethod = null;
+  if (body.autoOptimize) {
+    const opt = await sequencePendingStops(
+      route.id,
+      body.startLat ?? null,
+      body.startLng ?? null,
+    );
+    optimizationMethod = opt.optimizationMethod;
+  }
+
   const finalStops = filterEntities('DeliveryStop', { route_id: route.id });
+  const finalRoute = getEntity('DeliveryRoute', route.id);
 
   return {
     success: true,
-    message: `Imported ${created.length} stop(s)${geocodedCount ? ` — ${geocodedCount} mapped` : ''}.`,
-    route,
+    message: `Imported ${created.length} stop(s)${geocodedCount ? ` — ${geocodedCount} mapped` : ''}${optimizationMethod ? ' — route sequenced' : ''}.`,
+    route: finalRoute,
     stops: finalStops,
     geocoded: geocodedCount,
+    optimizationMethod,
   };
 }
 
