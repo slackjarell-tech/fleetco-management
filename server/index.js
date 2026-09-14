@@ -1412,6 +1412,8 @@ async function startServer() {
   beginStartupPhase();
   await initDatabase();
   seedDatabase();
+  const { closeAllLiveSessionsOnStartup } = await import('./liveStream.js');
+  closeAllLiveSessionsOnStartup();
   endStartupPhase();
   console.log('[integrity] Startup complete — user passwords and records are protected on future deploys');
 

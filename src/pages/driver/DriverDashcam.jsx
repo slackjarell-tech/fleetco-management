@@ -145,8 +145,32 @@ export default function DriverDashcam() {
     }
   }, [canRecord, shift, livePublisher, chunkedRecorder, getTelemetry]);
 
+  const endStuckStream = useCallback(async () => {
+    setError('');
+    setMessage('');
+    try {
+      await api.functions.invoke('stopLiveVideoStream', {});
+      setMessage('Previous live stream cleared. Tap Start Road Cam again.');
+    } catch (err) {
+      setError(err?.data?.error || err?.message || 'Could not end stuck stream');
+    }
+  }, []);
+
   const stopRecording = useCallback(async () => {
-    if (!session) return;
+    if (!session) {
+      setUploading(true);
+      try {
+        await stopDashcamForegroundService();
+        await api.functions.invoke('stopLiveVideoStream', {});
+        setRecording(false);
+        setMessage('Live stream ended.');
+      } catch (err) {
+        setError(err?.data?.error || err?.message || 'Could not stop recording');
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
     setUploading(true);
     try {
       const durationSec = liveStartRef.current
@@ -204,6 +228,23 @@ export default function DriverDashcam() {
     startRecording,
     stopRecording,
   });
+
+  const serverSyncRef = useRef(false);
+  useEffect(() => {
+    if (!canRecord || recording || startingLive || serverSyncRef.current) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { session: serverSession } = await api.functions.invoke('getMyLiveVideoSession');
+        serverSyncRef.current = true;
+        if (cancelled || !serverSession) return;
+        await startRecording(null);
+      } catch {
+        serverSyncRef.current = true;
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [canRecord, recording, startingLive, startRecording]);
 
   const autoStartHandled = useRef(false);
   useEffect(() => {
@@ -386,8 +427,17 @@ export default function DriverDashcam() {
         <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl p-3">{message}</div>
       )}
       {error && (
-        <div className={`text-sm rounded-xl p-3 ${recording ? 'text-red-300 bg-red-950/50 border border-red-800' : 'text-red-700 bg-red-50 border border-red-200'}`}>
-          {error}
+        <div className={`text-sm rounded-xl p-3 space-y-2 ${recording ? 'text-red-300 bg-red-950/50 border border-red-800' : 'text-red-700 bg-red-50 border border-red-200'}`}>
+          <p>{error}</p>
+          {!recording && error.includes('Stop the current live stream') && (
+            <button
+              type="button"
+              onClick={endStuckStream}
+              className="w-full py-2 rounded-lg bg-red-700 hover:bg-red-600 text-white text-xs font-bold"
+            >
+              End stuck stream
+            </button>
+          )}
         </div>
       )}
     </div>

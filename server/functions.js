@@ -169,6 +169,10 @@ export async function invokeFunction(name, body, user, ctx = null) {
       const { stopLiveVideoStream } = await import('./liveStream.js');
       return stopLiveVideoStream(body, user);
     }
+    case 'getMyLiveVideoSession': {
+      const { getMyLiveVideoSession } = await import('./liveStream.js');
+      return getMyLiveVideoSession(body, user);
+    }
     case 'getLiveVideoViewerToken': {
       const { getLiveVideoViewerToken } = await import('./liveStream.js');
       return getLiveVideoViewerToken(body, user, ctx);

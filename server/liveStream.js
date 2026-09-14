@@ -50,6 +50,55 @@ export const LIVE_CHUNKS_DIR = getLiveChunksDir();
 export const RETENTION_DAYS = Math.max(1, Number(process.env.LIVE_STREAM_RETENTION_DAYS) || 15);
 const REQUEST_TTL_MS = 30 * 60 * 1000;
 const CHUNK_RETENTION_MS = 24 * 60 * 60 * 1000;
+/** No preview/chunk activity — treat as orphaned (app crash, lost connection). */
+const STALE_LIVE_MS = 3 * 60 * 1000;
+/** Session marked live but never sent video — allow quick retry after crash. */
+const STALE_NO_DATA_MS = 45 * 1000;
+const MAX_LIVE_MS = 12 * 60 * 60 * 1000;
+
+function lastLiveActivityMs(session) {
+  const ts = session?.latest_preview_at || session?.latest_chunk_at || session?.started_at;
+  return ts ? new Date(ts).getTime() : 0;
+}
+
+function isStaleLiveSession(session) {
+  if (!session || session.status !== 'live') return false;
+  const now = Date.now();
+  const started = session.started_at ? new Date(session.started_at).getTime() : 0;
+  const hasMedia = session.latest_preview_at || session.latest_chunk_at;
+  if (started && now - started > MAX_LIVE_MS) return true;
+  if (started && !hasMedia && now - started > STALE_NO_DATA_MS) return true;
+  const lastMedia = session.latest_preview_at || session.latest_chunk_at;
+  if (lastMedia && now - new Date(lastMedia).getTime() > STALE_LIVE_MS) return true;
+  return false;
+}
+
+/** Live streams cannot survive a process restart — clear orphans on boot. */
+export function closeAllLiveSessionsOnStartup() {
+  const live = filterEntities('LiveStreamSession', { status: 'live' });
+  for (const s of live) {
+    endLiveSession(s.id, 'server_restart');
+    deleteSessionLiveChunks(s.id);
+  }
+  if (live.length) {
+    console.log(`[liveStream] Closed ${live.length} orphaned live session(s) after server start`);
+  }
+}
+
+function endLiveSession(sessionId, reason = '') {
+  return updateEntity('LiveStreamSession', sessionId, {
+    status: 'completed',
+    ended_at: nowIso(),
+    end_reason: reason,
+  });
+}
+
+function clearStaleLiveSession(session) {
+  if (!session?.id) return null;
+  endLiveSession(session.id, 'stale_auto_closed');
+  deleteSessionLiveChunks(session.id);
+  return null;
+}
 
 function sessionChunksDir(sessionId) {
   const safe = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
@@ -165,6 +214,56 @@ function assertRecordingAccess(recording, user, ctx) {
   return true;
 }
 
+async function finalizeLiveSessionStart(session, body, user, { resumed = false } = {}) {
+  const streamMode = session.stream_mode || getStreamMode();
+  if (!session.stream_mode) {
+    updateEntity('LiveStreamSession', session.id, { stream_mode: streamMode });
+    session = { ...session, stream_mode: streamMode };
+  }
+
+  if (streamMode === 'chunked' || streamMode === 'local') {
+    return {
+      success: true,
+      session: { ...session, status: 'live', stream_mode: 'chunked' },
+      streamMode: 'chunked',
+      resumed,
+      message: resumed
+        ? 'Live dashcam resumed — fleet office is still watching.'
+        : body.sessionId
+          ? 'Live dashcam started — fleet office can watch now. Full video saves when you stop.'
+          : 'Live dashcam started — fleet managers can watch in Driver Media (~3–5 sec delay). Full video saves for 15 days when you stop.',
+    };
+  }
+
+  const room = session.room_name || roomName(session.id);
+  if (!session.room_name) {
+    updateEntity('LiveStreamSession', session.id, { room_name: room, stream_mode: 'livekit' });
+  }
+
+  const publisherToken = await buildToken({
+    room,
+    identity: user.id,
+    name: user.full_name || user.email,
+    canPublish: true,
+    canSubscribe: false,
+  });
+
+  const cfg = liveKitConfig();
+  return {
+    success: true,
+    session: { ...session, room_name: room, status: 'live', stream_mode: 'livekit' },
+    streamMode: 'livekit',
+    livekitUrl: cfg.url,
+    token: publisherToken,
+    resumed,
+    message: resumed
+      ? 'Live video resumed — your fleet office is still watching.'
+      : body.sessionId
+        ? 'Live video started — your fleet office is now watching.'
+        : 'Live video started — fleet managers can watch in Driver Media. Recording saves automatically for 15 days.',
+  };
+}
+
 export async function startLiveVideoStream(body, user) {
   assertDriver(user);
 
@@ -173,9 +272,27 @@ export async function startLiveVideoStream(body, user) {
     throw new Error('Dashcam recording is turned off for your fleet — your fleet manager can re-enable it in Driver Media.');
   }
 
-  const active = filterEntities('LiveStreamSession', { driver_id: user.id, status: 'live' }, null, 1)[0];
+  let active = filterEntities('LiveStreamSession', { driver_id: user.id, status: 'live' }, null, 1)[0];
+  if (active && isStaleLiveSession(active)) {
+    clearStaleLiveSession(active);
+    active = null;
+  }
+
   if (active) {
-    throw new Error('Stop the current live stream before starting a new one');
+    if (body.sessionId && body.sessionId !== active.id) {
+      endLiveSession(active.id, 'replaced_by_request');
+      deleteSessionLiveChunks(active.id);
+      active = null;
+    } else {
+      updateEntity('LiveStreamSession', active.id, {
+        stream_mode: getStreamMode(),
+        vehicle_id: body.vehicleId || active.vehicle_id || '',
+        vehicle_unit_number: body.vehicleUnitNumber || active.vehicle_unit_number || '',
+        trailer_unit_number: body.trailerUnitNumber || active.trailer_unit_number || '',
+      });
+      const session = getEntity('LiveStreamSession', active.id);
+      return finalizeLiveSessionStart(session, body, user, { resumed: true });
+    }
   }
 
   const ts = nowIso();
@@ -223,47 +340,17 @@ export async function startLiveVideoStream(body, user) {
     });
   }
 
-  const streamMode = session.stream_mode || getStreamMode();
-  if (!session.stream_mode) {
-    updateEntity('LiveStreamSession', session.id, { stream_mode: streamMode });
-    session = { ...session, stream_mode: streamMode };
+  return finalizeLiveSessionStart(session, body, user);
+}
+
+export function getMyLiveVideoSession(_body, user) {
+  assertDriver(user);
+  let active = filterEntities('LiveStreamSession', { driver_id: user.id, status: 'live' }, null, 1)[0];
+  if (active && isStaleLiveSession(active)) {
+    clearStaleLiveSession(active);
+    active = null;
   }
-
-  if (streamMode === 'chunked' || streamMode === 'local') {
-    return {
-      success: true,
-      session: { ...session, status: 'live', stream_mode: 'chunked' },
-      streamMode: 'chunked',
-      message: body.sessionId
-        ? 'Live dashcam started — fleet office can watch now. Full video saves when you stop.'
-        : 'Live dashcam started — fleet managers can watch in Driver Media (~3–5 sec delay). Full video saves for 15 days when you stop.',
-    };
-  }
-
-  const room = session.room_name || roomName(session.id);
-  if (!session.room_name) {
-    updateEntity('LiveStreamSession', session.id, { room_name: room, stream_mode: 'livekit' });
-  }
-
-  const publisherToken = await buildToken({
-    room,
-    identity: user.id,
-    name: user.full_name || user.email,
-    canPublish: true,
-    canSubscribe: false,
-  });
-
-  const cfg = liveKitConfig();
-  return {
-    success: true,
-    session: { ...session, room_name: room, status: 'live', stream_mode: 'livekit' },
-    streamMode: 'livekit',
-    livekitUrl: cfg.url,
-    token: publisherToken,
-    message: body.sessionId
-      ? 'Live video started — your fleet office is now watching.'
-      : 'Live video started — fleet managers can watch in Driver Media. Recording saves automatically for 15 days.',
-  };
+  return { session: active || null };
 }
 
 export function requestLiveVideoForDriver(body, user, ctx) {
@@ -396,11 +483,13 @@ export function listDriversForLiveVideo(_body, user, ctx) {
 
 export async function stopLiveVideoStream(body, user) {
   assertDriver(user);
-  const { sessionId } = body;
-  if (!sessionId) throw new Error('sessionId is required');
-
-  const session = getEntity('LiveStreamSession', sessionId);
-  if (!session) throw new Error('Session not found');
+  let sessionId = body.sessionId;
+  let session = sessionId ? getEntity('LiveStreamSession', sessionId) : null;
+  if (!session) {
+    session = filterEntities('LiveStreamSession', { driver_id: user.id, status: 'live' }, null, 1)[0];
+    sessionId = session?.id;
+  }
+  if (!session) throw new Error('No active live stream');
   if (session.driver_id !== user.id) throw new Error('Not your live stream session');
 
   const ts = nowIso();
