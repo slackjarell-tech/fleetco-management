@@ -1,11 +1,24 @@
 import { useRef, useCallback } from 'react';
-import { attachStreamToVideo, startCameraStream, stopCameraStream, captureFrameFromVideo } from '@/lib/nativeBridge';
+import {
+  attachStreamToVideo,
+  startCameraStream,
+  stopCameraStream,
+  captureFrameFromVideo,
+  captureFrameFromStream,
+} from '@/lib/nativeBridge';
 import { uploadLiveChunk, uploadLivePreviewFrame } from '@/lib/liveVideo';
 import { api } from '@/api/apiClient';
 
 function pickMimeType() {
-  const types = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
-  return types.find((t) => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+  const types = [
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+    'video/mp4',
+    'video/mp4;codecs=h264',
+    'video/mp4;codecs=avc1',
+  ];
+  return types.find((t) => MediaRecorder.isTypeSupported(t)) || '';
 }
 
 const CHUNK_MS = 1500;
@@ -36,9 +49,12 @@ export function useChunkedLiveRecorder() {
   const uploadPreviewFrame = useCallback(async () => {
     const videoEl = videoElRef.current;
     const sessionId = sessionIdRef.current;
-    if (!videoEl?.videoWidth || !sessionId) return;
+    const stream = roadStreamRef.current;
+    if (!sessionId || (!videoEl?.videoWidth && !stream)) return;
 
-    const { file } = await captureFrameFromVideo(videoEl, 0.72);
+    const { file } = videoEl?.videoWidth
+      ? await captureFrameFromVideo(videoEl, 0.72)
+      : await captureFrameFromStream(stream, 0.72);
     const seq = frameSeqRef.current;
     frameSeqRef.current += 1;
     const tel = getTelemetryRef.current?.() || {};
@@ -109,12 +125,16 @@ export function useChunkedLiveRecorder() {
     const mime = pickMimeType();
     chunksRef.current = [];
     let recorder;
-    try {
-      recorder = new MediaRecorder(roadStream, {
-        mimeType: mime,
-        videoBitsPerSecond: 2_000_000,
-      });
-    } catch {
+    if (mime) {
+      try {
+        recorder = new MediaRecorder(roadStream, {
+          mimeType: mime,
+          videoBitsPerSecond: 2_000_000,
+        });
+      } catch {
+        recorder = new MediaRecorder(roadStream);
+      }
+    } else {
       recorder = new MediaRecorder(roadStream);
     }
 

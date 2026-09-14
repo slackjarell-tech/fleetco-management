@@ -34,6 +34,8 @@ export default function DriverDashcam() {
     refreshPosition,
     getRoadStream,
     bindRoadPreview,
+    releaseRoadPreviewForLive,
+    restoreRoadPreviewToHidden,
     cameraActive,
     activateDevices,
   } = useDriverDevice();
@@ -158,9 +160,10 @@ export default function DriverDashcam() {
         }
         if (cancelled) return;
 
-        let existingStream = getRoadStream();
+        releaseRoadPreviewForLive();
+        const existingStream = getRoadStream();
         if (existingStream) {
-          bindRoadPreview(roadPreviewRef.current);
+          await bindRoadPreview(roadPreviewRef.current);
         }
 
         await startDashcamForegroundService(`${boot.unitLabel} — live to fleet`);
@@ -208,6 +211,7 @@ export default function DriverDashcam() {
     activateDevices,
     getRoadStream,
     bindRoadPreview,
+    releaseRoadPreviewForLive,
     getTelemetry,
     livePublisher,
     chunkedRecorder,
@@ -247,6 +251,7 @@ export default function DriverDashcam() {
       const { roadBlob } = streamMode === 'livekit'
         ? await livePublisher.stop()
         : await chunkedRecorder.stop();
+      restoreRoadPreviewToHidden();
       await stopDashcamForegroundService();
       await api.functions.invoke('stopLiveVideoStream', { sessionId: session.id });
 
@@ -284,7 +289,7 @@ export default function DriverDashcam() {
     } finally {
       setUploading(false);
     }
-  }, [session, streamMode, livePublisher, chunkedRecorder, refreshPosition]);
+  }, [session, streamMode, livePublisher, chunkedRecorder, refreshPosition, restoreRoadPreviewToHidden]);
 
   useDashcamAutoStart({
     enabled: autoDashcam && !autoStartPaused,

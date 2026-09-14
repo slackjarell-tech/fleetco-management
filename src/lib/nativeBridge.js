@@ -178,6 +178,18 @@ export function stopCameraStream(stream) {
   stream.getTracks().forEach((t) => t.stop());
 }
 
+/** Capture a JPEG from a MediaStream (works when preview video has no frames yet). */
+export async function captureFrameFromStream(stream, quality = 0.85) {
+  if (!stream) throw new Error('Camera not ready');
+  const video = document.createElement('video');
+  try {
+    await attachStreamToVideo(video, stream);
+    return captureFrameFromVideo(video, quality);
+  } finally {
+    video.srcObject = null;
+  }
+}
+
 /** Capture a JPEG frame from an active video element */
 export async function captureFrameFromVideo(videoEl, quality = 0.85) {
   if (!videoEl?.videoWidth) {

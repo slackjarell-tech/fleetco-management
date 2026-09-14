@@ -163,39 +163,43 @@ const liveVideoUpload = multer({
   limits: { fileSize: 512 * 1024 * 1024 },
 });
 
+/** Buffer uploads — multer parses text fields after the file part, so diskStorage cannot rely on req.body.seq. */
 const liveChunkUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, _file, cb) => {
-      const sessionId = String(req.body?.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
-      if (!sessionId) return cb(new Error('sessionId is required'));
-      const dir = path.join(liveChunksDir, sessionId);
-      fs.mkdirSync(dir, { recursive: true });
-      cb(null, dir);
-    },
-    filename: (req, _file, cb) => {
-      const seq = String(Number(req.body?.seq) || 0).padStart(6, '0');
-      cb(null, `chunk-${seq}.webm`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
 });
 
 const livePreviewUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, _file, cb) => {
-      const sessionId = String(req.body?.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
-      if (!sessionId) return cb(new Error('sessionId is required'));
-      const dir = path.join(liveChunksDir, sessionId);
-      fs.mkdirSync(dir, { recursive: true });
-      cb(null, dir);
-    },
-    filename: (req, _file, cb) => {
-      const seq = String(Number(req.body?.seq) || 0).padStart(6, '0');
-      cb(null, `preview-${seq}.jpg`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 3 * 1024 * 1024 },
 });
+
+function writeLiveChunkFile(sessionId, seq, ext, buffer) {
+  const safe = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  const safeExt = ext === 'mp4' ? 'mp4' : 'webm';
+  const dir = path.join(liveChunksDir, safe);
+  fs.mkdirSync(dir, { recursive: true });
+  const filename = `chunk-${String(seq).padStart(6, '0')}.${safeExt}`;
+  const filePath = path.join(dir, filename);
+  fs.writeFileSync(filePath, buffer);
+  return {
+    filePath,
+    fileUrl: `/uploads/live-chunks/${safe}/${filename}`,
+  };
+}
+
+function writeLivePreviewFile(sessionId, seq, buffer) {
+  const safe = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  const dir = path.join(liveChunksDir, safe);
+  fs.mkdirSync(dir, { recursive: true });
+  const filename = `preview-${String(seq).padStart(6, '0')}.jpg`;
+  const filePath = path.join(dir, filename);
+  fs.writeFileSync(filePath, buffer);
+  return {
+    filePath,
+    fileUrl: `/uploads/live-chunks/${safe}/${filename}`,
+  };
+}
 
 function signToken(userId) {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: '7d' });
@@ -1207,24 +1211,29 @@ app.post('/api/live-recordings/upload', requireAuth, liveVideoUpload.single('fil
 });
 
 app.post('/api/live-recordings/chunk', requireAuth, liveChunkUpload.single('file'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No chunk uploaded' });
-  const sessionId = String(req.body?.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
-  const seq = Number(req.body?.seq);
-  if (!sessionId || !Number.isFinite(seq)) {
-    return res.status(400).json({ error: 'sessionId and seq are required' });
-  }
-  const fileUrl = `/uploads/live-chunks/${sessionId}/chunk-${String(seq).padStart(6, '0')}.webm`;
   try {
-    await replicateToObjectStorage(req.file.path, fileUrl, req.file.mimetype || 'video/webm');
+    if (!req.file?.buffer) return res.status(400).json({ error: 'No chunk uploaded' });
+    const sessionId = String(req.body?.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    const seq = Number(req.body?.seq);
+    const ext = String(req.body?.ext || 'webm').replace(/[^a-z0-9]/gi, '') || 'webm';
+    if (!sessionId || !Number.isFinite(seq)) {
+      return res.status(400).json({ error: 'sessionId and seq are required' });
+    }
+    const { filePath, fileUrl } = writeLiveChunkFile(sessionId, seq, ext, req.file.buffer);
+    try {
+      await replicateToObjectStorage(filePath, fileUrl, req.file.mimetype || `video/${ext}`);
+    } catch (err) {
+      console.warn('[live-chunks] object storage mirror failed:', err.message);
+    }
+    res.json({
+      file_url: fileUrl,
+      file_size: req.file.size,
+      seq,
+      sessionId,
+    });
   } catch (err) {
-    console.warn('[live-chunks] object storage mirror failed:', err.message);
+    res.status(500).json({ error: err.message || 'Chunk upload failed' });
   }
-  res.json({
-    file_url: fileUrl,
-    file_size: req.file.size,
-    seq,
-    sessionId,
-  });
 });
 
 app.get('/api/live-recordings/chunk/:sessionId/:seq', requireAuth, async (req, res) => {
@@ -1236,7 +1245,7 @@ app.get('/api/live-recordings/chunk/:sessionId/:seq', requireAuth, async (req, r
       req.user,
       getEntityContext(req),
     );
-    res.type('.webm');
+    res.type(path.extname(filePath) === '.mp4' ? 'video/mp4' : 'video/webm');
     return res.sendFile(filePath);
   } catch (err) {
     const status = err.status || (err.message?.includes('not found') ? 404 : 403);
@@ -1245,24 +1254,28 @@ app.get('/api/live-recordings/chunk/:sessionId/:seq', requireAuth, async (req, r
 });
 
 app.post('/api/live-recordings/preview-frame', requireAuth, livePreviewUpload.single('file'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No preview frame uploaded' });
-  const sessionId = String(req.body?.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
-  const seq = Number(req.body?.seq);
-  if (!sessionId || !Number.isFinite(seq)) {
-    return res.status(400).json({ error: 'sessionId and seq are required' });
-  }
-  const fileUrl = `/uploads/live-chunks/${sessionId}/preview-${String(seq).padStart(6, '0')}.jpg`;
   try {
-    await replicateToObjectStorage(req.file.path, fileUrl, req.file.mimetype || 'image/jpeg');
+    if (!req.file?.buffer) return res.status(400).json({ error: 'No preview frame uploaded' });
+    const sessionId = String(req.body?.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    const seq = Number(req.body?.seq);
+    if (!sessionId || !Number.isFinite(seq)) {
+      return res.status(400).json({ error: 'sessionId and seq are required' });
+    }
+    const { filePath, fileUrl } = writeLivePreviewFile(sessionId, seq, req.file.buffer);
+    try {
+      await replicateToObjectStorage(filePath, fileUrl, req.file.mimetype || 'image/jpeg');
+    } catch (err) {
+      console.warn('[live-preview] object storage mirror failed:', err.message);
+    }
+    res.json({
+      file_url: fileUrl,
+      file_size: req.file.size,
+      seq,
+      sessionId,
+    });
   } catch (err) {
-    console.warn('[live-preview] object storage mirror failed:', err.message);
+    res.status(500).json({ error: err.message || 'Preview upload failed' });
   }
-  res.json({
-    file_url: fileUrl,
-    file_size: req.file.size,
-    seq,
-    sessionId,
-  });
 });
 
 app.get('/api/live-recordings/preview/:sessionId/:seq', requireAuth, async (req, res) => {

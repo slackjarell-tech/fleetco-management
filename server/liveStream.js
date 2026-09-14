@@ -109,7 +109,19 @@ function sessionChunksDir(sessionId) {
 function chunkFilePath(sessionId, seq) {
   const dir = sessionChunksDir(sessionId);
   if (!dir) return null;
-  return path.join(dir, `chunk-${String(seq).padStart(6, '0')}.webm`);
+  const stem = `chunk-${String(seq).padStart(6, '0')}`;
+  for (const ext of ['webm', 'mp4']) {
+    const fp = path.join(dir, `${stem}.${ext}`);
+    if (fs.existsSync(fp)) return fp;
+  }
+  return path.join(dir, `${stem}.webm`);
+}
+
+function chunkFileUrl(sessionId, seq) {
+  const fp = chunkFilePath(sessionId, seq);
+  if (!fp) return null;
+  const safe = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  return `/uploads/live-chunks/${safe}/${path.basename(fp)}`;
 }
 
 function previewFilePath(sessionId, seq) {
@@ -559,6 +571,11 @@ export async function listActiveLiveVideoSessions(_body, user, ctx) {
     .filter(Boolean);
   const liveSessions = sessions
     .filter((s) => s.status === 'live')
+    .filter((s) => {
+      if (!isStaleLiveSession(s)) return true;
+      clearStaleLiveSession(s);
+      return false;
+    })
     .map((s) => ({
       ...s,
       stream_mode: normalizeStreamMode(s.stream_mode || getStreamMode()),
@@ -682,8 +699,9 @@ export function getLiveVideoPreview(body, user, ctx) {
       if (fp && fs.existsSync(fp)) {
         chunks.push({
           seq: s,
-          url: `/uploads/live-chunks/${path.basename(dir)}/chunk-${String(s).padStart(6, '0')}.webm`,
+          url: chunkFileUrl(sessionId, s),
           size: fs.statSync(fp).size,
+          ext: path.extname(fp).slice(1) || 'webm',
         });
       }
     }

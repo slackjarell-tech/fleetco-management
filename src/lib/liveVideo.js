@@ -1,12 +1,20 @@
 import { getToken } from '@/api/apiClient';
 import { apiUrl } from '@/lib/nativeBridge';
 
+function chunkExtension(blob) {
+  const type = blob?.type || '';
+  if (type.includes('mp4')) return 'mp4';
+  return 'webm';
+}
+
 /** Upload a live preview segment while recording (FleetCo chunked mode — no LiveKit). */
 export async function uploadLiveChunk(blob, { sessionId, seq } = {}) {
+  const ext = chunkExtension(blob);
   const form = new FormData();
-  form.append('file', blob, `chunk-${String(seq).padStart(6, '0')}.webm`);
   form.append('sessionId', sessionId);
   form.append('seq', String(seq));
+  form.append('ext', ext);
+  form.append('file', blob, `chunk-${String(seq).padStart(6, '0')}.${ext}`);
 
   const headers = {};
   const token = getToken?.() || localStorage.getItem('fleet_pulse_access_token');
@@ -29,9 +37,9 @@ export function liveChunkUrl(sessionId, seq) {
 /** Upload JPEG live preview frame (~1s refresh, no API keys). */
 export async function uploadLivePreviewFrame(blob, { sessionId, seq } = {}) {
   const form = new FormData();
-  form.append('file', blob, `preview-${String(seq).padStart(6, '0')}.jpg`);
   form.append('sessionId', sessionId);
   form.append('seq', String(seq));
+  form.append('file', blob, `preview-${String(seq).padStart(6, '0')}.jpg`);
 
   const headers = {};
   const token = getToken?.() || localStorage.getItem('fleet_pulse_access_token');

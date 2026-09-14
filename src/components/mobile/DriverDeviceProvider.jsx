@@ -153,9 +153,23 @@ export function DriverDeviceProvider({ user, children }) {
 
   const getRoadStream = useCallback(() => roadStreamRef.current, []);
 
+  const releaseRoadPreviewForLive = useCallback(() => {
+    if (roadVideoRef.current) {
+      roadVideoRef.current.pause();
+      roadVideoRef.current.srcObject = null;
+    }
+  }, []);
+
   const bindRoadPreview = useCallback((el) => {
     if (el && roadStreamRef.current) {
-      attachStreamToVideo(el, roadStreamRef.current).catch(() => {});
+      return attachStreamToVideo(el, roadStreamRef.current);
+    }
+    return Promise.resolve();
+  }, []);
+
+  const restoreRoadPreviewToHidden = useCallback(() => {
+    if (roadVideoRef.current && roadStreamRef.current) {
+      attachStreamToVideo(roadVideoRef.current, roadStreamRef.current).catch(() => {});
     }
   }, []);
 
@@ -180,6 +194,8 @@ export function DriverDeviceProvider({ user, children }) {
     captureDualEldFrames,
     refreshPosition,
     getRoadStream,
+    releaseRoadPreviewForLive,
+    restoreRoadPreviewToHidden,
     bindRoadPreview,
     bindCabinPreview(el) {
       if (el && cabinStreamRef.current) {

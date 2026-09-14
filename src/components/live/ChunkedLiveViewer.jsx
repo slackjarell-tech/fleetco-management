@@ -10,6 +10,7 @@ export default function ChunkedLiveViewer({ session }) {
   const videoRef = useRef(null);
   const imgRef = useRef(null);
   const blobPartsRef = useRef([]);
+  const chunkMimeRef = useRef('video/webm');
   const lastSeqRef = useRef(-1);
   const lastPreviewSeqRef = useRef(-1);
   const objectUrlRef = useRef(null);
@@ -42,6 +43,8 @@ export default function ChunkedLiveViewer({ session }) {
     const fetchChunkBlob = async (seq) => {
       const res = await fetch(liveChunkUrl(session.id, seq), { headers: authHeaders() });
       if (!res.ok) throw new Error('Could not load video segment');
+      const type = res.headers.get('content-type') || 'video/webm';
+      if (type.includes('mp4')) chunkMimeRef.current = 'video/mp4';
       return res.blob();
     };
 
@@ -90,7 +93,7 @@ export default function ChunkedLiveViewer({ session }) {
           }
 
           if (useVideoFallback || !preview.previewFrame) {
-            const combined = new Blob(blobPartsRef.current, { type: 'video/webm' });
+            const combined = new Blob(blobPartsRef.current, { type: chunkMimeRef.current });
             if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
             const url = URL.createObjectURL(combined);
             objectUrlRef.current = url;
