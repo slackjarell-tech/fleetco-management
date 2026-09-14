@@ -124,6 +124,12 @@ export function entityBelongsToCustomer(type, item, customerId, scopeIndex) {
     return true;
   }
 
+  if (type === 'TrailerAssignment') {
+    if (item.driver_id && userIds?.has(item.driver_id)) return true;
+    if (item.trailer_id && vehicleIds?.has(item.trailer_id)) return true;
+    if (matchesCustomerField(item, customerId)) return true;
+  }
+
   if (type === 'DeliveryStop' && item.route_id) {
     const route = getEntity('DeliveryRoute', item.route_id);
     if (route && matchesCustomerField(route, customerId)) return true;

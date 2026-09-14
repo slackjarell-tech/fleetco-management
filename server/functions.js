@@ -151,6 +151,18 @@ export async function invokeFunction(name, body, user, ctx = null) {
       const { importDeliveryManifest } = await import('./deliveryRouting.js');
       return importDeliveryManifest(body, user);
     }
+    case 'hookTrailer': {
+      const { hookTrailer } = await import('./trailerEquipment.js');
+      return hookTrailer(body, user);
+    }
+    case 'unhookTrailer': {
+      const { unhookTrailer } = await import('./trailerEquipment.js');
+      return unhookTrailer(body, user);
+    }
+    case 'listTrailerAssignments': {
+      const { listTrailerAssignments } = await import('./trailerEquipment.js');
+      return listTrailerAssignments(body, user);
+    }
     case 'startDashcamSession':
       return startDashcamSession(body, user);
     case 'captureDashcamFrame':

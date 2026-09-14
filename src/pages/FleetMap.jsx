@@ -1,85 +1,45 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { api } from '@/api/apiClient';
-import { MapPin, Truck, Filter, RefreshCw, AlertCircle, User } from 'lucide-react';
+import { MapPin, Truck, Filter, User, Route } from 'lucide-react';
 import SimulatorPanel from '@/components/simulation/SimulatorPanel';
+import {
+  getVehicleMapColor,
+  getVehicleMapColorKey,
+  MAP_COLOR_HEX,
+  MAP_COLOR_LABELS,
+  mpsToMph,
+} from '@/lib/vehicleMapColors';
+import {
+  truckCircleIcon,
+  trailerRectIcon,
+  offsetTrailerCoords,
+  startOfLocalDay,
+} from '@/lib/fleetMapMarkers';
 
-const STATUS_COLORS = {
-  active: '#22c55e',
-  in_shop: '#ef4444',
-  waiting_for_parts: '#f97316',
-  out_of_service: '#dc2626',
-  inactive: '#94a3b8',
-  pending_inspection: '#f59e0b',
-  leased_out: '#8b5cf6',
-  retired: '#64748b',
-  sold: '#64748b',
+const MAP_DOT = {
+  driveable: 'bg-green-500',
+  support_needed: 'bg-red-500',
+  in_shop: 'bg-blue-500',
 };
-
-const STATUS_DOT = {
-  active: 'bg-green-500',
-  in_shop: 'bg-red-500',
-  waiting_for_parts: 'bg-orange-500',
-  out_of_service: 'bg-red-600',
-  inactive: 'bg-slate-400',
-  pending_inspection: 'bg-amber-500',
-  leased_out: 'bg-purple-500',
-  retired: 'bg-slate-500',
-  sold: 'bg-slate-500',
-};
-
-// US city coordinates map for demo/manual location
-const CITY_COORDS = {
-  'chicago': [41.8781, -87.6298],
-  'dallas': [32.7767, -96.7970],
-  'houston': [29.7604, -95.3698],
-  'atlanta': [33.7490, -84.3880],
-  'los angeles': [34.0522, -118.2437],
-  'new york': [40.7128, -74.0060],
-  'miami': [25.7617, -80.1918],
-  'denver': [39.7392, -104.9903],
-  'phoenix': [33.4484, -112.0740],
-  'seattle': [47.6062, -122.3321],
-  'nashville': [36.1627, -86.7816],
-  'memphis': [35.1495, -90.0490],
-  'st. louis': [38.6270, -90.1994],
-  'kansas city': [39.0997, -94.5786],
-  'indianapolis': [39.7684, -86.1581],
-  'columbus': [39.9612, -82.9988],
-  'charlotte': [35.2271, -80.8431],
-  'jacksonville': [30.3322, -81.6557],
-  'austin': [30.2672, -97.7431],
-  'san antonio': [29.4241, -98.4936],
-};
-
-function guessCoords(locationStr) {
-  if (!locationStr) return null;
-  const lower = locationStr.toLowerCase();
-  for (const [city, coords] of Object.entries(CITY_COORDS)) {
-    if (lower.includes(city)) return coords;
-  }
-  return null;
-}
 
 export default function FleetMap() {
-  const [user, setUser] = useState(null);
   const [vehicles, setVehicles] = useState([]);
-  const [loads, setLoads] = useState([]);
   const [users, setUsers] = useState([]);
   const [driverLocations, setDriverLocations] = useState([]);
+  const [activeShifts, setActiveShifts] = useState([]);
   const [showDrivers, setShowDrivers] = useState(true);
+  const [showTrails, setShowTrails] = useState(true);
+  const [showTrailers, setShowTrailers] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterColor, setFilterColor] = useState('all');
   const [MapComponents, setMapComponents] = useState(null);
 
   useEffect(() => {
-    // Dynamically import react-leaflet to avoid SSR issues
     Promise.all([
       import('react-leaflet'),
       import('leaflet'),
     ]).then(([rl, L]) => {
-      // Fix default marker icon
       delete L.default.Icon.Default.prototype._getIconUrl;
       L.default.Icon.Default.mergeOptions({
         iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -90,199 +50,214 @@ export default function FleetMap() {
     });
   }, []);
 
-  useEffect(() => {
-    api.auth.me().then(async u => {
-      setUser(u);
-      const [vs, ls, us, locs] = await Promise.all([
-        api.entities.Vehicle.list(),
-        api.entities.Load.list('-pickup_date', 200),
-        api.entities.User.list(),
-        api.entities.DriverLocation.list('-timestamp', 500),
-      ]);
-      setVehicles(vs);
-      setLoads(ls);
-      setUsers(us);
-      setDriverLocations(locs || []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-
-    // Real-time subscription for driver locations (includes simulated drivers)
-    const unsubscribe = api.entities.DriverLocation.subscribe((event) => {
-      if (event.type === 'create') {
-        setDriverLocations(prev => [...prev, event.data]);
-      }
-    });
-
-    return () => unsubscribe();
+  const loadData = useCallback(async () => {
+    const [vs, us, locs, shifts] = await Promise.all([
+      api.entities.Vehicle.list(),
+      api.entities.User.list(),
+      api.entities.DriverLocation.list('-timestamp', 2000),
+      api.entities.TimeClockEntry.filter({}, '-clock_in', 300),
+    ]);
+    setVehicles(vs);
+    setUsers(us);
+    setDriverLocations(locs || []);
+    setActiveShifts((shifts || []).filter((e) => e.entry_type === 'shift' && !e.clock_out));
+    setLoading(false);
   }, []);
 
-  const userMap = useMemo(() => Object.fromEntries(users.map(u => [u.id, u])), [users]);
+  useEffect(() => {
+    loadData().catch(() => setLoading(false));
+    const unsubscribe = api.entities.DriverLocation.subscribe((event) => {
+      if (event.type === 'create') {
+        setDriverLocations((prev) => [...prev, event.data]);
+      }
+    });
+    const poll = setInterval(() => { loadData().catch(() => {}); }, 45000);
+    return () => {
+      unsubscribe();
+      clearInterval(poll);
+    };
+  }, [loadData]);
 
-  // Get latest location per driver — includes simulated drivers (sim_driver_*)
+  const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
+  const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, v])), [vehicles]);
+
+  const activeShiftByUser = useMemo(() => {
+    const map = {};
+    activeShifts.forEach((s) => { map[s.user_id] = s; });
+    return map;
+  }, [activeShifts]);
+
   const liveDrivers = useMemo(() => {
     const eightHoursAgo = Date.now() - 8 * 60 * 60 * 1000;
-    const recent = (driverLocations || []).filter(l => new Date(l.timestamp).getTime() > eightHoursAgo);
+    const recent = (driverLocations || []).filter((l) => new Date(l.timestamp).getTime() > eightHoursAgo);
     const latest = {};
-    recent.forEach(l => {
+    recent.forEach((l) => {
       if (!latest[l.user_id] || new Date(l.timestamp) > new Date(latest[l.user_id].timestamp)) {
         latest[l.user_id] = l;
       }
     });
-    return Object.values(latest).filter(d => userMap[d.user_id] || d.user_id?.startsWith('sim_driver_'));
+    return Object.values(latest).filter((d) => userMap[d.user_id] || d.user_id?.startsWith('sim_driver_'));
   }, [driverLocations, userMap]);
 
-  // Map vehicles to last known location from active loads
-  const mappedVehicles = useMemo(() => {
-    const activeLoads = loads.filter(l => l.status === 'in_transit' || l.status === 'assigned');
-    const vehicleLoad = {};
-    activeLoads.forEach(l => {
-      if (l.assigned_vehicle_id && !vehicleLoad[l.assigned_vehicle_id]) {
-        vehicleLoad[l.assigned_vehicle_id] = l;
-      }
+  const todayTrails = useMemo(() => {
+    const dayStart = startOfLocalDay();
+    const byUser = {};
+    (driverLocations || []).forEach((l) => {
+      if (new Date(l.timestamp) < dayStart) return;
+      if (!byUser[l.user_id]) byUser[l.user_id] = [];
+      byUser[l.user_id].push([l.lat, l.lng]);
     });
+    Object.keys(byUser).forEach((uid) => {
+      const pings = (driverLocations || [])
+        .filter((l) => l.user_id === uid && new Date(l.timestamp) >= dayStart)
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      byUser[uid] = pings.map((p) => [p.lat, p.lng]);
+    });
+    return byUser;
+  }, [driverLocations]);
 
-    return vehicles.map(v => {
-      const load = vehicleLoad[v.id];
-      const location = load?.origin || v.notes;
-      const coords = guessCoords(location) || guessCoords(load?.destination);
-      return { ...v, activeLoad: load, lastKnownLocation: location, coords };
-    }).filter(v => v.coords);
-  }, [vehicles, loads]);
+  const parkedTrailers = useMemo(() => {
+    return vehicles.filter((v) => {
+      if (v.unit_type !== 'trailer') return false;
+      if (v.coupled_driver_id) return false;
+      return v.last_known_lat != null && v.last_known_lng != null;
+    });
+  }, [vehicles]);
 
-  const filtered = useMemo(() =>
-    filterStatus === 'all' ? mappedVehicles : mappedVehicles.filter(v => v.status === filterStatus),
-    [mappedVehicles, filterStatus]
-  );
-
-  const statusCounts = useMemo(() => {
-    const counts = {};
-    vehicles.forEach(v => { counts[v.status] = (counts[v.status] || 0) + 1; });
+  const colorCounts = useMemo(() => {
+    const counts = { driveable: 0, support_needed: 0, in_shop: 0 };
+    vehicles.forEach((v) => {
+      const key = getVehicleMapColorKey(v);
+      if (counts[key] != null) counts[key] += 1;
+    });
     return counts;
   }, [vehicles]);
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      {/* Header */}
       <div className="bg-slate-900 px-5 py-3 flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <MapPin className="w-4 h-4 text-amber-400" />
           <span className="text-white font-black text-sm">Fleet Map</span>
-          <span className="text-slate-400 text-xs">— Last known locations from active loads</span>
+          <span className="text-slate-400 text-xs">— Live trucks, trailer sign-in locations, daily trails</span>
           {liveDrivers.length > 0 && (
-            <span className="flex items-center gap-1 text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full ml-2">
-              <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
-              {liveDrivers.length} live driver{liveDrivers.length !== 1 ? 's' : ''}
+            <span className="flex items-center gap-1 text-xs bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full ml-2">
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+              {liveDrivers.length} live
             </span>
           )}
         </div>
-        <div className="flex gap-2 ml-auto flex-wrap">
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+        <div className="flex gap-2 ml-auto flex-wrap items-center">
+          <label className="flex items-center gap-1.5 text-xs text-slate-300">
+            <input type="checkbox" checked={showTrails} onChange={(e) => setShowTrails(e.target.checked)} />
+            Trails
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-300">
+            <input type="checkbox" checked={showTrailers} onChange={(e) => setShowTrailers(e.target.checked)} />
+            Trailers
+          </label>
+          <select value={filterColor} onChange={(e) => setFilterColor(e.target.value)}
             className="bg-slate-800 border border-slate-600 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none">
-            <option value="all">All Statuses ({vehicles.length})</option>
-            {Object.entries(statusCounts).map(([s, c]) => (
-              <option key={s} value={s}>{s.replace(/_/g, ' ')} ({c})</option>
+            <option value="all">All colors ({vehicles.length})</option>
+            {Object.entries(MAP_COLOR_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label} ({colorCounts[key] || 0})</option>
             ))}
           </select>
         </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
         <div className="w-72 bg-white border-r border-slate-200 flex flex-col overflow-hidden flex-shrink-0">
           <div className="p-3 border-b border-slate-100 bg-slate-50">
             <p className="text-xs font-black text-slate-500 uppercase tracking-wider">
-              {filtered.length} vehicles on map
+              {liveDrivers.length} live · {parkedTrailers.length} parked trailers
             </p>
           </div>
           <div className="p-2 border-b border-slate-100">
             <SimulatorPanel />
           </div>
+
           <div className="overflow-y-auto flex-1">
-            {filtered.length === 0 ? (
+            {liveDrivers.length === 0 ? (
               <div className="p-5 text-center text-slate-400 text-sm">
                 <Truck className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                <p>No vehicles with location data.</p>
-                <p className="text-xs mt-1">Location is inferred from active load origins.</p>
+                <p>No live drivers on map.</p>
+                <p className="text-xs mt-1">Drivers appear when clocked in with location sharing.</p>
               </div>
-            ) : filtered.map(v => {
-              const driver = userMap[v.assigned_driver_id];
+            ) : liveDrivers.map((d) => {
+              const driverInfo = userMap[d.user_id];
+              const shift = activeShiftByUser[d.user_id];
+              const truck = d.vehicle_id ? vehicleMap[d.vehicle_id] : null;
+              const trailer = d.trailer_id ? vehicleMap[d.trailer_id] : null;
+              const colorKey = truck ? getVehicleMapColorKey(truck) : 'driveable';
+              if (filterColor !== 'all' && truck && colorKey !== filterColor) return null;
+              const age = Math.round((Date.now() - new Date(d.timestamp).getTime()) / 60000);
+              const mph = mpsToMph(d.speed);
               return (
-                <div key={v.id} onClick={() => setSelected(selected?.id === v.id ? null : v)}
-                  className={`p-3 border-b border-slate-50 cursor-pointer hover:bg-amber-50 transition-colors ${selected?.id === v.id ? 'bg-amber-50 border-l-4 border-l-amber-500' : ''}`}>
+                <div key={d.user_id} onClick={() => setSelectedDriver(d)}
+                  className={`p-3 border-b border-slate-50 cursor-pointer hover:bg-amber-50 ${selectedDriver?.user_id === d.user_id ? 'bg-amber-50 border-l-4 border-l-amber-500' : ''}`}>
                   <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[v.status] || 'bg-slate-400'}`} />
-                    <span className="font-black text-slate-800 text-sm">Unit {v.unit_number}</span>
-                    <span className="text-xs text-slate-400 ml-auto capitalize">{v.status?.replace(/_/g, ' ')}</span>
+                    <span className={`w-3 h-3 rounded-full flex-shrink-0 ${MAP_DOT[colorKey] || 'bg-slate-400'}`} />
+                    <span className="font-black text-slate-800 text-sm truncate">{driverInfo?.full_name || d.user_name}</span>
+                    <span className="text-xs text-slate-400 ml-auto">{age}m</span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5 ml-4">{v.year} {v.make} {v.model}</div>
-                  {driver && <div className="text-xs text-blue-600 mt-0.5 ml-4">👤 {driver.full_name}</div>}
-                  {v.activeLoad && <div className="text-xs text-amber-600 mt-0.5 ml-4">🚛 Load #{v.activeLoad.load_number}</div>}
-                  <div className="text-xs text-slate-400 mt-0.5 ml-4 truncate">📍 {v.lastKnownLocation || 'Unknown'}</div>
+                  <div className="text-xs text-slate-600 mt-1 ml-5">
+                    {d.vehicle_unit_number === 'POV' ? '🚗 POV' : d.vehicle_unit_number ? `🚛 #${d.vehicle_unit_number}` : 'No truck'}
+                    {d.trailer_unit_number && ` · 📦 #${d.trailer_unit_number}`}
+                  </div>
+                  <div className="text-xs text-slate-500 ml-5 mt-0.5">
+                    {mph > 0 ? `${mph} mph` : 'Stopped'}
+                    {shift && !shift.clock_out && <span className="text-emerald-600 font-bold ml-2">● On shift</span>}
+                  </div>
+                  {trailer && (
+                    <div className="text-[10px] text-slate-400 ml-5 mt-0.5 capitalize">
+                      Trailer: {MAP_COLOR_LABELS[getVehicleMapColorKey(trailer)] || 'Unknown'}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
-          {/* Live Drivers */}
-          {liveDrivers.length > 0 && (
-            <div className="p-3 border-t border-slate-200 bg-blue-50">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-black text-blue-700 uppercase tracking-wider flex items-center gap-1">
-                  <User className="w-3 h-3" /> Live Drivers ({liveDrivers.length})
-                </p>
-                <button onClick={() => setShowDrivers(!showDrivers)}
-                  className={`text-xs font-bold px-2 py-0.5 rounded ${showDrivers ? 'bg-blue-200 text-blue-700' : 'bg-slate-200 text-slate-500'}`}>
-                  {showDrivers ? 'Hide' : 'Show'}
-                </button>
-              </div>
-              <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                {liveDrivers.map(d => {
-                  const driverInfo = userMap[d.user_id];
-                  const age = Math.round((Date.now() - new Date(d.timestamp).getTime()) / 60000);
-                  const isSim = d.user_id?.startsWith('sim_driver_');
-                  return (
-                    <div key={d.user_id} onClick={() => setSelectedDriver(d)}
-                      className={`text-xs p-1.5 rounded cursor-pointer hover:bg-blue-100 ${selectedDriver?.user_id === d.user_id ? 'bg-blue-100' : ''}`}>
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isSim ? 'bg-amber-500 animate-pulse' : 'bg-blue-500 animate-pulse'}`} />
-                        <span className="font-bold text-slate-700 truncate flex-1">{driverInfo?.full_name || d.user_name}</span>
-                        <span className="text-slate-400 flex-shrink-0">{age}m ago</span>
-                      </div>
-                      {(d.vehicle_unit_number || d.trailer_unit_number) && (
-                        <div className="ml-4 mt-0.5 text-[10px] text-slate-500">
-                          {d.vehicle_unit_number === 'POV' ? '🚗 POV' : d.vehicle_unit_number ? `🚛 Unit #${d.vehicle_unit_number}` : ''}
-                          {d.trailer_unit_number && ` + 📦 #${d.trailer_unit_number}`}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+          {parkedTrailers.length > 0 && (
+            <div className="p-3 border-t border-slate-200 bg-slate-50 max-h-36 overflow-y-auto">
+              <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Parked Trailers</p>
+              {parkedTrailers.map((t) => (
+                <div key={t.id} className="text-xs text-slate-600 py-1 flex items-center gap-2">
+                  <span className="w-3 h-2 rounded-sm flex-shrink-0" style={{ background: getVehicleMapColor(t) }} />
+                  <span className="font-bold">#{t.unit_number}</span>
+                  <span className="text-slate-400 truncate ml-auto">
+                    {t.last_known_at ? new Date(t.last_known_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* Status Legend */}
           <div className="p-3 border-t border-slate-100 bg-slate-50">
-            <p className="text-xs font-black text-slate-400 mb-2 uppercase tracking-wider">Fleet Status</p>
-            <div className="grid grid-cols-2 gap-1">
-              {Object.entries(statusCounts).map(([s, c]) => (
-                <div key={s} className="flex items-center gap-1.5 text-xs text-slate-600">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[s] || 'bg-slate-400'}`} />
-                  <span className="capitalize truncate">{s.replace(/_/g, ' ')}</span>
-                  <span className="text-slate-400 ml-auto">{c}</span>
+            <p className="text-xs font-black text-slate-400 mb-2 uppercase tracking-wider">Map Legend</p>
+            <div className="space-y-1.5 text-xs text-slate-600">
+              <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500" /> Circle = truck (live GPS)</div>
+              <div className="flex items-center gap-2"><span className="w-4 h-2.5 rounded-sm bg-green-500" /> Rectangle = trailer</div>
+              <div className="flex items-center gap-2"><Route className="w-3 h-3 text-blue-500" /> Line = today&apos;s trail</div>
+              {Object.entries(MAP_COLOR_LABELS).map(([key, label]) => (
+                <div key={key} className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${MAP_DOT[key]}`} style={{ background: MAP_COLOR_HEX[key] }} />
+                  {label}
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Map */}
         <div className="flex-1 relative">
           {!MapComponents ? (
             <div className="flex items-center justify-center h-full bg-slate-100">
@@ -291,86 +266,116 @@ export default function FleetMap() {
           ) : (
             <>
               <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-              <MapComponents.MapContainer
-                center={[39.5, -98.35]}
-                zoom={4}
-                style={{ height: '100%', width: '100%' }}
-              >
+              <MapComponents.MapContainer center={[39.5, -98.35]} zoom={4} style={{ height: '100%', width: '100%' }}>
                 <MapComponents.TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                {filtered.map(v => {
-                  const driver = userMap[v.assigned_driver_id];
-                  const color = STATUS_COLORS[v.status] || '#94a3b8';
-                  const icon = MapComponents.L.divIcon({
-                    html: `<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
-                    className: '',
-                    iconSize: [14, 14],
-                    iconAnchor: [7, 7],
-                  });
+
+                {showTrails && Object.entries(todayTrails).map(([userId, coords]) => {
+                  if (coords.length < 2) return null;
+                  const shift = activeShiftByUser[userId];
+                  const isActive = !!shift;
+                  const driverInfo = userMap[userId];
                   return (
-                    <MapComponents.Marker key={v.id} position={v.coords} icon={icon}
-                      eventHandlers={{ click: () => setSelected(v) }}>
+                    <MapComponents.Polyline
+                      key={`trail-${userId}`}
+                      positions={coords}
+                      pathOptions={{
+                        color: isActive ? '#3b82f6' : '#94a3b8',
+                        weight: 3,
+                        opacity: isActive ? 0.85 : 0.5,
+                        dashArray: isActive ? null : '6 8',
+                      }}
+                    >
                       <MapComponents.Popup>
-                        <div className="text-sm font-bold">Unit {v.unit_number}</div>
-                        <div className="text-xs text-gray-600">{v.year} {v.make} {v.model}</div>
-                        <div className="text-xs mt-1 capitalize font-semibold" style={{ color }}>{v.status?.replace(/_/g, ' ')}</div>
-                        {driver && <div className="text-xs text-blue-600">Driver: {driver.full_name}</div>}
-                        {v.activeLoad && <div className="text-xs text-orange-600">Load #{v.activeLoad.load_number}</div>}
-                        <div className="text-xs text-gray-500 mt-1">📍 {v.lastKnownLocation}</div>
+                        <div className="text-sm font-bold">{driverInfo?.full_name || userId}</div>
+                        <div className="text-xs text-gray-600">Today&apos;s route trail ({coords.length} points)</div>
+                        {!isActive && <div className="text-xs text-gray-500">Shift completed</div>}
                       </MapComponents.Popup>
-                    </MapComponents.Marker>
+                    </MapComponents.Polyline>
                   );
                 })}
 
-                {/* Live Driver Locations */}
-                {showDrivers && liveDrivers.map(d => {
-                  const driverInfo = userMap[d.user_id];
+                {showDrivers && liveDrivers.map((d) => {
+                  const truck = d.vehicle_id ? vehicleMap[d.vehicle_id] : null;
+                  const colorKey = truck ? getVehicleMapColorKey(truck) : 'driveable';
+                  if (filterColor !== 'all' && truck && colorKey !== filterColor) return null;
+
+                  const color = truck ? getVehicleMapColor(truck) : '#22c55e';
                   const isSim = d.user_id?.startsWith('sim_driver_');
-                  const dotColor = isSim ? '#f59e0b' : '#3b82f6';
-                  const glowColor = isSim ? 'rgba(245,158,11,0.3)' : 'rgba(59,130,246,0.2)';
-                  const driverIcon = MapComponents.L.divIcon({
-                    html: `<div style="background:${dotColor};width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px ${glowColor};position:relative">
-                      <div style="position:absolute;inset:-6px;border-radius:50%;background:${glowColor};animation:pulse 2s infinite"></div>
-                    </div>`,
-                    className: '',
-                    iconSize: [18, 18],
-                    iconAnchor: [9, 9],
+                  const truckIcon = truckCircleIcon(MapComponents.L, isSim ? '#f59e0b' : color, {
+                    speedMps: d.speed,
+                    label: d.vehicle_unit_number && d.vehicle_unit_number !== 'POV' ? `#${d.vehicle_unit_number}` : null,
+                    pulse: true,
                   });
-                  return (
-                    <MapComponents.Marker key={`driver-${d.user_id}`} position={[d.lat, d.lng]} icon={driverIcon}
+
+                  const markers = [
+                    <MapComponents.Marker key={`truck-${d.user_id}`} position={[d.lat, d.lng]} icon={truckIcon}
                       eventHandlers={{ click: () => setSelectedDriver(d) }}>
                       <MapComponents.Popup>
-                        <div className="text-sm font-bold">👤 {driverInfo?.full_name || d.user_name}</div>
-                        <div className="text-xs text-gray-600">{new Date(d.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
-                        <div className="text-xs text-blue-600 mt-1">📍 Lat: {d.lat?.toFixed(5)}, Lng: {d.lng?.toFixed(5)}</div>
-                        {d.speed > 0 && <div className="text-xs text-gray-500">Speed: {(d.speed * 2.237).toFixed(0)} mph</div>}
+                        <div className="text-sm font-bold">👤 {userMap[d.user_id]?.full_name || d.user_name}</div>
                         {d.vehicle_unit_number && (
-                          <div className="text-xs text-slate-700 font-semibold mt-1">
-                            {d.vehicle_unit_number === 'POV' ? '🚗 POV' : `🚛 Unit #${d.vehicle_unit_number}`}
-                            {d.trailer_unit_number && ` + 📦 #${d.trailer_unit_number}`}
+                          <div className="text-xs font-semibold text-slate-700">
+                            🚛 {d.vehicle_unit_number === 'POV' ? 'POV' : `Unit #${d.vehicle_unit_number}`}
                           </div>
                         )}
-                        <div className="text-xs text-emerald-600 font-bold mt-1 animate-pulse">● Live</div>
+                        <div className="text-xs text-gray-600">{new Date(d.timestamp).toLocaleTimeString()}</div>
+                        <div className="text-xs font-bold mt-1">{mpsToMph(d.speed) > 0 ? `${mpsToMph(d.speed)} mph` : 'Stopped'}</div>
+                        {truck && (
+                          <div className="text-xs capitalize mt-1" style={{ color }}>
+                            {MAP_COLOR_LABELS[getVehicleMapColorKey(truck)]}
+                          </div>
+                        )}
+                      </MapComponents.Popup>
+                    </MapComponents.Marker>,
+                  ];
+
+                  if (showTrailers && d.trailer_id && vehicleMap[d.trailer_id]) {
+                    const trailer = vehicleMap[d.trailer_id];
+                    const tColor = getVehicleMapColor(trailer);
+                    const [tLat, tLng] = offsetTrailerCoords(d.lat, d.lng);
+                    markers.push(
+                      <MapComponents.Marker key={`trailer-live-${d.trailer_id}`} position={[tLat, tLng]}
+                        icon={trailerRectIcon(MapComponents.L, tColor, { label: trailer.unit_number })}>
+                        <MapComponents.Popup>
+                          <div className="text-sm font-bold">📦 Trailer #{trailer.unit_number}</div>
+                          <div className="text-xs text-gray-600">Hooked — follows truck GPS</div>
+                          <div className="text-xs capitalize mt-1" style={{ color: tColor }}>
+                            {MAP_COLOR_LABELS[getVehicleMapColorKey(trailer)]}
+                          </div>
+                        </MapComponents.Popup>
+                      </MapComponents.Marker>,
+                    );
+                  }
+
+                  return markers;
+                })}
+
+                {showTrailers && parkedTrailers.map((t) => {
+                  if (filterColor !== 'all' && getVehicleMapColorKey(t) !== filterColor) return null;
+                  const stale = t.last_known_at && (Date.now() - new Date(t.last_known_at).getTime() > 24 * 60 * 60 * 1000);
+                  const color = getVehicleMapColor(t);
+                  return (
+                    <MapComponents.Marker key={`trailer-parked-${t.id}`}
+                      position={[t.last_known_lat, t.last_known_lng]}
+                      icon={trailerRectIcon(MapComponents.L, color, { label: t.unit_number, stale })}>
+                      <MapComponents.Popup>
+                        <div className="text-sm font-bold">📦 Trailer #{t.unit_number}</div>
+                        <div className="text-xs text-gray-600">Last signed out location</div>
+                        {t.last_driver_name && <div className="text-xs">Driver: {t.last_driver_name}</div>}
+                        {t.last_known_at && (
+                          <div className="text-xs text-gray-500">{new Date(t.last_known_at).toLocaleString()}</div>
+                        )}
+                        <div className="text-xs capitalize mt-1" style={{ color }}>
+                          {MAP_COLOR_LABELS[getVehicleMapColorKey(t)]}
+                        </div>
                       </MapComponents.Popup>
                     </MapComponents.Marker>
                   );
                 })}
-                </MapComponents.MapContainer>
+              </MapComponents.MapContainer>
             </>
-          )}
-
-          {filtered.length === 0 && MapComponents && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg p-6 text-center max-w-sm">
-                <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-                <p className="font-black text-slate-800">No Location Data Available</p>
-                <p className="text-sm text-slate-500 mt-1">
-                  Vehicle locations are inferred from active load origins (city names). Assign loads with city names in the origin field to see vehicles on the map.
-                </p>
-              </div>
-            </div>
           )}
         </div>
       </div>

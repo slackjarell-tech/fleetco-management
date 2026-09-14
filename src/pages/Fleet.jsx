@@ -13,14 +13,22 @@ import { isFleetCoAdmin, filterVehiclesForUser } from '@/lib/roles';
 import { canAddCustomerVehicles, isCustomerPortalUser } from '@/lib/customerRoles';
 import AddVehiclesWizard from '@/components/fleet/AddVehiclesWizard';
 
+import { getVehicleMapColorKey, MAP_COLOR_LABELS } from '@/lib/vehicleMapColors';
+
+const MAP_COLOR_BADGE = {
+  driveable: 'bg-green-100 text-green-700',
+  support_needed: 'bg-red-100 text-red-700',
+  in_shop: 'bg-blue-100 text-blue-700',
+};
+
 const STATUS_COLORS = {
   active: 'bg-green-100 text-green-700',
   inactive: 'bg-slate-100 text-slate-500',
-  in_shop: 'bg-red-100 text-red-600',
-  waiting_for_parts: 'bg-orange-100 text-orange-700',
+  in_shop: 'bg-blue-100 text-blue-700',
+  waiting_for_parts: 'bg-red-100 text-red-700',
   out_of_service: 'bg-red-200 text-red-800',
-  pending_inspection: 'bg-yellow-100 text-yellow-700',
-  leased_out: 'bg-blue-100 text-blue-700',
+  pending_inspection: 'bg-red-100 text-red-700',
+  leased_out: 'bg-green-100 text-green-700',
   retired: 'bg-purple-100 text-purple-700',
   sold: 'bg-slate-200 text-slate-600',
 };
@@ -178,9 +186,14 @@ export default function Fleet() {
                     <div className="text-sm text-slate-500">{[v.year, v.make, v.model].filter(Boolean).join(' ')}</div>
                   </div>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[v.status] || 'bg-slate-100 text-slate-500'}`}>
-                  {STATUS_LABELS[v.status] || v.status?.replace(/_/g, ' ')}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[v.status] || 'bg-slate-100 text-slate-500'}`}>
+                    {STATUS_LABELS[v.status] || v.status?.replace(/_/g, ' ')}
+                  </span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${MAP_COLOR_BADGE[getVehicleMapColorKey(v)] || 'bg-slate-100 text-slate-500'}`}>
+                    {MAP_COLOR_LABELS[getVehicleMapColorKey(v)] || 'Map'}
+                  </span>
+                </div>
               </div>
 
               <div className="space-y-1.5 text-sm">
@@ -258,6 +271,10 @@ export default function Fleet() {
           vehicles={vehicles}
           user={user}
           onClose={() => setDetailVehicle(null)}
+          onVehicleUpdated={(updated) => {
+            setVehicles((prev) => prev.map((v) => (v.id === updated.id ? { ...v, ...updated } : v)));
+            setDetailVehicle((prev) => (prev?.id === updated.id ? { ...prev, ...updated } : prev));
+          }}
         />
       )}
 

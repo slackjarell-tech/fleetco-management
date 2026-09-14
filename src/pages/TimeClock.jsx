@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@/api/apiClient';
-import { Clock, LogIn, LogOut, Wrench, Play, Square, Timer, Calendar, User, ChevronDown, MapPin, Navigation, Camera } from 'lucide-react';
+import { Clock, LogIn, LogOut, Wrench, Play, Square, User, MapPin, Navigation, Camera, Link2, Unlink } from 'lucide-react';
 import useDriverLocation from '@/hooks/useDriverLocation';
 import CameraCapture from '@/components/driver/CameraCapture';
 import DriverDutyBar from '@/components/driver/DriverDutyBar';
 import { isPlatformAdmin } from '@/lib/roles';
+import { getCurrentPosition } from '@/lib/nativeBridge';
 
 function formatDuration(minutes) {
   if (!minutes) return '0m';
@@ -37,6 +38,9 @@ export default function TimeClock() {
   const [photoUploading, setPhotoUploading] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [selectedTrailerId, setSelectedTrailerId] = useState('');
+  const [hookTrailerId, setHookTrailerId] = useState('');
+  const [trailerBusy, setTrailerBusy] = useState(false);
+  const [trailerMsg, setTrailerMsg] = useState('');
   const [vehicleConflict, setVehicleConflict] = useState(null);
 
   // Live clock tick
@@ -104,6 +108,64 @@ export default function TimeClock() {
     );
   };
 
+  const captureGps = async () => {
+    try {
+      const pos = await getCurrentPosition();
+      return { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy };
+    } catch {
+      return { lat: null, lng: null, accuracy: null };
+    }
+  };
+
+  const signInTrailer = async (trailerId, clockEntryId) => {
+    const gps = await captureGps();
+    return api.functions.invoke('hookTrailer', {
+      trailerId,
+      clockEntryId,
+      ...gps,
+    });
+  };
+
+  const signOutTrailer = async (trailerId, clockEntryId) => {
+    const gps = await captureGps();
+    return api.functions.invoke('unhookTrailer', {
+      trailerId,
+      clockEntryId,
+      ...gps,
+    });
+  };
+
+  const handleHookTrailer = async () => {
+    if (!hookTrailerId || !activeShift) return;
+    setTrailerBusy(true);
+    setTrailerMsg('');
+    try {
+      const result = await signInTrailer(hookTrailerId, activeShift.id);
+      setTrailerMsg(result.message || 'Trailer signed in');
+      setHookTrailerId('');
+      await loadData();
+    } catch (err) {
+      setTrailerMsg(err?.data?.error || err?.message || 'Could not sign in to trailer');
+    } finally {
+      setTrailerBusy(false);
+    }
+  };
+
+  const handleUnhookTrailer = async () => {
+    if (!activeShift?.trailer_id) return;
+    setTrailerBusy(true);
+    setTrailerMsg('');
+    try {
+      const result = await signOutTrailer(activeShift.trailer_id, activeShift.id);
+      setTrailerMsg(result.message || 'Trailer signed out');
+      await loadData();
+    } catch (err) {
+      setTrailerMsg(err?.data?.error || err?.message || 'Could not sign out of trailer');
+    } finally {
+      setTrailerBusy(false);
+    }
+  };
+
   const clockInShift = async () => {
     setVehicleConflict(null);
 
@@ -138,6 +200,11 @@ export default function TimeClock() {
     if (entry._offlineQueued) {
       setEntries((prev) => [entry, ...prev]);
     } else {
+      if (selectedTrailerId && selectedVehicleId !== 'pov') {
+        try {
+          await signInTrailer(selectedTrailerId, entry.id);
+        } catch { /* hook can be retried from shift panel */ }
+      }
       await loadData();
     }
     setNotes('');
@@ -148,6 +215,11 @@ export default function TimeClock() {
 
   const clockOutShift = async () => {
     setSavingShift(true);
+    if (activeShift?.trailer_id) {
+      try {
+        await signOutTrailer(activeShift.trailer_id, activeShift.id);
+      } catch { /* best effort */ }
+    }
     const clockOut = new Date().toISOString();
     const mins = elapsedMinutes(activeShift.clock_in);
     const updated = await api.entities.TimeClockEntry.update(activeShift.id, {
@@ -351,6 +423,44 @@ export default function TimeClock() {
 
                 <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes..."
                   rows={2} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
+              </div>
+            )}
+            {activeShift && activeShift.vehicle_id && activeShift.vehicle_unit_number !== 'POV' && (
+              <div className="mb-3 p-3 bg-white/70 rounded-xl border border-emerald-200 space-y-2">
+                <div className="text-xs font-black text-slate-600 uppercase tracking-wider">Trailer Sign-In</div>
+                {activeShift.trailer_id ? (
+                  <div className="space-y-2">
+                    <div className="text-sm font-bold text-slate-800">
+                      📦 Signed in: Trailer #{activeShift.trailer_unit_number}
+                    </div>
+                    <p className="text-xs text-slate-500">Fleet map shows this trailer moving with your truck. Sign out when you drop it.</p>
+                    <button type="button" onClick={handleUnhookTrailer} disabled={trailerBusy}
+                      className="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-60">
+                      <Unlink className="w-4 h-4" /> {trailerBusy ? 'Saving…' : 'Sign Out of Trailer'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <select value={hookTrailerId} onChange={(e) => setHookTrailerId(e.target.value)}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white">
+                      <option value="">— Select trailer to sign in —</option>
+                      {vehicles.filter((v) => v.unit_type === 'trailer' && v.status === 'active'
+                        && (!v.coupled_driver_id || v.coupled_driver_id === user.id)).map((v) => (
+                        <option key={v.id} value={v.id}>
+                          📦 #{v.unit_number} — {v.trailer_type || v.make}
+                          {v.coupled_driver_id === user.id ? ' (yours)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={handleHookTrailer} disabled={!hookTrailerId || trailerBusy}
+                      className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-40">
+                      <Link2 className="w-4 h-4" /> {trailerBusy ? 'Signing in…' : 'Sign In to Trailer'}
+                    </button>
+                  </div>
+                )}
+                {trailerMsg && (
+                  <div className="text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5">{trailerMsg}</div>
+                )}
               </div>
             )}
             {activeShift ? (

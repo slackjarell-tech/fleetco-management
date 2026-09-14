@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { X, Search, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { filterDriverRoster } from '@/lib/driverAccess';
 import { EQUIPMENT_CATEGORIES } from '@/lib/equipmentTypes';
+import { defaultMapColorFromStatus } from '@/lib/vehicleMapColors';
+import MapColorSelect from '@/components/fleet/MapColorSelect';
 
 export default function VehicleModal({ vehicle, users, customers = [], onSave, onClose }) {
   const drivers = filterDriverRoster(users);
@@ -27,6 +29,7 @@ export default function VehicleModal({ vehicle, users, customers = [], onSave, o
     vin: vehicle?.vin || '',
     license_plate: vehicle?.license_plate || '',
     status: vehicle?.status || 'active',
+    map_color: vehicle?.map_color || defaultMapColorFromStatus(vehicle?.status || 'active'),
     odometer: vehicle?.odometer || '',
     purchase_price: vehicle?.purchase_price || '',
     purchase_date: vehicle?.purchase_date || '',
@@ -118,7 +121,10 @@ export default function VehicleModal({ vehicle, users, customers = [], onSave, o
             </div>
             <div>
               <Label>Status</Label>
-              <Select value={form.status} onValueChange={v => set('status', v)}>
+              <Select value={form.status} onValueChange={(v) => {
+                set('status', v);
+                if (!vehicle?.map_color) set('map_color', defaultMapColorFromStatus(v));
+              }}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">Active</SelectItem>
@@ -133,6 +139,10 @@ export default function VehicleModal({ vehicle, users, customers = [], onSave, o
                 </SelectContent>
               </Select>
             </div>
+            <MapColorSelect
+              value={form.map_color}
+              onChange={(v) => set('map_color', v)}
+            />
             <div>
               <Label>Make</Label>
               <Input value={form.make} onChange={e => set('make', e.target.value)} className="mt-1" placeholder="e.g. Freightliner" />

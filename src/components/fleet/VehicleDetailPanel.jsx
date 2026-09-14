@@ -14,6 +14,13 @@ import {
 } from '@/lib/vehicleExternalLinks';
 import { VEHICLE_ACCESSORY_TYPES } from '@/lib/vehicleAccessoryTypes';
 import { useCustomerContext } from '@/lib/CustomerContext';
+import MapColorSelect from '@/components/fleet/MapColorSelect';
+import {
+  getVehicleMapColor,
+  getVehicleMapColorKey,
+  MAP_COLOR_LABELS,
+  defaultMapColorFromStatus,
+} from '@/lib/vehicleMapColors';
 
 const TABS = [
   { id: 'specs', label: 'Specs', icon: Truck },
@@ -33,7 +40,7 @@ function warrantyBadge(expiry) {
   );
 }
 
-export default function VehicleDetailPanel({ vehicle, vehicles, user, onClose }) {
+export default function VehicleDetailPanel({ vehicle, vehicles, user, onClose, onVehicleUpdated }) {
   const { viewAsCustomerId } = useCustomerContext();
   const [tab, setTab] = useState('specs');
   const [loading, setLoading] = useState(true);
@@ -41,6 +48,9 @@ export default function VehicleDetailPanel({ vehicle, vehicles, user, onClose })
   const [data, setData] = useState(null);
   const [showAccessoryModal, setShowAccessoryModal] = useState(false);
   const [editingAccessory, setEditingAccessory] = useState(null);
+  const [mapColor, setMapColor] = useState(vehicle?.map_color || defaultMapColorFromStatus(vehicle?.status));
+  const [mapColorSaving, setMapColorSaving] = useState(false);
+  const [mapColorMsg, setMapColorMsg] = useState('');
 
   const customerId = user?.customer_id || viewAsCustomerId || vehicle?.customer_id || null;
 
@@ -62,6 +72,26 @@ export default function VehicleDetailPanel({ vehicle, vehicles, user, onClose })
   }, [vehicle?.id, customerId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    setMapColor(vehicle?.map_color || defaultMapColorFromStatus(vehicle?.status));
+  }, [vehicle?.id, vehicle?.map_color, vehicle?.status]);
+
+  const handleMapColorChange = async (nextColor) => {
+    setMapColor(nextColor);
+    setMapColorSaving(true);
+    setMapColorMsg('');
+    try {
+      const updated = await api.entities.Vehicle.update(vehicle.id, { map_color: nextColor });
+      setMapColorMsg('Map color saved — visible on Fleet Map');
+      onVehicleUpdated?.(updated._offlineQueued ? { ...vehicle, map_color: nextColor } : updated);
+    } catch (err) {
+      setMapColorMsg(err?.message || 'Could not save map color');
+      setMapColor(vehicle?.map_color || defaultMapColorFromStatus(vehicle?.status));
+    } finally {
+      setMapColorSaving(false);
+    }
+  };
 
   const specs = data?.decode?.specs || {};
   const recalls = data?.recalls || [];
@@ -119,7 +149,14 @@ export default function VehicleDetailPanel({ vehicle, vehicles, user, onClose })
               {[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
               {vehicle.vin && <span className="font-mono ml-2 text-xs">{vehicle.vin}</span>}
             </p>
-            <div className="flex flex-wrap gap-2 mt-2">
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <span
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full text-white shadow-sm"
+                style={{ background: getVehicleMapColor({ ...vehicle, map_color: mapColor }) }}
+              >
+                <span className="w-2 h-2 rounded-full bg-white/80" />
+                {MAP_COLOR_LABELS[getVehicleMapColorKey({ ...vehicle, map_color: mapColor })]}
+              </span>
               <a href={nhtsaVinDecoderUrl(data?.vin || vehicle.vin)} target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:underline">
                 NHTSA VIN Decoder <ExternalLink className="w-3 h-3" />
@@ -178,14 +215,42 @@ export default function VehicleDetailPanel({ vehicle, vehicles, user, onClose })
             <>
               {tab === 'specs' && (
                 <div className="grid md:grid-cols-2 gap-4">
-                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                    <h3 className="font-black text-slate-900 text-sm mb-3">Fleet record</h3>
+                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-4">
+                    <h3 className="font-black text-slate-900 text-sm">Fleet record</h3>
                     <dl className="text-sm space-y-2">
                       <div className="flex justify-between"><dt className="text-slate-500">Status</dt><dd className="font-medium capitalize">{vehicle.status?.replace(/_/g, ' ')}</dd></div>
+                      <div className="flex justify-between"><dt className="text-slate-500">Unit type</dt><dd className="capitalize">{vehicle.unit_type || 'truck'}</dd></div>
                       <div className="flex justify-between"><dt className="text-slate-500">Plate</dt><dd>{vehicle.license_plate || '—'}</dd></div>
                       <div className="flex justify-between"><dt className="text-slate-500">Odometer</dt><dd>{vehicle.odometer ? `${vehicle.odometer.toLocaleString()} mi` : '—'}</dd></div>
                       {vehicle.trailer_type && <div className="flex justify-between"><dt className="text-slate-500">Trailer type</dt><dd>{vehicle.trailer_type}</dd></div>}
+                      {vehicle.last_known_at && (
+                        <div className="flex justify-between">
+                          <dt className="text-slate-500">Last drop-off</dt>
+                          <dd className="text-xs text-right">{new Date(vehicle.last_known_at).toLocaleString()}</dd>
+                        </div>
+                      )}
                     </dl>
+                    <div className="pt-3 border-t border-slate-200">
+                      <MapColorSelect
+                        value={mapColor}
+                        onChange={handleMapColorChange}
+                        label="Fleet Map Color"
+                        disabled={mapColorSaving}
+                      />
+                      {mapColorSaving && (
+                        <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Saving…
+                        </p>
+                      )}
+                      {mapColorMsg && !mapColorSaving && (
+                        <p className="text-xs text-emerald-700 mt-1 font-semibold">{mapColorMsg}</p>
+                      )}
+                      <p className="text-xs text-slate-500 mt-2">
+                        {vehicle.unit_type === 'trailer'
+                          ? 'Trailers show as colored rectangles on the map. While signed in, they follow the truck; after sign-out, they stay at the last drop location.'
+                          : 'Trucks show as colored circles on the map with live speed while a driver is on shift.'}
+                      </p>
+                    </div>
                   </div>
                   <div className="bg-white rounded-xl p-4 border border-slate-200">
                     <h3 className="font-black text-slate-900 text-sm mb-3">NHTSA decoded specs</h3>
