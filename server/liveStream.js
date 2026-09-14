@@ -63,6 +63,12 @@ function chunkFilePath(sessionId, seq) {
   return path.join(dir, `chunk-${String(seq).padStart(6, '0')}.webm`);
 }
 
+function previewFilePath(sessionId, seq) {
+  const dir = sessionChunksDir(sessionId);
+  if (!dir) return null;
+  return path.join(dir, `preview-${String(seq).padStart(6, '0')}.jpg`);
+}
+
 export function deleteSessionLiveChunks(sessionId) {
   const dir = sessionChunksDir(sessionId);
   if (dir) deleteLocalDirectory(dir);
@@ -187,6 +193,9 @@ export async function startLiveVideoStream(body, user) {
       status: 'live',
       started_at: ts,
       stream_mode: getStreamMode(),
+      vehicle_id: body.vehicleId || session.vehicle_id || '',
+      vehicle_unit_number: body.vehicleUnitNumber || session.vehicle_unit_number || '',
+      trailer_unit_number: body.trailerUnitNumber || session.trailer_unit_number || '',
     });
     session = getEntity('LiveStreamSession', session.id);
   } else {
@@ -200,6 +209,8 @@ export async function startLiveVideoStream(body, user) {
       driver_name: user.full_name || user.email,
       customer_id: user.customer_id || '',
       vehicle_id: body.vehicleId || '',
+      vehicle_unit_number: body.vehicleUnitNumber || '',
+      trailer_unit_number: body.trailerUnitNumber || '',
       status: 'live',
       stream_mode: getStreamMode(),
       room_name: '',
@@ -476,6 +487,51 @@ export async function listActiveLiveVideoSessions(_body, user, ctx) {
   };
 }
 
+export function registerLiveVideoPreviewFrame(body, user) {
+  assertDriver(user);
+
+  const {
+    sessionId,
+    seq,
+    fileUrl,
+    fileSizeBytes,
+    lat,
+    lng,
+    speedMps,
+    vehicleUnitNumber,
+  } = body;
+  if (!sessionId || seq == null || !fileUrl) {
+    throw new Error('sessionId, seq, and fileUrl are required');
+  }
+
+  const session = getEntity('LiveStreamSession', sessionId);
+  if (!session) throw new Error('Session not found');
+  if (session.driver_id !== user.id) throw new Error('Not your session');
+  if (session.status !== 'live') throw new Error('Session is not live');
+
+  const frameSeq = Number(seq);
+  const ts = nowIso();
+  const patch = {
+    latest_preview_url: fileUrl,
+    latest_preview_seq: frameSeq,
+    latest_preview_at: ts,
+    stream_mode: normalizeStreamMode(session.stream_mode),
+  };
+  if (lat != null) patch.live_lat = lat;
+  if (lng != null) patch.live_lng = lng;
+  if (speedMps != null) patch.live_speed_mps = speedMps;
+  if (vehicleUnitNumber) patch.vehicle_unit_number = vehicleUnitNumber;
+
+  updateEntity('LiveStreamSession', sessionId, patch);
+
+  return {
+    success: true,
+    seq: frameSeq,
+    latest_preview_at: ts,
+    file_size: fileSizeBytes ? Number(fileSizeBytes) : null,
+  };
+}
+
 export function registerLiveVideoChunk(body, user) {
   assertDriver(user);
 
@@ -544,6 +600,28 @@ export function getLiveVideoPreview(body, user, ctx) {
     }
   }
 
+  let driverLocation = null;
+  if (session.live_lat != null && session.live_lng != null) {
+    driverLocation = {
+      lat: session.live_lat,
+      lng: session.live_lng,
+      speed_mps: session.live_speed_mps ?? null,
+      at: session.latest_preview_at || session.latest_chunk_at || null,
+    };
+  } else {
+    const locs = listEntities('DriverLocation', '-timestamp', 50)
+      .filter((l) => l.user_id === session.driver_id);
+    const latest = locs[0];
+    if (latest?.lat != null && latest?.lng != null) {
+      driverLocation = {
+        lat: latest.lat,
+        lng: latest.lng,
+        speed_mps: latest.speed ?? null,
+        at: latest.timestamp || null,
+      };
+    }
+  }
+
   return {
     live: true,
     session: {
@@ -553,8 +631,28 @@ export function getLiveVideoPreview(body, user, ctx) {
     chunks,
     latestSeq,
     latestChunkAt: session.latest_chunk_at || null,
-    previewDelaySec: 3,
+    previewFrame: session.latest_preview_url ? {
+      url: session.latest_preview_url,
+      seq: session.latest_preview_seq ?? 0,
+      at: session.latest_preview_at || null,
+    } : null,
+    driverLocation,
+    previewDelaySec: 2,
   };
+}
+
+export function getLiveVideoPreviewFramePath(sessionId, seq, user, ctx) {
+  const session = getEntity('LiveStreamSession', sessionId);
+  if (!session) throw new Error('Session not found');
+  assertRecordingAccess({ customer_id: session.customer_id }, user, ctx);
+
+  const frameSeq = Number(seq);
+  if (!Number.isFinite(frameSeq) || frameSeq < 0) throw new Error('Invalid preview sequence');
+
+  const fp = previewFilePath(sessionId, frameSeq);
+  if (!fp || !fs.existsSync(fp)) throw new Error('Preview frame not found');
+
+  return { filePath: fp, session };
 }
 
 export function getLiveVideoChunkPath(sessionId, seq, user, ctx) {

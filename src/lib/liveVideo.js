@@ -26,6 +26,31 @@ export function liveChunkUrl(sessionId, seq) {
   return apiUrl(`/live-recordings/chunk/${sessionId}/${seq}`);
 }
 
+/** Upload JPEG live preview frame (~1s refresh, no API keys). */
+export async function uploadLivePreviewFrame(blob, { sessionId, seq } = {}) {
+  const form = new FormData();
+  form.append('file', blob, `preview-${String(seq).padStart(6, '0')}.jpg`);
+  form.append('sessionId', sessionId);
+  form.append('seq', String(seq));
+
+  const headers = {};
+  const token = getToken?.() || localStorage.getItem('fleet_pulse_access_token');
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(apiUrl('/live-recordings/preview-frame'), {
+    method: 'POST',
+    headers,
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Preview upload failed');
+  return data;
+}
+
+export function livePreviewUrl(sessionId, seq) {
+  return apiUrl(`/live-recordings/preview/${sessionId}/${seq}`);
+}
+
 /** Upload WebM recording after live stream ends. */
 export async function uploadLiveRecording(blob, { sessionId, track = 'road' } = {}) {
   const form = new FormData();

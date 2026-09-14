@@ -5,8 +5,7 @@ import {
   Download, Archive, HardDrive, Play, X,
 } from 'lucide-react';
 import { canManageCustomerTeam } from '@/lib/customerRoles';
-import LiveStreamViewer from '@/components/live/LiveStreamViewer';
-import ChunkedLiveViewer from '@/components/live/ChunkedLiveViewer';
+import LiveSessionPanel from '@/components/live/LiveSessionPanel';
 import LiveKitSetupCard from '@/components/live/LiveKitSetupCard';
 import { daysRemainingLabel, downloadLiveRecording } from '@/lib/liveVideo';
 
@@ -75,7 +74,7 @@ export default function DriverMedia() {
   useEffect(() => {
     if (activeTab !== 'live') return undefined;
     refreshLive();
-    const t = setInterval(refreshLive, 2000);
+    const t = setInterval(refreshLive, 1200);
     return () => clearInterval(t);
   }, [activeTab, refreshLive]);
 
@@ -161,32 +160,61 @@ export default function DriverMedia() {
           <Video className="w-7 h-7 text-amber-500" /> Driver Media
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Road dashcam — live office viewing works out of the box (~3–5 sec delay). Saved video stays in the library for 15 days. LiveKit below is optional for lower latency.
+          Semi road cam — live map + road feed (~2 sec delay, no API keys). Saved video stays in the library for 15 days.
         </p>
       </div>
 
       {canManageLiveKit(user?.role) && <LiveKitSetupCard />}
 
       {canManageDual && (
-        <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex-1">
-            <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <Eye className="w-4 h-4 text-amber-600" /> Road dashcam
+        <div className="space-y-3">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Eye className="w-4 h-4 text-amber-600" /> Road dashcam
+              </div>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Semi/OTR road camera from the FleetCo Driver app — live to this portal without third-party keys.
+              </p>
             </div>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Included for all fleets — drivers record the road ahead from the FleetCo Driver app. Turn off only if your fleet opts out.
-            </p>
+            <button
+              type="button"
+              disabled={savingDual}
+              onClick={toggleDualCamera}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm shrink-0 ${
+                customer.driver_dual_camera_enabled !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {customer.driver_dual_camera_enabled !== false ? <><ToggleRight className="w-5 h-5" /> Enabled</> : <><ToggleLeft className="w-5 h-5" /> Disabled</>}
+            </button>
           </div>
-          <button
-            type="button"
-            disabled={savingDual}
-            onClick={toggleDualCamera}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm shrink-0 ${
-              customer.driver_dual_camera_enabled !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
-            }`}
-          >
-            {customer.driver_dual_camera_enabled !== false ? <><ToggleRight className="w-5 h-5" /> Enabled</> : <><ToggleLeft className="w-5 h-5" /> Disabled</>}
-          </button>
+          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <div className="font-bold text-slate-900 text-sm">Auto-start when Driving</div>
+              <p className="text-xs text-slate-500 mt-1">
+                When clocked in and duty is Driving, road cam starts automatically (ELD-style workflow).
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={savingDual}
+              onClick={async () => {
+                setSavingDual(true);
+                try {
+                  const on = customer.auto_dashcam_on_driving !== false;
+                  await api.entities.Customer.update(customer.id, { auto_dashcam_on_driving: !on });
+                  setCustomer({ ...customer, auto_dashcam_on_driving: !on });
+                } finally {
+                  setSavingDual(false);
+                }
+              }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm shrink-0 ${
+                customer.auto_dashcam_on_driving !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {customer.auto_dashcam_on_driving !== false ? <><ToggleRight className="w-5 h-5" /> On</> : <><ToggleLeft className="w-5 h-5" /> Off</>}
+            </button>
+          </div>
         </div>
       )}
 
@@ -301,14 +329,14 @@ export default function DriverMedia() {
             </div>
           ) : (
             liveVideoSessions.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {liveVideoSessions.map((session) => {
-                  const mode = session.stream_mode === 'local' ? 'chunked' : session.stream_mode;
-                  if (mode === 'livekit' && livekitConfigured) {
-                    return <LiveStreamViewer key={session.id} session={session} />;
-                  }
-                  return <ChunkedLiveViewer key={session.id} session={session} />;
-                })}
+              <div className="space-y-6">
+                {liveVideoSessions.map((session) => (
+                  <LiveSessionPanel
+                    key={session.id}
+                    session={session}
+                    livekitConfigured={livekitConfigured}
+                  />
+                ))}
               </div>
             )
           )}

@@ -3,6 +3,7 @@ import { api } from '@/api/apiClient';
 import { Clock, LogIn, LogOut, Wrench, Play, Square, Timer, Calendar, User, ChevronDown, MapPin, Navigation, Camera } from 'lucide-react';
 import useDriverLocation from '@/hooks/useDriverLocation';
 import CameraCapture from '@/components/driver/CameraCapture';
+import DriverDutyBar from '@/components/driver/DriverDutyBar';
 import { isPlatformAdmin } from '@/lib/roles';
 
 function formatDuration(minutes) {
@@ -273,6 +274,10 @@ export default function TimeClock() {
               <span className="text-xs font-bold text-emerald-700">Live location active</span>
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse ml-auto" />
             </div>
+          )}
+
+          {activeShift && (
+            <DriverDutyBar compact />
           )}
 
           {/* Today Summary */}

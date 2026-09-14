@@ -209,6 +209,10 @@ export async function invokeFunction(name, body, user, ctx = null) {
       const { registerLiveVideoChunk } = await import('./liveStream.js');
       return registerLiveVideoChunk(body, user);
     }
+    case 'registerLiveVideoPreviewFrame': {
+      const { registerLiveVideoPreviewFrame } = await import('./liveStream.js');
+      return registerLiveVideoPreviewFrame(body, user);
+    }
     case 'getLiveVideoPreview': {
       const { getLiveVideoPreview } = await import('./liveStream.js');
       return getLiveVideoPreview(body, user, ctx);

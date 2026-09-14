@@ -180,6 +180,23 @@ const liveChunkUpload = multer({
   limits: { fileSize: 20 * 1024 * 1024 },
 });
 
+const livePreviewUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, _file, cb) => {
+      const sessionId = String(req.body?.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!sessionId) return cb(new Error('sessionId is required'));
+      const dir = path.join(liveChunksDir, sessionId);
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, _file, cb) => {
+      const seq = String(Number(req.body?.seq) || 0).padStart(6, '0');
+      cb(null, `preview-${seq}.jpg`);
+    },
+  }),
+  limits: { fileSize: 3 * 1024 * 1024 },
+});
+
 function signToken(userId) {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: '7d' });
 }
@@ -287,6 +304,7 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
       user.customer_name = customer.company_name;
       user.notification_prefs = getCustomerNotificationPrefs(customer);
       user.driver_dual_camera_enabled = customer.driver_dual_camera_enabled !== false;
+      user.auto_dashcam_on_driving = customer.auto_dashcam_on_driving !== false;
       user.driver_safety_ai_enabled = customer.driver_safety_ai_enabled !== false;
       user.max_stops_per_route = Number(customer.max_stops_per_route) || 200;
       user.require_pod_signature = !!customer.require_pod_signature;
@@ -1223,6 +1241,44 @@ app.get('/api/live-recordings/chunk/:sessionId/:seq', requireAuth, async (req, r
   } catch (err) {
     const status = err.status || (err.message?.includes('not found') ? 404 : 403);
     return res.status(status).json({ error: err.message || 'Chunk not found' });
+  }
+});
+
+app.post('/api/live-recordings/preview-frame', requireAuth, livePreviewUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No preview frame uploaded' });
+  const sessionId = String(req.body?.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  const seq = Number(req.body?.seq);
+  if (!sessionId || !Number.isFinite(seq)) {
+    return res.status(400).json({ error: 'sessionId and seq are required' });
+  }
+  const fileUrl = `/uploads/live-chunks/${sessionId}/preview-${String(seq).padStart(6, '0')}.jpg`;
+  try {
+    await replicateToObjectStorage(req.file.path, fileUrl, req.file.mimetype || 'image/jpeg');
+  } catch (err) {
+    console.warn('[live-preview] object storage mirror failed:', err.message);
+  }
+  res.json({
+    file_url: fileUrl,
+    file_size: req.file.size,
+    seq,
+    sessionId,
+  });
+});
+
+app.get('/api/live-recordings/preview/:sessionId/:seq', requireAuth, async (req, res) => {
+  try {
+    const { getLiveVideoPreviewFramePath } = await import('./liveStream.js');
+    const { filePath } = getLiveVideoPreviewFramePath(
+      req.params.sessionId,
+      req.params.seq,
+      req.user,
+      getEntityContext(req),
+    );
+    res.type('.jpg');
+    return res.sendFile(filePath);
+  } catch (err) {
+    const status = err.status || (err.message?.includes('not found') ? 404 : 403);
+    return res.status(status).json({ error: err.message || 'Preview not found' });
   }
 });
 
