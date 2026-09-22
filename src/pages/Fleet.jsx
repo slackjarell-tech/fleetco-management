@@ -9,8 +9,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import VehicleModal from '@/components/fleet/VehicleModal';
 import VehicleDocuments from '@/components/fleet/VehicleDocuments';
 import VehicleHistory from '@/components/fleet/VehicleHistory';
-import { isFleetCoAdmin, filterVehiclesForUser } from '@/lib/roles';
-import { canAddCustomerVehicles, isCustomerPortalUser } from '@/lib/customerRoles';
+import { filterVehiclesForUser } from '@/lib/roles';
+import { isCustomerPortalUser } from '@/lib/customerRoles';
+import {
+  canAddFleetUnits,
+  canEditFleetUnits,
+  canAdministerFleetUnits,
+  useCustomerFleetUnitModal,
+} from '@/lib/fleetUnitAccess';
+import { useCustomerContext } from '@/lib/CustomerContext';
 import AddVehiclesWizard from '@/components/fleet/AddVehiclesWizard';
 
 import { getVehicleMapColorKey, MAP_COLOR_LABELS } from '@/lib/vehicleMapColors';
@@ -46,6 +53,7 @@ const STATUS_LABELS = {
 };
 
 export default function Fleet() {
+  const { effectiveCustomerId, isViewingAsCustomer } = useCustomerContext();
   const [user, setUser] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [users, setUsers] = useState([]);
@@ -70,13 +78,13 @@ export default function Fleet() {
         api.entities.User.list(),
         api.entities.Customer.list(),
       ]);
-      const filtered = filterVehiclesForUser(vs, u);
+      const filtered = filterVehiclesForUser(vs, u, effectiveCustomerId || undefined);
       setVehicles(filtered);
       setUsers(us);
       setCustomers(cs);
       setLoading(false);
     });
-  }, []);
+  }, [effectiveCustomerId]);
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this vehicle?')) return;
@@ -85,8 +93,17 @@ export default function Fleet() {
   };
 
   const handleSave = async (data) => {
+    let payload = data;
+    const scopedCustomerId = user?.customer_id || (isViewingAsCustomer ? effectiveCustomerId : null);
+    if (editVehicle && scopedCustomerId && useCustomerFleetUnitModal(user)) {
+      payload = {
+        ...data,
+        customer_id: editVehicle.customer_id || scopedCustomerId,
+        assigned_customer_id: editVehicle.assigned_customer_id || scopedCustomerId,
+      };
+    }
     if (editVehicle) {
-      const updated = await api.entities.Vehicle.update(editVehicle.id, data);
+      const updated = await api.entities.Vehicle.update(editVehicle.id, payload);
       setVehicles(prev => prev.map(v => v.id === editVehicle.id ? updated : v));
     } else {
       const created = await api.entities.Vehicle.create(data);
@@ -96,8 +113,12 @@ export default function Fleet() {
     setEditVehicle(null);
   };
 
-  const isAdmin = isFleetCoAdmin(user?.role) || user?.role === 'tech';
-  const canCustomerAddUnits = isCustomerPortalUser(user) && canAddCustomerVehicles(user?.role);
+  const isAdmin = canAdministerFleetUnits(user);
+  const canAddUnits = canAddFleetUnits(user);
+  const canEditUnits = canEditFleetUnits(user);
+  const customerFleetEdit = useCustomerFleetUnitModal(user);
+  const showAdminAddButtons = isAdmin;
+  const showCustomerAddWizard = canAddUnits && !showAdminAddButtons;
   const canViewManuals = ['admin', 'tech', 'employee'].includes(user?.role);
   const getName = (id) => users.find(u => u.id === id)?.full_name || '—';
 
@@ -122,9 +143,9 @@ export default function Fleet() {
           <h1 className="text-2xl font-bold text-slate-900">Fleet</h1>
           <p className="text-slate-500 text-sm">{powerUnits.length} vehicles · {trailers.length} trailers</p>
         </div>
-        {(isAdmin || canCustomerAddUnits) && (
+        {(showAdminAddButtons || showCustomerAddWizard) && (
           <div className="flex gap-2">
-            {isAdmin && (
+            {showAdminAddButtons && (
               <>
                 <Button onClick={() => { setEditVehicle(null); setDefaultUnitType('trailer'); setShowModal(true); }} variant="outline" className="font-bold">
                   <Plus className="w-4 h-4 mr-1" /> Add Trailer
@@ -134,7 +155,7 @@ export default function Fleet() {
                 </Button>
               </>
             )}
-            {canCustomerAddUnits && (
+            {showCustomerAddWizard && (
               <Button
                 onClick={() => setShowAddWizard(true)}
                 className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold"
@@ -243,15 +264,21 @@ export default function Fleet() {
                     <BookOpen className="w-3.5 h-3.5 mr-1" /> Manuals
                   </Button>
                 )}
+                {canEditUnits && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={customerFleetEdit ? 'flex-1 min-w-[5rem]' : ''}
+                    onClick={() => { setEditVehicle(v); setDefaultUnitType(v.unit_type || 'truck'); setShowModal(true); }}
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    {customerFleetEdit && <span className="ml-1">Edit</span>}
+                  </Button>
+                )}
                 {isAdmin && (
-                  <>
-                    <Button size="sm" variant="outline" onClick={() => { setEditVehicle(v); setDefaultUnitType(v.unit_type || 'truck'); setShowModal(true); }}>
-                      <Edit className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDelete(v.id)}>
-                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                    </Button>
-                  </>
+                  <Button size="sm" variant="ghost" onClick={() => handleDelete(v.id)}>
+                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  </Button>
                 )}
               </div>
             </CardContent>
@@ -295,6 +322,7 @@ export default function Fleet() {
           vehicle={editVehicle || { unit_type: defaultUnitType }}
           users={users}
           customers={customers}
+          customerPortalEdit={customerFleetEdit}
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditVehicle(null); }}
         />

@@ -1208,6 +1208,18 @@ app.patch('/api/entities/:type/:id', requireAuth, async (req, res) => {
       });
     }
   }
+  if (type === 'Vehicle' && req.user?.customer_id) {
+    const { canEditCustomerVehicles } = await import('./customerRoles.js');
+    if (!canEditCustomerVehicles(req.user.role)) {
+      return res.status(403).json({ error: 'Your role cannot edit fleet units' });
+    }
+    if (req.body?.assigned_customer_id && req.body.assigned_customer_id !== req.user.customer_id) {
+      return res.status(403).json({ error: 'Cannot reassign units to another company' });
+    }
+    if (req.body?.customer_id && req.body.customer_id !== req.user.customer_id) {
+      return res.status(403).json({ error: 'Cannot reassign units to another company' });
+    }
+  }
   if (IMMUTABLE_ENTITY_TYPES.has(type)) {
     return res.status(403).json({ error: 'Marketplace communications and booking records cannot be edited' });
   }

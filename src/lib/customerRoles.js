@@ -57,6 +57,17 @@ export function canAddCustomerVehicles(role) {
   return ['customer_owner', 'customer_fleet_manager', 'customer_fleet_coordinator'].includes(r);
 }
 
+/** Customer portal roles that may update fleet units (status, specs, odometer, etc.). */
+export function canEditCustomerVehicles(role) {
+  const r = normalizeCustomerRole(role);
+  return [
+    'customer_owner',
+    'customer_fleet_manager',
+    'customer_fleet_coordinator',
+    'customer_parts_manager',
+  ].includes(r);
+}
+
 export function getAssignableCustomerRoles(actorRole) {
   const actor = normalizeCustomerRole(actorRole);
   if (actor === 'customer_owner') return [...CUSTOMER_TEAM_ROLES];

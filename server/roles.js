@@ -69,6 +69,11 @@ export function isFleetCoInternal(role) {
   return FLEETCO_INTERNAL_ROLES.includes(role);
 }
 
+/** Internal portal + shop tech — at least customer-equivalent fleet unit access. */
+export function isFleetCoEmployeeRole(role) {
+  return isFleetCoInternal(role) || role === 'tech';
+}
+
 export function canCreateFleetCoEmployees(role) {
   return role === 'owner';
 }

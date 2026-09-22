@@ -1,6 +1,7 @@
 /** Work order status lifecycle: intake → estimate → approval → repair */
 
 import { normalizeCustomerRole } from '@/lib/customerRoles';
+import { isFleetCoEmployee } from '@/lib/fleetUnitAccess';
 
 export const CUSTOMER_WO_ROLES = new Set([
   'customer_owner',
@@ -190,7 +191,12 @@ export function isWorkOrderCommentOnlyUser(user) {
 export function canViewWorkOrders(user) {
   if (!user) return false;
   if (!user.customer_id) {
-    return MANAGER_ROLES.has(user.role) || MECHANIC_ROLES.has(user.role) || user.role === 'tech';
+    return (
+      MANAGER_ROLES.has(user.role)
+      || MECHANIC_ROLES.has(user.role)
+      || user.role === 'tech'
+      || isFleetCoEmployee(user)
+    );
   }
   const role = normalizeCustomerRole(user.role);
   return (
@@ -214,6 +220,7 @@ export function isCustomerPortalWorkOrderUser(user) {
 export function canCreateWorkOrder(user) {
   if (!user) return false;
   if (MANAGER_ROLES.has(user.role)) return true;
+  if (isFleetCoEmployee(user)) return true;
   return isCustomerPortalWorkOrderUser(user);
 }
 

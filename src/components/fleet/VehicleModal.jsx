@@ -11,7 +11,7 @@ import { EQUIPMENT_CATEGORIES } from '@/lib/equipmentTypes';
 import { defaultMapColorFromStatus } from '@/lib/vehicleMapColors';
 import MapColorSelect from '@/components/fleet/MapColorSelect';
 
-export default function VehicleModal({ vehicle, users, customers = [], onSave, onClose }) {
+export default function VehicleModal({ vehicle, users, customers = [], customerPortalEdit = false, onSave, onClose }) {
   const drivers = filterDriverRoster(users);
   const customerOptions = customers.length > 0
     ? customers.map((c) => ({ id: c.id, label: c.company_name || c.contact_name }))
@@ -89,7 +89,9 @@ export default function VehicleModal({ vehicle, users, customers = [], onSave, o
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-900">{vehicle ? 'Edit Vehicle' : 'Add Vehicle'}</h2>
+          <h2 className="text-lg font-bold text-slate-900">
+            {vehicle?.id ? (customerPortalEdit ? 'Edit fleet unit' : 'Edit Vehicle') : 'Add Vehicle'}
+          </h2>
           <Button size="icon" variant="ghost" onClick={onClose}><X className="w-5 h-5" /></Button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -98,16 +100,18 @@ export default function VehicleModal({ vehicle, users, customers = [], onSave, o
               <Label>Unit Number *</Label>
               <Input value={form.unit_number} onChange={e => set('unit_number', e.target.value)} required className="mt-1" placeholder="e.g. 101" />
             </div>
-            <div>
-              <Label>Unit Type</Label>
-              <Select value={form.unit_type} onValueChange={v => set('unit_type', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="truck">Truck (Power Unit)</SelectItem>
-                  <SelectItem value="trailer">Trailer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {!customerPortalEdit && (
+              <div>
+                <Label>Unit Type</Label>
+                <Select value={form.unit_type} onValueChange={v => set('unit_type', v)}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="truck">Truck (Power Unit)</SelectItem>
+                    <SelectItem value="trailer">Trailer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label>Equipment Class *</Label>
               <Select value={form.equipment_class} onValueChange={v => set('equipment_class', v)} required>
@@ -261,16 +265,18 @@ export default function VehicleModal({ vehicle, users, customers = [], onSave, o
                 </SelectContent>
               </Select>
             </div>
-            <div className="col-span-2">
-              <Label>Assigned Customer</Label>
-              <Select value={form.assigned_customer_id} onValueChange={v => set('assigned_customer_id', v)}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={null}>None</SelectItem>
-                  {customerOptions.map(c => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            {!customerPortalEdit && (
+              <div className="col-span-2">
+                <Label>Assigned Customer</Label>
+                <Select value={form.assigned_customer_id} onValueChange={v => set('assigned_customer_id', v)}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={null}>None</SelectItem>
+                    {customerOptions.map(c => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <div>
             <Label>Notes</Label>

@@ -64,6 +64,16 @@ export function canManageCustomerTeam(role) {
   return CUSTOMER_ASSIGN_ROLES.includes(normalizeCustomerRole(role)) || role === CUSTOMER_LEGACY_ROLE;
 }
 
+export function canEditCustomerVehicles(role) {
+  const r = normalizeCustomerRole(role);
+  return [
+    'customer_owner',
+    'customer_fleet_manager',
+    'customer_fleet_coordinator',
+    'customer_parts_manager',
+  ].includes(r);
+}
+
 export function getAssignableCustomerRoles(actorRole) {
   const actor = normalizeCustomerRole(actorRole);
   if (actor === 'customer_owner') return [...CUSTOMER_TEAM_ROLES];
