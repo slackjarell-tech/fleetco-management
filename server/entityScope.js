@@ -19,6 +19,8 @@ export const GLOBAL_ENTITY_TYPES = new Set([
   'MarketingReportRun',
   'MarketingConversation',
   'MarketingAutopilotRun',
+  'MarketingOutbox',
+  'MarketingDailyDigest',
   'DomainEmail',
   'UsageFeedback',
   'FuelStation',
@@ -247,6 +249,7 @@ export function stampEntityForCreate(type, data, ctx) {
     'PortalActivity',
     'JobPosting',
     'JobApplication',
+    'WorkOrder',
   ]);
 
   if (type === 'Vehicle' && !next.customer_id && !next.assigned_customer_id) {

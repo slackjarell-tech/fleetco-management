@@ -6,8 +6,10 @@ import {
   scheduleSalesCall,
   sendLeadEmail,
   updateMarketingLead,
+  runDailyLeadReport,
   assertSltMarketingAccess,
 } from './sltMarketing.js';
+import { runAutopilotTick } from './marketingAutopilot.js';
 import { listEntities } from './db.js';
 
 export const MARKETING_TOOL_DEFINITIONS = [
@@ -45,8 +47,28 @@ export const MARKETING_TOOL_DEFINITIONS = [
           lead_status: { type: 'string' },
           notes: { type: 'string' },
           assigned_to: { type: 'string' },
+          autopilot_paused: { type: 'boolean', description: 'Pause or resume autopilot nurture for this lead' },
         },
         required: ['inquiry_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'run_marketing_autopilot',
+      description: 'Run the marketing autopilot tick now (nurture emails due, weekly social drafts on Monday).',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'run_daily_lead_report',
+      description: 'Send the SLT daily interested-leads email report now.',
+      parameters: {
+        type: 'object',
+        properties: { force: { type: 'boolean' } },
       },
     },
   },
@@ -163,8 +185,24 @@ export async function executeMarketingTool(user, name, args) {
         lead_status: args.lead_status,
         notes: args.notes,
         assigned_to: args.assigned_to,
+        autopilot_paused: args.autopilot_paused,
       });
       return { success: true, item };
+    }
+
+    case 'run_marketing_autopilot': {
+      const result = await runAutopilotTick();
+      return {
+        success: true,
+        nurture_count: result.nurture?.length ?? 0,
+        nurture: result.nurture,
+        social: result.social,
+      };
+    }
+
+    case 'run_daily_lead_report': {
+      const result = await runDailyLeadReport({ force: args.force !== false });
+      return { success: true, ...result };
     }
 
     case 'send_lead_email':

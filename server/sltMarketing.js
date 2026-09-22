@@ -7,7 +7,9 @@ import {
   nowIso,
   updateEntity,
 } from './db.js';
-import { sendEmail } from './email.js';
+import { sendEmail, getResendApiKey } from './email.js';
+import { isLocalMarketingMode, marketingModeStatus } from './marketingLocalMode.js';
+import { queueMarketingOutbox, saveDailyDigest, listMarketingOutbox, getLatestDailyDigest } from './marketingInApp.js';
 
 export const SLT_MARKETING_ROLES = new Set(['owner', 'executive', 'fleet_manager']);
 
@@ -85,7 +87,7 @@ export function listMarketingLeads({ status, limit = 50 } = {}) {
   return items;
 }
 
-export function updateMarketingLead(user, { inquiryId, lead_status, notes, assigned_to }) {
+export function updateMarketingLead(user, { inquiryId, lead_status, notes, assigned_to, autopilot_paused }) {
   assertSltMarketingAccess(user);
   const inquiry = getEntity('Inquiry', inquiryId);
   if (!inquiry) throw new Error('Lead not found');
@@ -98,6 +100,7 @@ export function updateMarketingLead(user, { inquiryId, lead_status, notes, assig
   }
   if (notes !== undefined) patch.lead_notes = notes;
   if (assigned_to !== undefined) patch.assigned_to = assigned_to;
+  if (autopilot_paused !== undefined) patch.autopilot_paused = !!autopilot_paused;
 
   const updated = updateEntity('Inquiry', inquiryId, patch);
   createEntity('MarketingActivityLog', {
@@ -289,6 +292,26 @@ export async function sendLeadEmail(user, { inquiry_id, to, subject, html, text 
     html ||
     `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:640px"><p>${bodyText.replace(/\n/g, '<br/>')}</p></div>`;
 
+  if (isLocalMarketingMode() || !getResendApiKey()) {
+    const outbox = queueMarketingOutbox({
+      type: 'manual',
+      inquiry_id: inquiry_id || '',
+      to_email: recipient,
+      lead_name: inquiry?.name || '',
+      subject,
+      body_text: bodyText,
+      body_html: bodyHtml,
+    });
+    createEntity('MarketingActivityLog', {
+      action: 'send_email',
+      inquiry_id: inquiry_id || '',
+      actor_email: user.email,
+      details: JSON.stringify({ to: recipient, subject, mode: 'outbox', outbox_id: outbox.id }),
+      created_at: nowIso(),
+    });
+    return { success: true, mode: 'outbox', outbox_id: outbox.id, to: recipient };
+  }
+
   const result = await sendEmail({
     to: recipient,
     subject,
@@ -330,8 +353,11 @@ export function getMarketingDashboard(user) {
   const todayChicago = chicagoDateKey(new Date());
   const reportSentToday = filterEntities('MarketingReportRun', { report_date: todayChicago }, null, 1)[0];
 
+  const outboxPending = listMarketingOutbox({ status: 'pending', limit: 30 });
+
   return {
     success: true,
+    marketing_mode: marketingModeStatus(),
     summary: {
       total_leads: leads.length,
       interested_count: interested.length,
@@ -341,13 +367,16 @@ export function getMarketingDashboard(user) {
       social_scheduled: socialQueue.filter((p) => ['approved', 'manual'].includes(p.status)).length,
       upcoming_calls: upcomingCalls.length,
       autopilot_enrolled: leads.filter((l) => l.autopilot_enrolled_at).length,
+      outbox_pending: outboxPending.length,
     },
     interested_leads: interested.slice(0, 50),
     new_leads: newLeads.slice(0, 20),
     social_queue: socialQueue,
+    outbox: outboxPending,
     upcoming_calls: upcomingCalls,
     recent_activity: recentActivity,
     social_config: getSocialConfigStatus(),
+    daily_digest: getLatestDailyDigest(),
     daily_report: {
       timezone: 'America/Chicago',
       send_time: '15:00',
@@ -454,20 +483,39 @@ export async function runDailyLeadReport({ force = false } = {}) {
     return { success: true, skipped: true, reason: 'Report already sent today', report_date: reportDate };
   }
 
-  const recipients = getSltReportRecipients();
-  if (!recipients.length) {
-    return { success: false, error: 'No SLT report recipients (configure owner/executive/fleet_manager users or SLT_MARKETING_REPORT_EMAILS)' };
+  const { text, html, counts } = buildDailyLeadReportContent();
+  const local = isLocalMarketingMode() || !getResendApiKey();
+
+  if (local) {
+    const digest = saveDailyDigest({ reportDate, text, html, counts });
+    const run = createEntity('MarketingReportRun', {
+      report_date: reportDate,
+      sent_at: nowIso(),
+      recipient_count: 0,
+      interested_count: counts.interested,
+      email_success: false,
+      mode: 'in_app_digest',
+      error: '',
+    });
+    return {
+      success: true,
+      skipped: false,
+      mode: 'in_app_digest',
+      report_date: reportDate,
+      counts,
+      digest,
+      run,
+    };
   }
 
-  const { text, html, counts } = buildDailyLeadReportContent();
-  const subject = `FleetCo SLT lead report — ${reportDate} (${counts.interested} interested)`;
+  const recipients = getSltReportRecipients();
+  if (!recipients.length) {
+    const digest = saveDailyDigest({ reportDate, text, html, counts });
+    return { success: true, mode: 'in_app_digest', report_date: reportDate, counts, digest };
+  }
 
-  const emailResult = await sendEmail({
-    to: recipients,
-    subject,
-    html,
-    text,
-  });
+  const subject = `FleetCo SLT lead report — ${reportDate} (${counts.interested} interested)`;
+  const emailResult = await sendEmail({ to: recipients, subject, html, text });
 
   const run = createEntity('MarketingReportRun', {
     report_date: reportDate,
@@ -478,7 +526,9 @@ export async function runDailyLeadReport({ force = false } = {}) {
     error: emailResult.error || '',
   });
 
-  console.log('[slt-marketing] daily report', reportDate, recipients.length, emailResult.success ? 'sent' : 'failed');
+  if (!emailResult.success) {
+    saveDailyDigest({ reportDate, text, html, counts });
+  }
 
   return {
     success: !!emailResult.success,

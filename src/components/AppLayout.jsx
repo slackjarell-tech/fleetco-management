@@ -17,15 +17,18 @@ import CustomerPausedOverlay from '@/components/billing/CustomerPausedOverlay';
 import BulkCsvImport from '@/components/shared/BulkCsvImport';
 import { getBulkImportConfig } from '@/lib/bulkImportConfigs';
 import { CustomerProvider, useCustomerContext } from '@/lib/CustomerContext';
-import { defaultSidebarModulesForRole } from '@/lib/customerRoles';
+import {
+  canManageCustomerTeam,
+  customerRoleLabel,
+  defaultSidebarModulesForRole,
+  isCustomerPortalUser,
+} from '@/lib/customerRoles';
 import { sectionForPath, isCustomerFacingPath } from '@/lib/portalSections';
 import { isPortalFullBleedPath } from '@/lib/portalLayout';
 
 const isInternalRole = (role) => {
   return ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(role);
 };
-
-import { canManageCustomerTeam, isCustomerPortalUser } from '@/lib/customerRoles';
 import { canAccessDriverApp } from '@/lib/driverAccess';
 
 const isFleetCoAdmin = (role) => ['owner', 'executive', 'fleet_manager'].includes(role);
@@ -289,7 +292,9 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
         {user && (
           <div className="px-4 py-3 border-b border-slate-800 space-y-2">
             <div className="text-white text-sm font-medium truncate">{user.full_name}</div>
-            <div className="text-slate-400 text-xs capitalize">{user.role || 'user'}</div>
+            <div className="text-slate-400 text-xs">
+              {isCustomerPortalUser(user) ? customerRoleLabel(user.role) : (user.role || 'user').replace(/_/g, ' ')}
+            </div>
             {isInternal && (
               <div className="pt-1">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
@@ -398,7 +403,9 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
                             (canManageCustomerTeam(user?.role) && user?.customer_id) || isViewingAsCustomer
                           )
                             ? (isViewingAsCustomer ? 'Customer Team' : 'My Team')
-                            : item.label}
+                            : item.path === '/portal' && isCustomerPortalUser(user) && !isInternal
+                              ? 'Dashboard'
+                              : item.label}
                         </Link>
                       );
                     })}

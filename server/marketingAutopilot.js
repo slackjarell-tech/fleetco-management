@@ -1,6 +1,7 @@
 /**
- * FleetCo Marketing Autopilot — autonomous lead nurture, social drafts, and SLT alerts.
- * No HubSpot/Apollo required: Groq (free) + Resend + our Inquiry store.
+ * FleetCo Marketing Autopilot — local-first lead nurture, social drafts, SLT alerts.
+ * No HubSpot/Apollo/API keys: in-app notifications + outbox copy for manual send.
+ * Optional email/LLM when MARKETING_LOCAL_ONLY=false and keys are set.
  */
 import {
   createEntity,
@@ -11,14 +12,20 @@ import {
   updateEntity,
 } from './db.js';
 import { sendEmail } from './email.js';
-import { getAiStatus } from './aiProvider.js';
-import { simpleLLM } from './aiAgent.js';
-import { sendInquiryNotificationEmail } from './inquiryEmails.js';
+import { getResendApiKey } from './email.js';
 import { NURTURE_SEQUENCE } from './marketingEmailTemplates.js';
+import { pickSocialTemplate } from './marketingKnowledge.js';
 import {
+  approveSocialPost,
   defaultCalendarUrl,
   syncInquiryLeadFields,
 } from './sltMarketing.js';
+import { isLocalMarketingMode } from './marketingLocalMode.js';
+import {
+  notifyNewLead,
+  queueMarketingOutbox,
+} from './marketingInApp.js';
+import { sendInquiryNotificationEmail } from './inquiryEmails.js';
 
 const APP_URL = process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org';
 const TICK_MS = 15 * 60 * 1000;
@@ -48,52 +55,51 @@ function nextNurtureStep(lead) {
   return next;
 }
 
-async function maybePersonalizeIntro(lead, templateText) {
-  const status = getAiStatus();
-  if (!status.configured || !status.healthy) return templateText;
-  try {
-    const result = await simpleLLM({
-      prompt: `Write 2 short sentences to personalize a follow-up email for a trucking fleet prospect.
-Name: ${lead.name}. Company: ${lead.company || 'unknown'}. Fleet size: ${lead.fleet_size || 'unknown'}.
-Their message: ${(lead.message || '').slice(0, 300)}
-Interest: ${lead.service_interest || 'fleet software'}
-Be professional, no hype. Output ONLY the 2 sentences, no subject line.`,
-    });
-    const extra = result.content || result.description;
-    if (extra && extra.length > 20 && extra.length < 500) {
-      return `${extra}\n\n${templateText}`;
-    }
-  } catch {
-    /* template only */
-  }
-  return templateText;
-}
-
-export async function sendNurtureEmail(lead, stepConfig) {
+async function deliverNurtureStep(lead, stepConfig) {
   const { text, html } = stepConfig.build(lead);
-  let bodyText = text;
-  if (stepConfig.step === 1) {
-    bodyText = await maybePersonalizeIntro(lead, text);
-  }
   const subject = typeof stepConfig.subject === 'function'
     ? stepConfig.subject(lead)
     : stepConfig.subject;
 
-  let bodyHtml = html;
-  if (stepConfig.step === 1 && bodyText !== text) {
-    const intro = bodyText.split('\n\n')[0];
-    bodyHtml = html.replace('</p>', `</p><p>${intro}</p>`, 1);
+  const local = isLocalMarketingMode() || !getResendApiKey();
+
+  if (local) {
+    const outbox = queueMarketingOutbox({
+      type: 'nurture',
+      inquiry_id: lead.id,
+      to_email: lead.email,
+      lead_name: lead.name,
+      subject,
+      body_text: text,
+      body_html: html,
+      nurture_step: stepConfig.step,
+    });
+    return { success: true, mode: 'outbox', outbox_id: outbox.id, subject, step: stepConfig.step };
   }
 
   const result = await sendEmail({
     to: lead.email,
     subject,
-    html: bodyHtml,
-    text: bodyText,
+    html,
+    text,
     replyTo: 'support@fleetcomanagement.org',
   });
 
-  return { ...result, subject, step: stepConfig.step };
+  if (!result.success) {
+    const outbox = queueMarketingOutbox({
+      type: 'nurture',
+      inquiry_id: lead.id,
+      to_email: lead.email,
+      lead_name: lead.name,
+      subject,
+      body_text: text,
+      body_html: html,
+      nurture_step: stepConfig.step,
+    });
+    return { success: true, mode: 'outbox_fallback', outbox_id: outbox.id, subject, step: stepConfig.step, emailError: result.error };
+  }
+
+  return { ...result, mode: 'email', subject, step: stepConfig.step };
 }
 
 export async function enrollLeadInAutopilot(inquiryId) {
@@ -130,14 +136,14 @@ async function processLeadNurture(lead) {
   const step = nextNurtureStep(lead);
   if (!step) return { skipped: true, reason: 'not_due' };
 
-  const emailResult = await sendNurtureEmail(lead, step);
+  const delivery = await deliverNurtureStep(lead, step);
 
   const patch = {
     nurture_step: step.step,
     last_nurture_at: nowIso(),
     lead_status: lead.lead_status === 'new' ? 'contacted' : lead.lead_status,
   };
-  if (step.step === 1 && emailResult.success) {
+  if (step.step === 1 && delivery.success) {
     patch.status = 'contacted';
     patch.lead_status = 'contacted';
   }
@@ -150,13 +156,18 @@ async function processLeadNurture(lead) {
     details: JSON.stringify({
       step: step.step,
       name: step.name,
-      emailSent: !!emailResult.success,
-      error: emailResult.error || emailResult.reason || '',
+      mode: delivery.mode,
+      outbox_id: delivery.outbox_id || '',
     }),
     created_at: nowIso(),
   });
 
-  return { leadId: lead.id, step: step.step, emailSent: !!emailResult.success };
+  return {
+    leadId: lead.id,
+    step: step.step,
+    mode: delivery.mode,
+    outboxQueued: delivery.mode?.includes('outbox'),
+  };
 }
 
 async function processAllNurture() {
@@ -183,21 +194,12 @@ const WEEKLY_SOCIAL_THEMES = [
   { platform: 'facebook', topic: 'Cut fleet admin time — maintenance, IFTA, and compliance in one place' },
 ];
 
-async function generateSocialCopy(topic) {
-  const status = getAiStatus();
-  const fallback = `${topic}\n\nLearn more: ${APP_URL}\n\n#fleetmanagement #trucking #FleetCo`;
-  if (!status.configured || !status.healthy) return fallback;
-
-  try {
-    const result = await simpleLLM({
-      prompt: `Write a short social media post (max 280 chars) for FleetCo Management, a B2B fleet SaaS for owner-operators.
-Topic: ${topic}
-Include fleetcomanagement.org. Professional tone. No hashtag spam — max 3 hashtags.`,
-    });
-    const text = (result.content || result.description || '').trim();
-    if (text.length > 40) return text.slice(0, 500);
-  } catch { /* fallback */ }
-  return fallback;
+function generateSocialCopy(platform, topic) {
+  const base = pickSocialTemplate(platform);
+  if (topic && topic.length > 20) {
+    return `${topic}\n\n${APP_URL}\n\n#fleetmanagement #trucking #FleetCo`;
+  }
+  return base;
 }
 
 function weekId(date) {
@@ -217,7 +219,7 @@ async function runWeeklySocialDrafts() {
 
   const posts = [];
   for (const theme of WEEKLY_SOCIAL_THEMES) {
-    const content = await generateSocialCopy(theme.topic);
+    const content = generateSocialCopy(theme.platform, theme.topic);
     const post = createEntity('MarketingSocialPost', {
       platform: theme.platform,
       content,
@@ -252,6 +254,26 @@ function isMondayMorningChicago(date = new Date()) {
   return parts.weekday === 'Mon' && parseInt(parts.hour, 10) === 9;
 }
 
+async function processScheduledSocialPosts() {
+  if (isLocalMarketingMode()) return [];
+  const now = nowIso();
+  const due = listEntities('MarketingSocialPost', '-created_at', 100)
+    .filter((p) => p.status === 'approved' && p.scheduled_at && p.scheduled_at <= now);
+  const results = [];
+  for (const post of due.slice(0, 5)) {
+    try {
+      const r = await approveSocialPost(
+        { email: 'autopilot@fleetco', role: 'owner' },
+        { postId: post.id, publishNow: true },
+      );
+      results.push({ post_id: post.id, published: r.publishResult?.success });
+    } catch (err) {
+      results.push({ post_id: post.id, error: err.message });
+    }
+  }
+  return results;
+}
+
 export async function runAutopilotTick() {
   if (!isAutopilotEnabled()) {
     return { success: true, skipped: true, reason: 'autopilot_disabled' };
@@ -259,6 +281,7 @@ export async function runAutopilotTick() {
 
   const started = nowIso();
   const nurtureResults = await processAllNurture();
+  const scheduledPosts = await processScheduledSocialPosts();
 
   let socialResult = { skipped: true };
   if (isMondayMorningChicago()) {
@@ -278,6 +301,7 @@ export async function runAutopilotTick() {
     run,
     nurture: nurtureResults,
     social: socialResult,
+    scheduled_posts: scheduledPosts,
   };
 }
 
@@ -289,11 +313,15 @@ export function getAutopilotStatus() {
   const lastRun = listEntities('MarketingAutopilotRun', '-started_at', 1)[0];
   const recentActivity = listEntities('MarketingActivityLog', '-created_at', 15)
     .filter((a) => (a.actor_email || '').includes('autopilot'));
+  const pendingOutbox = listEntities('MarketingOutbox', '-created_at', 200)
+    .filter((o) => o.status === 'pending');
 
   return {
     enabled: isAutopilotEnabled(),
+    local_mode: isLocalMarketingMode(),
     enrolled_count: enrolled.length,
     due_now: dueNow.length,
+    outbox_pending: pendingOutbox.length,
     nurture_steps: NURTURE_SEQUENCE.map((s) => ({ step: s.step, name: s.name, delayHours: s.delayHours })),
     last_run: lastRun || null,
     recent_activity: recentActivity,
@@ -306,7 +334,7 @@ export function startMarketingAutopilotScheduler() {
     try {
       const result = await runAutopilotTick();
       if (result.nurture?.length) {
-        console.log('[marketing-autopilot] nurture emails sent:', result.nurture.length);
+        console.log('[marketing-autopilot] nurture processed:', result.nurture.length);
       }
     } catch (err) {
       console.error('[marketing-autopilot]', err.message);
@@ -315,13 +343,20 @@ export function startMarketingAutopilotScheduler() {
 
   setTimeout(tick, 30_000);
   setInterval(tick, TICK_MS);
-  console.log('[marketing-autopilot] Scheduler active — nurture every 15m, social drafts Monday 9am CST');
+  console.log('[marketing-autopilot] Scheduler active (local-first) — nurture every 15m, social drafts Monday 9am CST');
 }
 
 export async function onNewLead(inquiry) {
   if (!inquiry?.id) return;
-  try {
-    await sendInquiryNotificationEmail(inquiry);
-  } catch { /* logged elsewhere */ }
+
+  if (isLocalMarketingMode() || !getResendApiKey()) {
+    notifyNewLead(inquiry);
+  } else {
+    try {
+      await sendInquiryNotificationEmail(inquiry);
+    } catch { /* fallback in-app */ }
+    notifyNewLead(inquiry);
+  }
+
   return enrollLeadInAutopilot(inquiry.id);
 }

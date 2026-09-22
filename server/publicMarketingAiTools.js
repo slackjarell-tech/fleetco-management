@@ -145,7 +145,7 @@ export async function executePublicMarketingTool(_guest, name, args) {
         success: true,
         inquiry_id: inquiry.id,
         autopilot_enrolled: !!autopilot.enrolled,
-        message: 'Lead saved — FleetCo Autopilot will send a welcome email and our team will follow up.',
+        message: 'Lead saved — FleetCo Autopilot enrolled our team for follow-up (in-app alert + nurture outbox).',
       };
     }
 

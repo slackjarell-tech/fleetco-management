@@ -1,31 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, ClipboardList, FileText, CheckCircle, Circle, Clock } from 'lucide-react';
+import { X, Plus, Trash2, ClipboardList, CheckCircle, Circle, Clock, Send } from 'lucide-react';
 import { api } from '@/api/apiClient';
+import {
+  WO_STATUSES,
+  STATUS_LABELS,
+  normalizeWorkOrder,
+  canSubmitEstimate,
+  canApproveWorkOrder,
+} from '@/lib/workOrderWorkflow';
 
 const REPAIR_TYPES = ["Engine","Transmission","Brakes","Tires","Electrical","HVAC","Suspension","Fuel System","Exhaust","Preventive Maintenance","Body & Frame","Other"];
-const STATUSES = ["open","in_progress","parts_ordered","awaiting_parts","completed","cancelled"];
 const PRIORITIES = ["low","medium","high","critical"];
 
 const emptyPart = { part_number: '', description: '', quantity: 1, unit_cost: 0, source: 'in_stock', total_cost: 0 };
 const emptyTask = { description: '', estimated_minutes: 30, completed: false, completed_by: '', completed_at: '', notes: '' };
 
-export default function WorkOrderModal({ wo, vehicles, techs, onSave, onClose }) {
-  const [form, setForm] = useState(wo || {
-    wo_number: `WO-${Date.now().toString().slice(-6)}`,
-    title: '', repair_type: 'Engine', status: 'open', priority: 'medium',
-    vehicle_id: '', assigned_tech_id: '', opened_date: new Date().toISOString().split('T')[0],
-    due_date: '', odometer: '', complaint: '', diagnosis: '', repair_notes: '',
-    service_tasks: [], parts: [], labor_hours: 0, labor_rate: 75, labor_cost: 0, parts_total: 0, total_cost: 0,
-    warranty_repair: false, shop_name: ''
-  });
+export default function WorkOrderModal({ wo, vehicles, techs, currentUser, onSave, onClose }) {
+  const [form, setForm] = useState(() => normalizeWorkOrder(wo));
   const [templates, setTemplates] = useState([]);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
+
+  useEffect(() => {
+    setForm(normalizeWorkOrder(wo));
+  }, [wo?.id]);
 
   useEffect(() => {
     if (!templatesLoaded) {
       api.entities.ServiceTemplate.list().then(t => { setTemplates(t); setTemplatesLoaded(true); });
     }
   }, [templatesLoaded]);
+
+  const estimatePhase = form.status === 'awaiting_estimate';
+  const pendingApproval = form.status === 'awaiting_approval';
+  const showSubmitEstimate = estimatePhase && canSubmitEstimate(currentUser);
+  const showApprovalActions = pendingApproval && canApproveWorkOrder(currentUser);
 
   const set = (field, val) => setForm(f => ({ ...f, [field]: val }));
 
@@ -111,6 +119,40 @@ export default function WorkOrderModal({ wo, vehicles, techs, onSave, onClose })
     onSave(form);
   };
 
+  const handleSubmitEstimate = (e) => {
+    e.preventDefault();
+    onSave({
+      ...form,
+      status: 'awaiting_approval',
+      estimate_submitted_at: new Date().toISOString(),
+      estimate_submitted_by: currentUser?.email || '',
+    });
+  };
+
+  const handleApprove = () => {
+    const nextStatus = form.require_customer_authorization !== false
+      ? 'awaiting_authorization'
+      : 'open';
+    onSave({
+      ...form,
+      status: nextStatus,
+      approved_at: new Date().toISOString(),
+      approved_by: currentUser?.email || '',
+      rejection_notes: '',
+    });
+  };
+
+  const handleRejectEstimate = () => {
+    const notes = window.prompt('What should the mechanic revise? (optional note to mechanic)');
+    onSave({
+      ...form,
+      status: 'awaiting_estimate',
+      rejection_notes: notes || '',
+      approved_at: '',
+      approved_by: '',
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center overflow-y-auto py-6 px-4">
       <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl">
@@ -118,12 +160,25 @@ export default function WorkOrderModal({ wo, vehicles, techs, onSave, onClose })
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-900 rounded-t-2xl">
           <div>
             <h2 className="text-white font-black text-lg">{wo ? `Edit ${wo.wo_number}` : 'New Work Order'}</h2>
-            <p className="text-slate-400 text-xs mt-0.5">Fill in repair details, assign parts and labor</p>
+            <p className="text-slate-400 text-xs mt-0.5">
+              {estimatePhase ? 'Add diagnosis, parts, and labor estimate' : 'Fill in repair details, assign parts and labor'}
+            </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {form.complaint && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="text-xs font-bold uppercase text-amber-800 mb-1">Customer complaint</div>
+              <p className="text-sm text-slate-800 whitespace-pre-wrap">{form.complaint}</p>
+              {form.rejection_notes && (
+                <p className="text-xs text-red-700 mt-2 border-t border-amber-200 pt-2">
+                  <strong>Manager note:</strong> {form.rejection_notes}
+                </p>
+              )}
+            </div>
+          )}
           {/* Basic Info */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div>
@@ -146,10 +201,18 @@ export default function WorkOrderModal({ wo, vehicles, techs, onSave, onClose })
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Status</label>
-              <select value={form.status} onChange={e => set('status', e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white capitalize">
-                {STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-              </select>
+              {estimatePhase || pendingApproval ? (
+                <div className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-700 font-medium">
+                  {STATUS_LABELS[form.status] || form.status}
+                </div>
+              ) : (
+                <select value={form.status} onChange={e => set('status', e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
+                  {WO_STATUSES.filter((s) => !['awaiting_estimate', 'awaiting_approval'].includes(s) || s === form.status).map((s) => (
+                    <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>
+                  ))}
+                </select>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Priority</label>
@@ -196,14 +259,16 @@ export default function WorkOrderModal({ wo, vehicles, techs, onSave, onClose })
             </div>
           </div>
 
-          {/* Complaint / Diagnosis */}
+          {/* Diagnosis / work notes */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Driver Complaint</label>
-              <textarea value={form.complaint} onChange={e => set('complaint', e.target.value)}
-                rows={3} placeholder="What did the driver report?"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none" />
-            </div>
+            {!form.complaint && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Driver Complaint</label>
+                <textarea value={form.complaint} onChange={e => set('complaint', e.target.value)}
+                  rows={3} placeholder="What did the driver report?"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none" />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Tech Diagnosis</label>
               <textarea value={form.diagnosis} onChange={e => set('diagnosis', e.target.value)}
@@ -344,6 +409,7 @@ export default function WorkOrderModal({ wo, vehicles, techs, onSave, onClose })
                         <td className="px-3 py-2">
                           <select value={p.source} onChange={e => updatePart(i, 'source', e.target.value)}
                             className="border border-slate-200 rounded px-2 py-1 text-xs bg-white">
+                            <option value="requested">Requested</option>
                             <option value="in_stock">In Stock</option>
                             <option value="ordered">Ordered</option>
                             <option value="warranty">Warranty</option>
@@ -399,15 +465,42 @@ export default function WorkOrderModal({ wo, vehicles, techs, onSave, onClose })
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+          <div className="flex flex-wrap justify-end gap-3 pt-2 border-t border-slate-100">
             <button type="button" onClick={onClose}
               className="px-6 py-2.5 text-sm font-semibold border border-slate-200 rounded-lg hover:bg-slate-50">
               Cancel
             </button>
-            <button type="submit"
-              className="px-6 py-2.5 text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg">
-              {wo ? 'Save Changes' : 'Create Work Order'}
-            </button>
+            {showApprovalActions && (
+              <>
+                <button type="button" onClick={handleRejectEstimate}
+                  className="px-6 py-2.5 text-sm font-semibold border border-red-200 text-red-700 rounded-lg hover:bg-red-50">
+                  Request revision
+                </button>
+                <button type="button" onClick={handleApprove}
+                  className="px-6 py-2.5 text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg">
+                  Approve estimate
+                </button>
+              </>
+            )}
+            {showSubmitEstimate && (
+              <button type="button" onClick={handleSubmitEstimate}
+                className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold bg-violet-600 hover:bg-violet-500 text-white rounded-lg">
+                <Send className="w-4 h-4" />
+                Submit estimate for approval
+              </button>
+            )}
+            {(!pendingApproval || showApprovalActions) && !showSubmitEstimate && (
+              <button type="submit"
+                className="px-6 py-2.5 text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg">
+                {wo ? 'Save changes' : 'Create Work Order'}
+              </button>
+            )}
+            {showSubmitEstimate && (
+              <button type="submit"
+                className="px-6 py-2.5 text-sm font-semibold border border-slate-200 rounded-lg hover:bg-slate-50">
+                Save draft
+              </button>
+            )}
           </div>
         </form>
       </div>

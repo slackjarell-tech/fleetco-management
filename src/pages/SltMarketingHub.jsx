@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '@/api/apiClient';
-import { Loader2, Megaphone, Calendar, Users, RefreshCw, Send, Globe, Bot, Zap } from 'lucide-react';
+import { Loader2, Megaphone, Users, RefreshCw, Send, Globe, Bot, Zap, Mail, Copy, Check, X } from 'lucide-react';
 import AssistantChat from '@/components/assistant/AssistantChat';
 import PortalPageShell from '@/components/layout/PortalPageShell';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,8 @@ export default function SltMarketingHub() {
   const [loadingDash, setLoadingDash] = useState(true);
   const [reportSending, setReportSending] = useState(false);
   const [autopilotRunning, setAutopilotRunning] = useState(false);
+  const [outboxActionId, setOutboxActionId] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
 
   const loadDashboard = useCallback(async () => {
     setLoadingDash(true);
@@ -67,6 +69,37 @@ export default function SltMarketingHub() {
     }
   };
 
+  const copyOutbox = async (item, field) => {
+    const text = field === 'subject' ? item.subject : (item.body_text || item.body_html || '');
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(`${item.id}-${field}`);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
+  const markOutboxSent = async (id) => {
+    setOutboxActionId(id);
+    try {
+      await api.sltMarketing.markOutboxSent(id);
+      await loadDashboard();
+    } finally {
+      setOutboxActionId(null);
+    }
+  };
+
+  const dismissOutbox = async (id) => {
+    setOutboxActionId(id);
+    try {
+      await api.sltMarketing.dismissOutbox(id);
+      await loadDashboard();
+    } finally {
+      setOutboxActionId(null);
+    }
+  };
+
   if (loadingUser) {
     return (
       <PortalPageShell variant="fullBleed" className="items-center justify-center">
@@ -94,8 +127,10 @@ export default function SltMarketingHub() {
   const aiLeads = summary?.marketing_ai_leads ?? '—';
   const autopilot = dashboard?.autopilot;
   const aiStatus = dashboard?.ai_status;
-  const aiHealthy = aiStatus?.healthy;
-  const aiConfigured = aiStatus?.configured;
+  const marketingMode = dashboard?.marketing_mode;
+  const localMode = marketingMode?.local_only !== false;
+  const outbox = dashboard?.outbox || [];
+  const dailyDigest = dashboard?.daily_digest;
 
   return (
     <PortalPageShell variant="fullBleed">
@@ -107,7 +142,9 @@ export default function SltMarketingHub() {
                 <Megaphone className="w-5 h-5 text-cyan-400" />
                 FleetCo Marketing AI
               </h1>
-              <p className="text-slate-500 text-xs mt-0.5">Autopilot · website AI · 3 PM CST report</p>
+              <p className="text-slate-500 text-xs mt-0.5">
+                {localMode ? 'Local mode — no API keys' : 'Hybrid mode'} · 3 PM CST digest
+              </p>
             </div>
             <button
               type="button"
@@ -119,18 +156,24 @@ export default function SltMarketingHub() {
             </button>
           </div>
 
-          <div className="mb-4 p-3 rounded-lg border border-amber-900/50 bg-amber-950/20 text-xs text-slate-300">
-            <div className="flex items-center gap-2 text-amber-400 font-semibold mb-1">
+          <div className={`mb-4 p-3 rounded-lg border text-xs ${
+            localMode
+              ? 'border-emerald-900/50 bg-emerald-950/20 text-slate-300'
+              : 'border-amber-900/50 bg-amber-950/20 text-slate-300'
+          }`}>
+            <div className={`flex items-center gap-2 font-semibold mb-1 ${localMode ? 'text-emerald-400' : 'text-amber-400'}`}>
               <Zap className="w-3.5 h-3.5" />
-              Marketing Autopilot
+              {localMode ? 'Local marketing — zero API keys' : 'Marketing Autopilot'}
             </div>
             <p className="text-slate-400 leading-relaxed">
-              Runs on its own — no HubSpot or Apollo. New leads get a 4-step nurture email sequence via Resend.
-              Social drafts generate Monday mornings. Chat uses free Groq/Gemini.
+              {localMode
+                ? 'Leads, nurture, social drafts, and daily digest all run inside FleetCo. Copy emails from the outbox and send from your own inbox. No Groq, Resend, or social tokens required.'
+                : 'Hybrid mode — Resend sends nurture emails when configured. Social drafts Monday mornings. Optional Groq/Gemini adds free-form chat.'}
             </p>
             {autopilot && (
               <p className="mt-2 text-slate-500">
                 {autopilot.enrolled_count} enrolled · {autopilot.due_now} due now
+                {summary?.outbox_pending ? ` · ${summary.outbox_pending} in outbox` : ''}
                 {autopilot.enabled ? '' : ' · paused'}
               </p>
             )}
@@ -144,15 +187,19 @@ export default function SltMarketingHub() {
             Prospects chat on the website via <strong className="text-slate-300">Ask FleetCo AI</strong>. Leads auto-enroll in Autopilot.
           </div>
 
-          {aiConfigured && (
-            <div className={`mb-4 px-3 py-2 rounded-lg border text-xs ${
-              aiHealthy
+          <div className={`mb-4 px-3 py-2 rounded-lg border text-xs ${
+            localMode
+              ? 'border-cyan-800/60 bg-cyan-950/30 text-cyan-300'
+              : aiStatus?.configured && aiStatus?.healthy
                 ? 'border-emerald-800/60 bg-emerald-950/30 text-emerald-400'
-                : 'border-red-800/60 bg-red-950/30 text-red-400'
-            }`}>
-              AI ({aiStatus?.provider}): {aiHealthy ? 'connected' : (aiStatus?.health_error || 'key invalid — update GROQ_API_KEY on Render')}
-            </div>
-          )}
+                : 'border-cyan-800/60 bg-cyan-950/30 text-cyan-300'
+          }`}>
+            {localMode
+              ? 'Chat uses built-in commands — show dashboard, list leads, outbox, draft post, run autopilot'
+              : aiStatus?.configured && aiStatus?.healthy
+                ? `AI (${aiStatus?.provider}): connected — free-form chat enabled`
+                : 'Command mode active — add Groq/Gemini for free-form chat'}
+          </div>
 
           {loadingDash && !summary ? (
             <Loader2 className="w-6 h-6 text-cyan-500 animate-spin mx-auto my-8" />
@@ -162,6 +209,7 @@ export default function SltMarketingHub() {
                 <StatCard label="Interested" value={summary?.interested_count ?? '—'} icon={Users} />
                 <StatCard label="Autopilot" value={summary?.autopilot_enrolled ?? '—'} icon={Zap} />
                 <StatCard label="Website AI" value={aiLeads} icon={Bot} />
+                <StatCard label="Outbox" value={summary?.outbox_pending ?? '—'} icon={Mail} />
                 <StatCard label="Social drafts" value={summary?.social_draft ?? '—'} icon={Megaphone} />
               </div>
 
@@ -203,6 +251,75 @@ export default function SltMarketingHub() {
                 Send lead report now
               </Button>
 
+              {outbox.length > 0 && (
+                <div className="mb-4">
+                  <h2 className="text-xs font-bold uppercase text-slate-400 mb-2 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5" />
+                    Email outbox ({outbox.length})
+                  </h2>
+                  <p className="text-[10px] text-slate-500 mb-2">
+                    Copy and send from your email client, then mark sent.
+                  </p>
+                  <ul className="space-y-2 max-h-56 overflow-y-auto">
+                    {outbox.slice(0, 10).map((item) => (
+                      <li key={item.id} className="text-xs bg-slate-900 border border-slate-800 rounded-lg p-2">
+                        <div className="text-white font-medium truncate">{item.lead_name || item.to_email}</div>
+                        <div className="text-slate-500 truncate">{item.subject}</div>
+                        {item.nurture_step != null && (
+                          <div className="text-amber-500/80 mt-0.5">Nurture step {item.nurture_step}</div>
+                        )}
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          <button
+                            type="button"
+                            onClick={() => copyOutbox(item, 'subject')}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                          >
+                            {copiedId === `${item.id}-subject` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            Subject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => copyOutbox(item, 'body')}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                          >
+                            {copiedId === `${item.id}-body` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            Body
+                          </button>
+                          <button
+                            type="button"
+                            disabled={outboxActionId === item.id}
+                            onClick={() => markOutboxSent(item.id)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-emerald-800 text-emerald-400 hover:bg-emerald-950 disabled:opacity-50"
+                          >
+                            {outboxActionId === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                            Sent
+                          </button>
+                          <button
+                            type="button"
+                            disabled={outboxActionId === item.id}
+                            onClick={() => dismissOutbox(item.id)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-700 text-slate-500 hover:text-red-400 hover:border-red-900 disabled:opacity-50"
+                          >
+                            <X className="w-3 h-3" />
+                            Dismiss
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {dailyDigest && (
+                <div className="mb-4 p-2 rounded-lg border border-slate-800 bg-slate-900/60">
+                  <h2 className="text-xs font-bold uppercase text-slate-400 mb-1">Latest daily digest</h2>
+                  <p className="text-[11px] text-slate-500 mb-1">{dailyDigest.report_date}</p>
+                  <p className="text-[11px] text-slate-400 whitespace-pre-wrap line-clamp-4">
+                    {(dailyDigest.body_text || '').slice(0, 400)}
+                  </p>
+                </div>
+              )}
+
               {dashboard?.interested_leads?.length > 0 && (
                 <div className="mb-4">
                   <h2 className="text-xs font-bold uppercase text-slate-400 mb-2">Interested pipeline</h2>
@@ -211,9 +328,10 @@ export default function SltMarketingHub() {
                       <li key={l.id} className="text-xs bg-slate-900 border border-slate-800 rounded-lg p-2">
                         <div className="text-white font-medium truncate">{l.name}</div>
                         <div className="text-slate-500 truncate">{l.email}</div>
-                        <div className="text-cyan-500/80 mt-0.5 flex gap-2">
+                        <div className="text-cyan-500/80 mt-0.5 flex flex-wrap gap-2">
                           <span>{l.lead_status}</span>
-                          {l.autopilot_enrolled_at && <span className="text-amber-500/80">· autopilot</span>}
+                          {l.autopilot_enrolled_at && !l.autopilot_paused && <span className="text-amber-500/80">· autopilot</span>}
+                          {l.autopilot_paused && <span className="text-red-400/80">· paused</span>}
                           {l.source === 'marketing_ai' && <span className="text-amber-500/80">· website AI</span>}
                         </div>
                       </li>
@@ -236,7 +354,9 @@ export default function SltMarketingHub() {
               )}
 
               {dashboard?.daily_report?.report_sent_today && (
-                <p className="text-[11px] text-emerald-500/90">Today&apos;s 3 PM CST report was sent.</p>
+                <p className="text-[11px] text-emerald-500/90">
+                  Today&apos;s 3 PM CST digest {localMode ? 'posted in-app' : 'was emailed'}.
+                </p>
               )}
             </>
           )}
@@ -253,10 +373,11 @@ export default function SltMarketingHub() {
             emptyTitle="Self-contained marketing"
             emptySubtitle="Autopilot emails new leads automatically. Manage pipeline, approve social drafts, and schedule discovery calls — all inside FleetCo, no paid CRM required."
             suggestedQuestions={[
-              'Show autopilot status and leads due for nurture emails',
-              'List leads captured by the website marketing AI',
+              'Show dashboard',
+              'List interested leads',
+              'Outbox',
               'Draft a LinkedIn post about our driver app',
-              'Which social posts are waiting for approval?',
+              'Run autopilot now',
             ]}
           />
         </div>

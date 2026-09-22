@@ -475,11 +475,14 @@ const conversations = new Map();
 
 app.get('/api/marketing-ai/status', async (_req, res) => {
   const { verifyAiProvider } = await import('./aiProvider.js');
+  const { marketingModeStatus } = await import('./marketingLocalMode.js');
   const status = await verifyAiProvider();
+  const mode = marketingModeStatus();
   res.json({
     ...status,
+    ...mode,
     public_agent: 'fleetco_guide',
-    free_tier: 'groq_or_gemini',
+    guide_mode: mode.local_only ? 'rule_based' : 'llm',
     autopilot: true,
   });
 });
@@ -536,42 +539,63 @@ app.get('/api/agents/status', requireAuth, async (_req, res) => {
   res.json(getAiStatus());
 });
 
-app.post('/api/agents/conversations', requireAuth, (req, res) => {
-  const { agent_name = 'site_commander', metadata = {} } = req.body || {};
-  if (agent_name === 'slt_marketing' && !['owner', 'executive', 'fleet_manager'].includes(req.user?.role)) {
-    return res.status(403).json({ error: 'SLT access required for Marketing Commander' });
+app.post('/api/agents/conversations', requireAuth, async (req, res) => {
+  try {
+    const { agent_name = 'site_commander', metadata = {} } = req.body || {};
+    if (agent_name === 'slt_marketing' && !['owner', 'executive', 'fleet_manager'].includes(req.user?.role)) {
+      return res.status(403).json({ error: 'SLT access required for Marketing Commander' });
+    }
+    const welcome =
+      agent_name === 'revan'
+        ? 'Revan online — executive commander with Cursor-style control. I can change fleetcomanagement.org content, manage fleet records, run audits, and update users. Try: "Run a system health audit" or "Change the homepage headline to …"'
+        : agent_name === 'slt_marketing'
+          ? 'FleetCo Marketing AI online — works internally with Autopilot + Resend (no HubSpot). Commands like **show dashboard**, **list interested leads**, **draft LinkedIn post**, **run autopilot** work without any LLM key. Optional Groq/Gemini makes free-form chat smarter.'
+          : 'Site Commander online. I can read your fleet data and make real changes — like Cursor for your portal. Try: "Show open work orders" or "Change the homepage headline to …"';
+
+    if (agent_name === 'slt_marketing') {
+      const { createPortalAgentConversation } = await import('./marketingAiSessions.js');
+      const conversation = createPortalAgentConversation(req.user.id, agent_name, welcome);
+      return res.json({ ...conversation, metadata });
+    }
+
+    const id = randomUUID();
+    const conversation = {
+      id,
+      agent_name,
+      metadata,
+      user_id: req.user.id,
+      messages: [{ role: 'assistant', content: welcome }],
+      created_at: new Date().toISOString(),
+    };
+    conversations.set(id, conversation);
+    res.json(conversation);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  const id = randomUUID();
-  const welcome =
-    agent_name === 'revan'
-      ? 'Revan online — executive commander with Cursor-style control. I can change fleetcomanagement.org content, manage fleet records, run audits, and update users. Try: "Run a system health audit" or "Change the homepage headline to …"'
-      : agent_name === 'slt_marketing'
-        ? 'FleetCo Marketing AI online — Autopilot handles lead nurture emails automatically (no HubSpot needed). Website prospects talk to FleetCo Guide; leads enroll in the 4-step sequence. I can manage pipeline, social posts, and schedule calls. Daily lead report at 3:00 PM CST.'
-        : 'Site Commander online. I can read your fleet data and make real changes — like Cursor for your portal. Try: "Show open work orders" or "Change the homepage headline to …"';
-  const conversation = {
-    id,
-    agent_name,
-    metadata,
-    user_id: req.user.id,
-    messages: [{ role: 'assistant', content: welcome }],
-    created_at: new Date().toISOString(),
-  };
-  conversations.set(id, conversation);
-  res.json(conversation);
 });
 
 app.post('/api/agents/conversations/:id/messages', requireAuth, async (req, res) => {
-  const conversation = conversations.get(req.params.id);
-  if (!conversation || conversation.user_id !== req.user.id) {
-    return res.status(404).json({ error: 'Conversation not found' });
-  }
-
   const { role, content } = req.body || {};
   if (role !== 'user' || !content?.trim()) {
     return res.status(400).json({ error: 'Message content required' });
   }
 
-  conversation.messages.push({ role: 'user', content: content.trim() });
+  let conversation = conversations.get(req.params.id);
+  let persistPortal = false;
+
+  if (!conversation) {
+    const { getPortalAgentConversation, appendPortalAgentMessage } = await import('./marketingAiSessions.js');
+    const appendResult = appendPortalAgentMessage(req.user.id, req.params.id, content);
+    if (appendResult.error) {
+      return res.status(appendResult.status || 404).json({ error: appendResult.error });
+    }
+    conversation = appendResult.conversation;
+    persistPortal = conversation.agent_name === 'slt_marketing';
+  } else if (conversation.user_id !== req.user.id) {
+    return res.status(404).json({ error: 'Conversation not found' });
+  } else {
+    conversation.messages.push({ role: 'user', content: content.trim() });
+  }
 
   try {
     const { message, actions, ai_status } = await runAgent({
@@ -585,6 +609,12 @@ app.post('/api/agents/conversations/:id/messages', requireAuth, async (req, res)
       content: message.content,
       actions: actions?.length ? actions : undefined,
     });
+    conversation.updated_at = new Date().toISOString();
+
+    if (persistPortal) {
+      const { savePortalAgentConversation } = await import('./marketingAiSessions.js');
+      savePortalAgentConversation(conversation);
+    }
 
     res.json({
       ...conversation,
@@ -598,6 +628,17 @@ app.post('/api/agents/conversations/:id/messages', requireAuth, async (req, res)
 });
 
 registerJobBoardRoutes(app, requireAuth);
+
+app.post('/api/work-orders/:id/comments', requireAuth, async (req, res) => {
+  try {
+    const { appendWorkOrderComment } = await import('./workOrderComments.js');
+    const ctx = getEntityContext(req);
+    const item = appendWorkOrderComment(req.params.id, req.user, req.body?.comment_text, ctx);
+    res.json(item);
+  } catch (err) {
+    res.status(err.message?.includes('not found') ? 404 : 403).json({ error: err.message });
+  }
+});
 
 app.get('/api/slt-marketing/dashboard', requireAuth, async (req, res) => {
   try {
@@ -640,6 +681,45 @@ app.post('/api/slt-marketing/daily-report', requireAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/slt-marketing/outbox', requireAuth, async (req, res) => {
+  try {
+    const { assertSltMarketingAccess } = await import('./sltMarketing.js');
+    const { listMarketingOutbox } = await import('./marketingInApp.js');
+    assertSltMarketingAccess(req.user);
+    const status = req.query.status || 'pending';
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+    res.json({ items: listMarketingOutbox({ status, limit }) });
+  } catch (err) {
+    res.status(err.message?.includes('SLT') ? 403 : 400).json({ error: err.message });
+  }
+});
+
+app.post('/api/slt-marketing/outbox/:id/sent', requireAuth, async (req, res) => {
+  if (!['owner', 'executive', 'fleet_manager'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'SLT access required' });
+  }
+  try {
+    const { markOutboxSent } = await import('./marketingInApp.js');
+    const item = markOutboxSent(req.params.id, req.user?.email);
+    res.json({ success: true, item });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/slt-marketing/outbox/:id/dismiss', requireAuth, async (req, res) => {
+  if (!['owner', 'executive', 'fleet_manager'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'SLT access required' });
+  }
+  try {
+    const { dismissOutbox } = await import('./marketingInApp.js');
+    const item = dismissOutbox(req.params.id, req.user?.email);
+    res.json({ success: true, item });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -885,7 +965,7 @@ const ENTITY_NAMES = [
   'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
   'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'DrivingSafetyEvent', 'LiveStreamSession', 'LiveStreamRecording', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'TrailerAssignment', 'WorkOrder', 'User', 'Yard', 'YardPlacement',
   'MarketingSocialPost', 'MarketingScheduledCall', 'MarketingActivityLog', 'MarketingReportRun',
-  'MarketingConversation', 'MarketingAutopilotRun',
+  'MarketingConversation', 'MarketingAutopilotRun', 'MarketingOutbox', 'MarketingDailyDigest',
   'CustomerFundingAccount', 'PayeeBankAccount', 'PayrollDisbursement', 'PayrollDisbursementBatch',
   'EmployeeTaxProfile',
   'BrokerApplication', 'TrialRequest', 'LoadMessage', 'LoadMarketplaceEvent',
@@ -1042,7 +1122,7 @@ app.get('/api/entities/:type/:id', requireAuth, (req, res) => {
   res.json(item);
 });
 
-app.post('/api/entities/:type', requireAuth, (req, res) => {
+app.post('/api/entities/:type', requireAuth, async (req, res) => {
   const { type } = req.params;
   if (type === 'User') return handleUserEntity(req, res, 'create');
   const ctx = getEntityContext(req);
@@ -1059,6 +1139,18 @@ app.post('/api/entities/:type', requireAuth, (req, res) => {
       payload = prepareLoadForCreate(payload, req.user);
     } catch (err) {
       return res.status(400).json({ error: err.message });
+    }
+  }
+  if (type === 'WorkOrder' && ctx.customerId && payload.vehicle_id) {
+    const index = ctx.scopeIndex || buildScopeIndex(ctx.customerId);
+    if (!index.vehicleIds?.has(payload.vehicle_id)) {
+      return res.status(403).json({ error: 'Vehicle not in your fleet' });
+    }
+  }
+  if (type === 'WorkOrder' && req.user?.customer_id) {
+    const { isWorkOrderCommentOnlyRole } = await import('./workOrderComments.js');
+    if (isWorkOrderCommentOnlyRole(req.user.role)) {
+      return res.status(403).json({ error: 'Drivers and HR cannot create work orders' });
     }
   }
   const item = createEntity(type, payload);
@@ -1090,7 +1182,7 @@ app.post('/api/entities/:type/bulk', requireAuth, (req, res) => {
   res.status(result.created ? 201 : 400).json(result);
 });
 
-app.patch('/api/entities/:type/:id', requireAuth, (req, res) => {
+app.patch('/api/entities/:type/:id', requireAuth, async (req, res) => {
   const { type, id } = req.params;
   if (type === 'User') { req.params.id = id; return handleUserEntity(req, res, 'update'); }
   const ctx = getEntityContext(req);
@@ -1100,6 +1192,21 @@ app.patch('/api/entities/:type/:id', requireAuth, (req, res) => {
     assertEntityAccess(type, existing, ctx, ctx.scopeIndex);
   } catch (err) {
     return res.status(err.status || 403).json({ error: err.message });
+  }
+  if (type === 'WorkOrder' && ctx.customerId) {
+    const index = ctx.scopeIndex || buildScopeIndex(ctx.customerId);
+    const vehicleId = req.body?.vehicle_id ?? existing.vehicle_id;
+    if (vehicleId && !index.vehicleIds?.has(vehicleId)) {
+      return res.status(403).json({ error: 'Vehicle not in your fleet' });
+    }
+  }
+  if (type === 'WorkOrder' && req.user?.customer_id) {
+    const { isWorkOrderCommentOnlyRole } = await import('./workOrderComments.js');
+    if (isWorkOrderCommentOnlyRole(req.user.role)) {
+      return res.status(403).json({
+        error: 'Drivers and HR can add comments only — use POST /api/work-orders/:id/comments',
+      });
+    }
   }
   if (IMMUTABLE_ENTITY_TYPES.has(type)) {
     return res.status(403).json({ error: 'Marketplace communications and booking records cannot be edited' });
@@ -1117,9 +1224,15 @@ app.patch('/api/entities/:type/:id', requireAuth, (req, res) => {
   res.json(item);
 });
 
-app.delete('/api/entities/:type/:id', requireAuth, (req, res) => {
+app.delete('/api/entities/:type/:id', requireAuth, async (req, res) => {
   const { type, id } = req.params;
   if (type === 'User') { req.params.id = id; return handleUserEntity(req, res, 'delete'); }
+  if (type === 'WorkOrder' && req.user?.customer_id) {
+    const { isWorkOrderCommentOnlyRole } = await import('./workOrderComments.js');
+    if (isWorkOrderCommentOnlyRole(req.user.role)) {
+      return res.status(403).json({ error: 'Drivers and HR cannot delete work orders' });
+    }
+  }
   const ctx = getEntityContext(req);
   try {
     assertDeleteAllowed(type, ctx, req.user);

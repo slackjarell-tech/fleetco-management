@@ -110,4 +110,58 @@ export function appendPublicMessage(req, conversationId, content) {
   return { conversation, guestId };
 }
 
+const PORTAL_AGENTS = new Set(['slt_marketing']);
+const PORTAL_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function portalGuestId(userId) {
+  return `user:${userId}`;
+}
+
+export function createPortalAgentConversation(userId, agentName, welcome) {
+  if (!PORTAL_AGENTS.has(agentName)) {
+    throw new Error('Agent not supported for portal persistence');
+  }
+  const id = randomUUID();
+  const ts = nowIso();
+  const messages = [{ role: 'assistant', content: welcome }];
+  const conversation = createEntity('MarketingConversation', {
+    id,
+    agent_name: agentName,
+    guest_id: portalGuestId(userId),
+    user_id: userId,
+    messages: JSON.stringify(messages),
+    created_at: ts,
+    updated_at: ts,
+    archived: false,
+  });
+  return toClientConversation(conversation);
+}
+
+export function getPortalAgentConversation(id, userId) {
+  const conv = getEntity('MarketingConversation', id);
+  if (!conv || conv.archived) return null;
+  if (conv.user_id !== userId && conv.guest_id !== portalGuestId(userId)) return null;
+  return toClientConversation(conv);
+}
+
+export function savePortalAgentConversation(conversation) {
+  updateEntity('MarketingConversation', conversation.id, {
+    messages: JSON.stringify(conversation.messages),
+    updated_at: conversation.updated_at || nowIso(),
+  });
+}
+
+export function appendPortalAgentMessage(userId, conversationId, content) {
+  const text = (content || '').trim();
+  if (!text) return { error: 'Message required', status: 400 };
+
+  const conversation = getPortalAgentConversation(conversationId, userId);
+  if (!conversation) return { error: 'Conversation not found', status: 404 };
+
+  conversation.messages.push({ role: 'user', content: text });
+  conversation.updated_at = nowIso();
+  savePortalAgentConversation(conversation);
+  return { conversation };
+}
+
 export { guestKey };

@@ -3,6 +3,9 @@ import { executeTool, getToolsForUser } from './aiTools.js';
 import { executeMarketingTool, getMarketingToolsForUser } from './marketingAiTools.js';
 import { executePublicMarketingTool, getPublicMarketingTools, PUBLIC_MARKETING_AGENT } from './publicMarketingAiTools.js';
 import { SLT_MARKETING_ROLES } from './sltMarketing.js';
+import { runInternalMarketingAssistant } from './marketingInternalAssistant.js';
+import { runPublicGuideBot, shouldUsePublicGuideBot } from './marketingPublicGuide.js';
+import { isLocalMarketingMode } from './marketingLocalMode.js';
 
 const MAX_TOOL_ROUNDS = 6;
 const MAX_HISTORY_MESSAGES = 14;
@@ -56,10 +59,13 @@ Current user: ${user?.email} (role: ${role})
 
 Tools (real actions — never pretend):
 - get_marketing_dashboard / list_marketing_leads
-- update_marketing_lead (status: new, interested, contacted, call_scheduled, qualified, won, lost)
+- update_marketing_lead (status + autopilot_paused)
 - send_lead_email (Resend — requires RESEND_API_KEY on server)
 - schedule_sales_call
 - queue_social_post / approve_social_post / list_social_queue
+- run_marketing_autopilot / run_daily_lead_report
+
+Internal command mode (no LLM): show dashboard, list interested leads, draft LinkedIn post, run autopilot, social queue.
 
 Social: Facebook auto-post works when FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN are set. Other platforms queue as draft for manual publish.
 
@@ -160,17 +166,42 @@ export async function runAgent({ user, messages, agentName = 'site_commander', g
   const status = getAiStatus();
   const actions = [];
   const isPublicGuide = agentName === PUBLIC_MARKETING_AGENT;
+  const isSltMarketing = agentName === 'slt_marketing';
+  const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+  const lastUserText = lastUser?.content || '';
+
+  if (isPublicGuide && (shouldUsePublicGuideBot() || !status.configured)) {
+    return runPublicGuideBot(guest, messages);
+  }
+
+  if (isSltMarketing && user) {
+    const internal = await runInternalMarketingAssistant(user, lastUserText);
+    if (internal.handled) {
+      const assistantMessage = {
+        role: 'assistant',
+        content: internal.message?.content || 'Done.',
+      };
+      if (internal.actions?.length) assistantMessage.actions = internal.actions;
+      return {
+        message: assistantMessage,
+        actions: internal.actions || [],
+        ai_status: {
+          ...status,
+          ...(internal.ai_status || {}),
+          mode: internal.mode || 'internal',
+          local_only: isLocalMarketingMode(),
+        },
+      };
+    }
+  }
 
   if (!status.configured) {
-    const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     return {
-      message: { role: 'assistant', content: offlineReply(agentName, lastUser?.content || '') },
+      message: { role: 'assistant', content: offlineReply(agentName, lastUserText) },
       actions: [],
       ai_status: status,
     };
   }
-
-  const isSltMarketing = agentName === 'slt_marketing';
   if (isSltMarketing && !SLT_MARKETING_ROLES.has(user?.role)) {
     return {
       message: {
@@ -197,8 +228,18 @@ export async function runAgent({ user, messages, agentName = 'site_commander', g
     const response = await chatCompletion({ messages: chatMessages, tools });
 
     if (response.error === 'not_configured') {
+      if (isSltMarketing && user) {
+        const internal = await runInternalMarketingAssistant(user, lastUserText);
+        if (internal.handled) {
+          return {
+            message: internal.message,
+            actions: internal.actions || [],
+            ai_status: { ...getAiStatus(), mode: 'internal' },
+          };
+        }
+      }
       return {
-        message: { role: 'assistant', content: offlineReply(agentName, messages.at(-1)?.content || '') },
+        message: { role: 'assistant', content: offlineReply(agentName, lastUserText) },
         actions: [],
         ai_status: getAiStatus(),
       };

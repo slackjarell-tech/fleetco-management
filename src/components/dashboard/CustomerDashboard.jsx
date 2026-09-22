@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileText, Truck, AlertCircle, CheckCircle } from 'lucide-react';
 import GettingStartedChecklist from '@/components/dashboard/GettingStartedChecklist';
+import { welcomeFirstName } from '@/lib/displayName';
 
 export default function CustomerDashboard({ user, data }) {
   const customerId = user?.customer_id;
@@ -17,7 +18,7 @@ export default function CustomerDashboard({ user, data }) {
   return (
     <div className="p-4 sm:p-6 space-y-6 bg-slate-900 min-h-screen">
       <div>
-        <h1 className="text-2xl font-black text-white">Welcome, {user?.full_name?.split(' ')[0]}</h1>
+        <h1 className="text-2xl font-black text-white">Welcome, {welcomeFirstName(user?.full_name)}</h1>
         <p className="text-slate-400 text-sm">Customer Portal</p>
       </div>
 

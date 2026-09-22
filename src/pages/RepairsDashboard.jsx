@@ -3,14 +3,7 @@ import { api } from '@/api/apiClient';
 import { Wrench, AlertTriangle, Clock, DollarSign, TrendingUp, Package, ChevronRight, Calendar, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const STATUS_COLORS = {
-  open: 'bg-blue-100 text-blue-700 border-blue-200',
-  in_progress: 'bg-amber-100 text-amber-700 border-amber-200',
-  parts_ordered: 'bg-purple-100 text-purple-700 border-purple-200',
-  awaiting_parts: 'bg-orange-100 text-orange-700 border-orange-200',
-  completed: 'bg-green-100 text-green-700 border-green-200',
-  cancelled: 'bg-slate-100 text-slate-500 border-slate-200',
-};
+import { STATUS_COLORS, STATUS_LABELS } from '@/lib/workOrderWorkflow';
 
 const PRIORITY_COLORS = {
   low: 'bg-slate-400',
@@ -19,14 +12,17 @@ const PRIORITY_COLORS = {
   critical: 'bg-red-500',
 };
 
-const ACTIVE_STATUSES = ['open', 'in_progress', 'parts_ordered', 'awaiting_parts'];
+const ACTIVE_STATUSES = ['awaiting_estimate', 'awaiting_approval', 'awaiting_authorization', 'open', 'in_progress', 'parts_ordered', 'awaiting_parts'];
+/** WOs that mean the unit is physically out of service (not intake/estimate queue). */
+const DOWN_STATUSES = ['open', 'in_progress', 'parts_ordered', 'awaiting_parts'];
 
 function DowntimeCostBar({ vehicle, workOrders }) {
   const vehWOs = workOrders.filter(w => w.vehicle_id === vehicle.id);
   const activeCost = vehWOs.filter(w => ACTIVE_STATUSES.includes(w.status)).reduce((s, w) => s + (w.total_cost || 0), 0);
   const totalCost = vehWOs.reduce((s, w) => s + (w.total_cost || 0), 0);
   const activeCount = vehWOs.filter(w => ACTIVE_STATUSES.includes(w.status)).length;
-  const isDown = vehicle.status === 'in_shop' || activeCount > 0;
+  const hasDownWork = vehWOs.some((w) => DOWN_STATUSES.includes(w.status));
+  const isDown = vehicle.status === 'in_shop' || hasDownWork;
 
   return (
     <div className={`p-4 rounded-xl border ${isDown ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white'}`}>
@@ -89,7 +85,9 @@ export default function RepairsDashboard() {
     [activeWOs, priorityFilter]);
 
   const totalActiveCost = activeWOs.reduce((s, w) => s + (w.total_cost || 0), 0);
-  const vehiclesDown = vehicles.filter(v => v.status === 'in_shop' || activeWOs.some(w => w.vehicle_id === v.id)).length;
+  const vehiclesDown = vehicles.filter(
+    (v) => v.status === 'in_shop' || activeWOs.some((w) => w.vehicle_id === v.id && DOWN_STATUSES.includes(w.status)),
+  ).length;
   const criticalCount = activeWOs.filter(w => w.priority === 'critical').length;
   const awaitingParts = activeWOs.filter(w => w.status === 'awaiting_parts' || w.status === 'parts_ordered').length;
 
@@ -187,8 +185,8 @@ export default function RepairsDashboard() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-black text-slate-900 text-sm">{wo.wo_number}</span>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border capitalize ${STATUS_COLORS[wo.status]}`}>
-                              {wo.status?.replace('_', ' ')}
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_COLORS[wo.status] || ''}`}>
+                              {STATUS_LABELS[wo.status] || wo.status?.replace('_', ' ')}
                             </span>
                             <span className="text-xs text-slate-400">{wo.repair_type}</span>
                           </div>

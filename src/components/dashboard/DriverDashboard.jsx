@@ -1,4 +1,5 @@
 import React from 'react';
+import { welcomeFirstName } from '@/lib/displayName';
 import { Link } from 'react-router-dom';
 import {
   Fuel, Clock, TrendingUp, Route, ScanLine,
@@ -38,7 +39,7 @@ export default function DriverDashboard({ user, data, delivery }) {
   return (
     <div className="p-4 sm:p-6 space-y-6 bg-slate-900 min-h-screen">
       <div>
-        <h1 className="text-2xl font-black text-white">Welcome, {user?.full_name?.split(' ')[0]}</h1>
+        <h1 className="text-2xl font-black text-white">Welcome, {welcomeFirstName(user?.full_name)}</h1>
         <p className="text-slate-400 text-sm">FleetCo Driver — {modes.join(' · ')}</p>
       </div>
 

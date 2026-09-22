@@ -431,6 +431,22 @@ const sltMarketing = {
       body: JSON.stringify(to ? { to } : {}),
     });
   },
+  getOutbox(status = 'pending', limit = 50) {
+    const params = new URLSearchParams({ status, limit: String(limit) });
+    return apiFetch(`/slt-marketing/outbox?${params}`);
+  },
+  markOutboxSent(id) {
+    return apiFetch(`/slt-marketing/outbox/${encodeURIComponent(id)}/sent`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+  dismissOutbox(id) {
+    return apiFetch(`/slt-marketing/outbox/${encodeURIComponent(id)}/dismiss`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
 };
 
 const sltBilling = {
@@ -508,7 +524,16 @@ const jobBoard = {
   },
 };
 
-export const api = { auth, entities, functions, integrations, agents, marketingAi, billing, payroll, sltMarketing, sltBilling, jobBoard, reports: {
+const workOrders = {
+  addComment(workOrderId, commentText) {
+    return apiFetch(`/work-orders/${encodeURIComponent(workOrderId)}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ comment_text: commentText }),
+    });
+  },
+};
+
+export const api = { auth, entities, functions, integrations, agents, marketingAi, billing, payroll, sltMarketing, sltBilling, jobBoard, workOrders, reports: {
   listEntity(entityName, sort, limit) {
     const params = new URLSearchParams();
     if (sort) params.set('sort', sort);
