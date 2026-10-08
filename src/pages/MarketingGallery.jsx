@@ -22,7 +22,7 @@ import Flyer11_IFTACompliance from '@/components/marketing/Flyer11_IFTAComplianc
 import Flyer12_MaintenanceProgram from '@/components/marketing/Flyer12_MaintenanceProgram';
 import Banner01_TradeShow from '@/components/marketing/Banner01_TradeShow';
 import Email03_Nurture from '@/components/marketing/Email03_Nurture';
-import { CLIENT_DECK_DOWNLOAD } from '@/lib/brand';
+import { CLIENT_DECK_DOWNLOAD, CAPABILITIES_DECK_DOWNLOAD, DEEP_DIVE_DECK_DOWNLOAD } from '@/lib/brand';
 
 const TEMPLATES = [
   { id: 'Flyer01', name: 'Fleet Services Flyer', category: 'Flyer', component: Flyer01_FleetServices, desc: 'Full-service fleet management overview with service cards and CTA' },
@@ -72,6 +72,27 @@ export default function MarketingGallery() {
       <div>
         <h1 className="text-2xl font-black text-slate-900">Marketing Gallery</h1>
         <p className="text-slate-500 text-sm mt-0.5">{TOTAL} print-ready marketing templates — click any to preview, then print, save as PDF, or download PowerPoint</p>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <a
+          href={DEEP_DIVE_DECK_DOWNLOAD}
+          download="FleetCo-System-Deep-Dive-Review.pptx"
+          className="rounded-xl border-2 border-amber-400 bg-amber-50 p-4 hover:bg-amber-100 transition-colors"
+        >
+          <div className="font-black text-slate-900 text-sm">System Deep Dive (recommended)</div>
+          <p className="text-xs text-slate-600 mt-1">FleetCo vs customer walkthroughs with UI screenshots + gap analysis for prioritizing improvements.</p>
+          <span className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-amber-800"><Download className="w-3 h-3" /> Download .pptx</span>
+        </a>
+        <a
+          href={CAPABILITIES_DECK_DOWNLOAD}
+          download="FleetCo-System-Capabilities-Review.pptx"
+          className="rounded-xl border border-slate-200 bg-white p-4 hover:border-amber-300 transition-colors"
+        >
+          <div className="font-black text-slate-900 text-sm">Capabilities reference (text)</div>
+          <p className="text-xs text-slate-600 mt-1">31-slide module catalog without screenshots — good for quick lookup.</p>
+          <span className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-slate-700"><Download className="w-3 h-3" /> Download .pptx</span>
+        </a>
       </div>
 
       {/* Category Filter */}
