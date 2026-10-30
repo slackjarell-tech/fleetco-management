@@ -5,6 +5,7 @@ import {
   getUserRowByEmail,
   updateUser,
   createEntity,
+  updateEntity,
   filterEntities,
   listEntities,
   nowIso,
@@ -149,10 +150,202 @@ export function getDemoDriverLogins() {
   }));
 }
 
+export function seedStressBulk() {
+  const customers = listEntities('Customer');
+  const vehicles = listEntities('Vehicle').filter((v) => v.unit_type === 'truck' || !v.unit_type);
+  const trailers = listEntities('Vehicle').filter((v) => v.unit_type === 'trailer');
+  const allUnits = [...vehicles, ...trailers];
+  const driver = findUserByEmail('driver1@fleetco.com');
+  const customer = customers[0];
+  if (!customer || allUnits.length === 0) {
+    console.warn('[seed] stress bulk skipped — need customer + vehicles');
+    return { added: 0 };
+  }
+
+  const ts = nowIso();
+  let added = 0;
+  const truck = vehicles[0] || allUnits[0];
+
+  for (const v of allUnits.slice(0, 12)) {
+    if (!v.purchase_price) {
+      updateEntity('Vehicle', v.id, {
+        purchase_price: v.unit_type === 'trailer' ? 45000 + Math.floor(Math.random() * 20000) : 85000 + Math.floor(Math.random() * 60000),
+        purchase_date: dateOnly(-365 * (2 + Math.floor(Math.random() * 5))),
+        odometer: v.odometer || 80000 + Math.floor(Math.random() * 200000),
+      });
+    }
+  }
+
+  const loadStatuses = ['available', 'assigned', 'in_transit', 'delivered', 'cancelled'];
+  for (let i = 0; i < 45; i += 1) {
+    const unit = allUnits[i % allUnits.length];
+    const status = loadStatuses[i % loadStatuses.length];
+    createEntity('Load', {
+      load_number: `STRESS-L${1000 + i}`,
+      origin_city: 'Dallas',
+      origin_state: 'TX',
+      destination_city: ['Houston', 'Atlanta', 'Chicago', 'Phoenix'][i % 4],
+      destination_state: ['TX', 'GA', 'IL', 'AZ'][i % 4],
+      rate: 1200 + (i % 20) * 150,
+      miles: 400 + (i % 15) * 80,
+      status,
+      pickup_date: dateOnly(-14 + (i % 28)),
+      assigned_vehicle_id: status !== 'available' ? unit.id : null,
+      customer_id: customer.id,
+      commodity: 'General freight',
+    });
+    added += 1;
+  }
+
+  const woStatuses = ['open', 'in_progress', 'awaiting_parts', 'completed', 'awaiting_estimate'];
+  for (let i = 0; i < 28; i += 1) {
+    const unit = allUnits[i % allUnits.length];
+    createEntity('WorkOrder', {
+      wo_number: `STRESS-WO-${2000 + i}`,
+      title: `Stress test repair #${i + 1}`,
+      repair_type: ['Brakes', 'Engine', 'Tires', 'Electrical', 'PM'][i % 5],
+      status: woStatuses[i % woStatuses.length],
+      priority: ['low', 'medium', 'high', 'critical'][i % 4],
+      vehicle_id: unit.id,
+      customer_id: customer.id,
+      opened_date: dateOnly(-30 + (i % 25)),
+      labor_hours: 1 + (i % 8),
+      labor_rate: 75 + (i % 3) * 10,
+      labor_cost: (1 + (i % 8)) * (75 + (i % 3) * 10),
+      parts_total: (i % 7) * 120,
+      total_cost: (1 + (i % 8)) * (75 + (i % 3) * 10) + (i % 7) * 120,
+      service_tasks: [{ description: 'Inspect and repair', status: 'pending' }],
+    });
+    added += 1;
+  }
+
+  for (let i = 0; i < 60; i += 1) {
+    const unit = vehicles[i % Math.max(vehicles.length, 1)] || truck;
+    createEntity('FuelLog', {
+      vehicle_id: unit.id,
+      gallons: 80 + (i % 40),
+      price_per_gallon: 3.45 + (i % 10) * 0.05,
+      total_cost: Math.round((80 + (i % 40)) * (3.45 + (i % 10) * 0.05) * 100) / 100,
+      date: dateOnly(-60 + i),
+      odometer_reading: (unit.odometer || 100000) + i * 320,
+      station_name: `Pilot #${100 + (i % 12)}`,
+      fuel_type: 'diesel',
+      driver_name: driver?.full_name || 'Demo Driver',
+    });
+    added += 1;
+  }
+
+  for (let i = 0; i < 15; i += 1) {
+    createEntity('MaintenanceSchedule', {
+      vehicle_id: allUnits[i % allUnits.length].id,
+      service_type: ['Oil Change', 'DOT Annual', 'Brake Service', 'Tire Rotation'][i % 4],
+      due_date: dateOnly(i % 3 === 0 ? -2 : 10 + i * 3),
+      due_mileage: (allUnits[i % allUnits.length].odometer || 100000) + 5000 + i * 1000,
+      status: i % 3 === 0 ? 'overdue' : 'scheduled',
+      recurring: true,
+      interval_miles: 25000,
+    });
+    added += 1;
+  }
+
+  for (let i = 0; i < 20; i += 1) {
+    createEntity('PartInventory', {
+      part_number: `PN-STRESS-${3000 + i}`,
+      description: `Demo part ${i + 1}`,
+      category: ['Filters', 'Brakes', 'Electrical', 'Fluids'][i % 4],
+      quantity_on_hand: 2 + (i % 15),
+      min_stock_level: 3,
+      unit_cost: 12 + i * 4.5,
+      supplier_name: 'FleetCo Demo Supply',
+    });
+    added += 1;
+  }
+
+  for (let i = 0; i < 8; i += 1) {
+    createEntity('Inspection', {
+      vehicle_id: allUnits[i % allUnits.length].id,
+      inspection_type: i % 2 === 0 ? 'Pre-Trip' : 'Annual',
+      inspection_date: dateOnly(-i * 3),
+      inspector_name: driver?.full_name || 'Inspector',
+      status: i % 4 === 0 ? 'failed' : 'passed',
+      defects_found: i % 4 === 0,
+      odometer: 120000 + i * 500,
+    });
+    added += 1;
+  }
+
+  if (entityCount('Yard') === 0) {
+    const yard = createEntity('Yard', {
+      name: 'Stress Test Terminal',
+      customer_id: customer.id,
+      address: '100 Demo Yard Rd',
+      city: 'Dallas',
+      state: 'TX',
+      width_ft: 300,
+      length_ft: 200,
+      cell_size_ft: 25,
+      elements: [
+        { id: 'dock-a', type: 'dock', label: 'Dock A', col: 0, row: 0, cols: 2, rows: 1, color: '#3b82f6' },
+        { id: 'spot-1', type: 'parking', label: 'Spot 1', col: 3, row: 0, cols: 2, rows: 2, color: '#22c55e' },
+      ],
+    });
+    createEntity('YardPlacement', {
+      yard_id: yard.id,
+      element_id: 'spot-1',
+      vehicle_id: truck.id,
+      customer_id: customer.id,
+      status: 'occupied',
+      checked_in_at: ts,
+    });
+    added += 2;
+  }
+
+  if (entityCount('VehicleAccessory') === 0 && truck) {
+    createEntity('VehicleAccessory', {
+      vehicle_id: truck.id,
+      accessory_type: 'dashcam',
+      label: 'Demo road camera',
+      serial_number: 'DC-STRESS-001',
+      install_date: dateOnly(-90),
+      customer_id: customer.id,
+    });
+    added += 1;
+  }
+
+  if (driver) {
+    for (let i = 0; i < 12; i += 1) {
+      createEntity('DriverLocation', {
+        user_id: driver.id,
+        user_name: driver.full_name,
+        vehicle_id: truck.id,
+        lat: 32.77 + (i * 0.01),
+        lng: -96.79 - (i * 0.008),
+        speed: 55 + (i % 20),
+        heading: (i * 30) % 360,
+        timestamp: daysAgo(i % 5),
+        source: 'driver_app',
+      });
+      added += 1;
+    }
+  }
+
+  console.log('[seed] Stress bulk added', added, 'records at', ts);
+  return { added };
+}
+
 export function seedDemoData(options = {}) {
   const fillGaps = options?.fillGaps === true;
   const ensureDrivers = options?.ensureDrivers === true;
+  const stress = options?.stress === true;
   const hasCustomers = filterEntities('Customer').length > 0;
+
+  if (stress) {
+    if (!hasCustomers) seedCoreDemoData();
+    ensureDemoDrivers();
+    seedGapDemoEntities();
+    const bulk = seedStressBulk();
+    return { created: true, stress: true, ...bulk, summary: getDemoSeedSummary() };
+  }
 
   if (ensureDrivers) {
     const result = ensureDemoDrivers(options?.customerId);

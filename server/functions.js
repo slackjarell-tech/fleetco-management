@@ -304,12 +304,14 @@ export async function invokeFunction(name, body, user, ctx = null) {
       const result = seedDemoData(body);
       const created = !!result?.created;
       let message = created
-        ? (body?.ensureDrivers
-          ? 'Demo driver accounts ensured'
-          : body?.fillGaps
-            ? 'Demo gap data added for system test'
-            : 'Demo data seeded successfully')
-        : 'Demo data already exists — pass fillGaps: true or ensureDrivers: true';
+        ? (body?.stress
+          ? 'Stress demo data loaded for portal testing'
+          : body?.ensureDrivers
+            ? 'Demo driver accounts ensured'
+            : body?.fillGaps
+              ? 'Demo gap data added for system test'
+              : 'Demo data seeded successfully')
+        : 'Demo data already exists — pass fillGaps: true, ensureDrivers: true, or stress: true';
       return {
         success: true,
         created,
