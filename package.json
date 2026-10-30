@@ -24,6 +24,8 @@
     "driver:android-emulator": "powershell -ExecutionPolicy Bypass -File scripts/setup-android-emulator.ps1",
     "driver:android-debug": "powershell -ExecutionPolicy Bypass -File scripts/run-driver-android-debug.ps1",
     "seed:production-demo": "node scripts/seed-production-demo.mjs",
+    "seed:flood-review": "node scripts/flood-demo-review.mjs",
+    "seed:flood-review:prod": "node scripts/flood-demo-review.mjs --production",
     "cap:sync": "npm run build:mobile && npx cap sync",
     "cap:open:ios": "npx cap open ios",
     "cap:open:android": "npx cap open android",

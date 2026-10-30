@@ -12,6 +12,15 @@ import {
 } from './db.js';
 import { computeNextDueDate } from './billing.js';
 import { defaultSidebarModulesForRole } from './customerRoles.js';
+import { stampCustomerNumber } from './entityNumbers.js';
+
+/** Customer portal review account — full sidebar demo fleet for JaRell */
+export const REVIEW_CUSTOMER_PORTAL = {
+  email: 'slackjarell@gmail.com',
+  fullName: 'JaRell Slack',
+  password: process.env.REVIEW_DEMO_PASSWORD || 'DemoReview2026!',
+  companyName: 'Slack Demo Transport LLC',
+};
 
 /** Shared demo password for all tester driver accounts */
 export const DEMO_DRIVER_PASSWORD = 'demo123';
@@ -333,18 +342,386 @@ export function seedStressBulk() {
   return { added };
 }
 
+export function getReviewCustomerLogins() {
+  return {
+    customerPortal: {
+      email: REVIEW_CUSTOMER_PORTAL.email,
+      password: REVIEW_CUSTOMER_PORTAL.password,
+      loginUrl: 'https://fleetcomanagement.org/login',
+      role: 'customer_owner',
+      company: REVIEW_CUSTOMER_PORTAL.companyName,
+      note: 'Full customer sidebar — all modules enabled for review',
+    },
+    fleetcoOwner: {
+      email: 'jarell.slack@fleetcomanagement.org',
+      loginUrl: 'https://fleetcomanagement.org/login',
+      note: 'FleetCo owner — see all customers; local dev password FleetCo2026! unless changed on Render',
+    },
+    fleetcoExecutive: {
+      email: 'admin@fleetco.com',
+      password: 'admin123',
+      loginUrl: 'https://fleetcomanagement.org/login',
+      role: 'executive',
+    },
+  };
+}
+
+function seedInvoicesIfMissing(minTotal = 6) {
+  if (entityCount('Invoice') >= minTotal) return 0;
+  const customers = listEntities('Customer');
+  let added = 0;
+  const statuses = ['paid', 'sent', 'overdue', 'draft', 'sent', 'paid'];
+  for (let i = entityCount('Invoice'); i < minTotal; i += 1) {
+    const customer = customers[i % customers.length];
+    if (!customer) break;
+    createEntity('Invoice', {
+      invoice_number: `INV-DEMO-${2026}${String(100 + i).padStart(3, '0')}`,
+      customer_id: customer.id,
+      amount: 1800 + i * 650,
+      total: 1800 + i * 650,
+      status: statuses[i % statuses.length],
+      due_date: dateOnly(i % 2 === 0 ? 14 : -7),
+      issue_date: dateOnly(-30 + i * 2),
+      description: `Fleet management & platform services — ${customer.company_name}`,
+    });
+    added += 1;
+  }
+  return added;
+}
+
+/** Dedicated demo org + portal login for slackjarell@gmail.com with data in every category. */
+export function ensureReviewCustomerDemo(options = {}) {
+  const flood = options?.flood === true;
+  const manager = findUserByEmail('manager@fleetco.com') || findUserByEmail('admin@fleetco.com');
+  const ts = nowIso();
+  const monthlyDue = computeNextDueDate(ts, 'monthly');
+  const portalEmail = REVIEW_CUSTOMER_PORTAL.email.trim().toLowerCase();
+
+  let customer = listEntities('Customer').find(
+    (c) => c.email?.toLowerCase() === portalEmail || c.company_name === REVIEW_CUSTOMER_PORTAL.companyName,
+  );
+
+  if (!customer) {
+    customer = createEntity(
+      'Customer',
+      stampCustomerNumber({
+        company_name: REVIEW_CUSTOMER_PORTAL.companyName,
+        contact_name: REVIEW_CUSTOMER_PORTAL.fullName,
+        email: portalEmail,
+        phone: '(360) 952-1249',
+        address: '1200 Demo Fleet Blvd',
+        city: 'Dallas',
+        state: 'TX',
+        zip: '75201',
+        mc_number: 'MC-REVIEW01',
+        dot_number: '9999001',
+        fleet_size: 12,
+        status: 'active',
+        assigned_manager_id: manager?.id,
+        subscription_plan: 'Per Unit',
+        subscription_term: 'monthly',
+        subscription_amount: 420,
+        payment_collected_at: ts,
+        last_payment_at: ts,
+        next_payment_due_at: monthlyDue,
+        subscription_status: 'active',
+        payment_status: 'current',
+        system_paused: false,
+        driver_dual_camera_enabled: true,
+        driver_safety_ai_enabled: true,
+        notes: 'Full demo fleet for customer-portal review (slackjarell@gmail.com)',
+      }),
+    );
+  }
+
+  const reviewUnits = listEntities('Vehicle').filter((v) => v.customer_id === customer.id);
+  const truckSpecs = [
+    { unit_number: 'SDT-101', make: 'Freightliner', model: 'Cascadia', year: 2023 },
+    { unit_number: 'SDT-102', make: 'Kenworth', model: 'T680', year: 2022 },
+    { unit_number: 'SDT-103', make: 'Volvo', model: 'VNL 760', year: 2021 },
+    { unit_number: 'SDT-104', make: 'Peterbilt', model: '579', year: 2020 },
+    { unit_number: 'SDT-105', make: 'International', model: 'LT', year: 2019 },
+    { unit_number: 'SDT-106', make: 'Mack', model: 'Anthem', year: 2022 },
+  ];
+  const trailerSpecs = [
+    { unit_number: 'SDT-TR01', trailer_type: 'Dry Van' },
+    { unit_number: 'SDT-TR02', trailer_type: 'Reefer' },
+    { unit_number: 'SDT-TR03', trailer_type: 'Flatbed' },
+  ];
+
+  const vehicles = [...reviewUnits];
+  for (const spec of truckSpecs) {
+    if (vehicles.filter((v) => v.unit_type !== 'trailer').length >= truckSpecs.length) break;
+    if (reviewUnits.some((v) => v.unit_number === spec.unit_number)) continue;
+    vehicles.push(
+      createEntity('Vehicle', {
+        ...spec,
+        unit_type: 'truck',
+        status: 'active',
+        odometer: 95000 + Math.floor(Math.random() * 120000),
+        purchase_price: 88000 + Math.floor(Math.random() * 40000),
+        purchase_date: dateOnly(-800),
+        customer_id: customer.id,
+        vin: `REVIEW${spec.unit_number.replace(/\W/g, '')}${Date.now().toString().slice(-6)}`,
+      }),
+    );
+  }
+  for (const spec of trailerSpecs) {
+    if (vehicles.filter((v) => v.unit_type === 'trailer').length >= trailerSpecs.length) break;
+    if (reviewUnits.some((v) => v.unit_number === spec.unit_number)) continue;
+    vehicles.push(
+      createEntity('Vehicle', {
+        ...spec,
+        unit_type: 'trailer',
+        make: 'Great Dane',
+        model: 'Champion',
+        year: 2021,
+        trailer_length: 53,
+        status: 'active',
+        customer_id: customer.id,
+      }),
+    );
+  }
+
+  const trucks = vehicles.filter((v) => v.unit_type !== 'trailer');
+  const truck = trucks[0];
+  const trailer = vehicles.find((v) => v.unit_type === 'trailer');
+
+  const hash = bcrypt.hashSync(REVIEW_CUSTOMER_PORTAL.password, 10);
+  const sidebarModules = defaultSidebarModulesForRole('customer_owner');
+  let portalUser = getUserRowByEmail(portalEmail);
+  if (!portalUser) {
+    portalUser = createUser({
+      email: portalEmail,
+      passwordHash: hash,
+      fullName: REVIEW_CUSTOMER_PORTAL.fullName,
+      role: 'customer_owner',
+      customerId: customer.id,
+      sidebarModules,
+      phone: '(360) 952-1249',
+    });
+  } else {
+    updateUser(portalUser.id, {
+      full_name: REVIEW_CUSTOMER_PORTAL.fullName,
+      role: 'customer_owner',
+      customer_id: customer.id,
+      password_hash: hash,
+      sidebar_modules: sidebarModules,
+      status: 'active',
+    });
+  }
+
+  updateEntity('Customer', customer.id, {
+    user_id: portalUser.id,
+    has_portal_login: true,
+    portal_login_email: portalEmail,
+    contact_name: REVIEW_CUSTOMER_PORTAL.fullName,
+  });
+
+  const reviewDriverEmail = 'slackdemo.driver@fleetco.com';
+  const driverHash = bcrypt.hashSync(DEMO_DRIVER_PASSWORD, 10);
+  let reviewDriver = getUserRowByEmail(reviewDriverEmail);
+  if (!reviewDriver) {
+    reviewDriver = createUser({
+      email: reviewDriverEmail,
+      passwordHash: driverHash,
+      fullName: 'Slack Demo Driver',
+      role: 'driver',
+      customerId: customer.id,
+      employeeNumber: 'DRV-88001',
+      sidebarModules: defaultSidebarModulesForRole('driver'),
+    });
+  } else {
+    updateUser(reviewDriver.id, {
+      customer_id: customer.id,
+      role: 'driver',
+      password_hash: driverHash,
+      status: 'active',
+    });
+  }
+
+  let added = 0;
+  const loadCount = listEntities('Load').filter((l) => l.customer_id === customer.id).length;
+  const targetLoads = flood ? 35 : 12;
+  for (let i = loadCount; i < targetLoads; i += 1) {
+    const unit = trucks[i % Math.max(trucks.length, 1)];
+    createEntity('Load', {
+      load_number: `SDT-L${5000 + i}`,
+      origin_city: 'Dallas',
+      origin_state: 'TX',
+      destination_city: ['Houston', 'Atlanta', 'Chicago', 'Denver'][i % 4],
+      destination_state: ['TX', 'GA', 'IL', 'CO'][i % 4],
+      rate: 1400 + (i % 12) * 175,
+      miles: 350 + (i % 10) * 90,
+      status: ['available', 'assigned', 'in_transit', 'delivered'][i % 4],
+      pickup_date: dateOnly(-10 + (i % 20)),
+      customer_id: customer.id,
+      assigned_vehicle_id: unit?.id,
+      commodity: 'General freight',
+    });
+    added += 1;
+  }
+
+  const woCount = listEntities('WorkOrder').filter((w) => w.customer_id === customer.id).length;
+  const targetWo = flood ? 25 : 10;
+  for (let i = woCount; i < targetWo; i += 1) {
+    const unit = vehicles[i % vehicles.length];
+    createEntity('WorkOrder', {
+      wo_number: `SDT-WO-${6000 + i}`,
+      title: `Review demo repair ${i + 1}`,
+      repair_type: ['Brakes', 'Engine', 'Tires', 'PM', 'Electrical'][i % 5],
+      status: ['open', 'in_progress', 'completed', 'awaiting_parts'][i % 4],
+      priority: ['medium', 'high', 'low', 'critical'][i % 4],
+      vehicle_id: unit.id,
+      customer_id: customer.id,
+      opened_date: dateOnly(-20 + i),
+      labor_hours: 2 + (i % 5),
+      labor_rate: 85,
+      total_cost: 200 + i * 85,
+    });
+    added += 1;
+  }
+
+  const invCount = listEntities('Invoice').filter((inv) => inv.customer_id === customer.id).length;
+  for (let i = invCount; i < 8; i += 1) {
+    createEntity('Invoice', {
+      invoice_number: `SDT-INV-${7000 + i}`,
+      customer_id: customer.id,
+      amount: 2200 + i * 400,
+      total: 2200 + i * 400,
+      status: ['paid', 'sent', 'overdue', 'draft'][i % 4],
+      due_date: dateOnly(i % 2 === 0 ? 10 : -3),
+      issue_date: dateOnly(-45 + i * 5),
+      description: `Slack Demo Transport — billing period ${i + 1}`,
+    });
+    added += 1;
+  }
+
+  if (truck) {
+    const fuelForCustomer = listEntities('FuelLog').filter((f) => {
+      const v = vehicles.find((u) => u.id === f.vehicle_id);
+      return v?.customer_id === customer.id;
+    }).length;
+    for (let i = fuelForCustomer; i < (flood ? 40 : 15); i += 1) {
+      const unit = trucks[i % trucks.length];
+      createEntity('FuelLog', {
+        vehicle_id: unit.id,
+        gallons: 75 + (i % 35),
+        price_per_gallon: 3.55 + (i % 8) * 0.04,
+        total_cost: Math.round((75 + (i % 35)) * 3.65 * 100) / 100,
+        date: dateOnly(-45 + i),
+        odometer_reading: (unit.odometer || 100000) + i * 280,
+        station_name: `Pilot Review #${i % 9}`,
+        fuel_type: 'diesel',
+        driver_name: reviewDriver.full_name || 'Slack Demo Driver',
+      });
+      added += 1;
+    }
+  }
+
+  if (entityCount('Yard') === 0 || !listEntities('Yard').some((y) => y.customer_id === customer.id)) {
+    const yard = createEntity('Yard', {
+      name: 'Slack Demo Terminal',
+      customer_id: customer.id,
+      address: '1200 Demo Fleet Blvd',
+      city: 'Dallas',
+      state: 'TX',
+      width_ft: 350,
+      length_ft: 250,
+      cell_size_ft: 25,
+      elements: [
+        { id: 'sd-dock', type: 'dock', label: 'Dock 1', col: 0, row: 0, cols: 2, rows: 1, color: '#3b82f6' },
+        { id: 'sd-park', type: 'parking', label: 'Spot A1', col: 3, row: 0, cols: 2, rows: 2, color: '#22c55e' },
+      ],
+    });
+    if (trailer) {
+      createEntity('YardPlacement', {
+        yard_id: yard.id,
+        element_id: 'sd-park',
+        vehicle_id: trailer.id,
+        customer_id: customer.id,
+        status: 'occupied',
+        checked_in_at: ts,
+      });
+    }
+    added += 2;
+  }
+
+  if (truck && !listEntities('VehicleAccessory').some((a) => a.customer_id === customer.id)) {
+    createEntity('VehicleAccessory', {
+      vehicle_id: truck.id,
+      accessory_type: 'dashcam',
+      brand: 'FleetCo',
+      label: 'Dual-camera demo unit',
+      serial_number: 'SDT-DC-001',
+      install_date: dateOnly(-120),
+      customer_id: customer.id,
+    });
+    added += 1;
+  }
+
+  if (reviewDriver && truck) {
+    for (let i = 0; i < (flood ? 8 : 4); i += 1) {
+      createEntity('DriverLocation', {
+        user_id: reviewDriver.id,
+        user_name: reviewDriver.full_name,
+        vehicle_id: truck.id,
+        lat: 32.78 + i * 0.012,
+        lng: -96.8 - i * 0.01,
+        speed: 50 + (i % 25),
+        heading: (i * 45) % 360,
+        timestamp: daysAgo(i % 3),
+        source: 'driver_app',
+      });
+      added += 1;
+    }
+  }
+
+  console.log('[seed] Review customer demo ready:', portalEmail, 'customer', customer.id, 'added', added);
+  return {
+    customerId: customer.id,
+    company: customer.company_name,
+    portalEmail,
+    portalPassword: REVIEW_CUSTOMER_PORTAL.password,
+    added,
+    logins: getReviewCustomerLogins(),
+  };
+}
+
 export function seedDemoData(options = {}) {
   const fillGaps = options?.fillGaps === true;
   const ensureDrivers = options?.ensureDrivers === true;
   const stress = options?.stress === true;
+  const flood = options?.flood === true;
   const hasCustomers = filterEntities('Customer').length > 0;
+
+  if (flood) {
+    if (!hasCustomers) seedCoreDemoData();
+    ensureDemoDrivers();
+    seedGapDemoEntities();
+    seedStressBulk();
+    seedStressBulk();
+    seedInvoicesIfMissing(12);
+    const review = ensureReviewCustomerDemo({ flood: true });
+    return {
+      created: true,
+      flood: true,
+      review,
+      summary: getDemoSeedSummary(),
+      logins: getReviewCustomerLogins(),
+    };
+  }
 
   if (stress) {
     if (!hasCustomers) seedCoreDemoData();
     ensureDemoDrivers();
     seedGapDemoEntities();
     const bulk = seedStressBulk();
-    return { created: true, stress: true, ...bulk, summary: getDemoSeedSummary() };
+    if (options?.reviewCustomer !== false) {
+      ensureReviewCustomerDemo({ flood: false });
+    }
+    seedInvoicesIfMissing(6);
+    return { created: true, stress: true, ...bulk, summary: getDemoSeedSummary(), logins: getReviewCustomerLogins() };
   }
 
   if (ensureDrivers) {

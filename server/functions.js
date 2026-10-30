@@ -313,19 +313,23 @@ export async function invokeFunction(name, body, user, ctx = null) {
       const result = seedDemoData(body);
       const created = !!result?.created;
       let message = created
-        ? (body?.stress
-          ? 'Stress demo data loaded for portal testing'
-          : body?.ensureDrivers
-            ? 'Demo driver accounts ensured'
-            : body?.fillGaps
-              ? 'Demo gap data added for system test'
-              : 'Demo data seeded successfully')
-        : 'Demo data already exists — pass fillGaps: true, ensureDrivers: true, or stress: true';
+        ? (body?.flood
+          ? 'Full demo flood loaded — review customer portal + all categories'
+          : body?.stress
+            ? 'Stress demo data loaded for portal testing'
+            : body?.ensureDrivers
+              ? 'Demo driver accounts ensured'
+              : body?.fillGaps
+                ? 'Demo gap data added for system test'
+                : 'Demo data seeded successfully')
+        : 'Demo data already exists — pass fillGaps: true, ensureDrivers: true, stress: true, or flood: true';
       return {
         success: true,
         created,
         message,
         drivers: body?.ensureDrivers ? getDemoDriverLogins() : undefined,
+        logins: result?.logins,
+        review: result?.review,
         summary: getDemoSeedSummary(),
         ...result,
       };
