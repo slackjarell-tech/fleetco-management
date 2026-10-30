@@ -298,6 +298,15 @@ export async function invokeFunction(name, body, user, ctx = null) {
       return { success: true };
     case 'refreshFuelPrices':
       return { success: true, message: 'Fuel prices refreshed (local mode)' };
+    case 'runPortalTabAuditAndEmail': {
+      if (!user || user.role !== 'owner') throw new Error('Owner access required');
+      const { runPortalTabAuditAndEmail } = await import('./portalTabAudit.js');
+      if (body?.stress === true) {
+        const { seedDemoData } = await import('./seedDemo.js');
+        seedDemoData({ stress: true, fillGaps: true, ensureDrivers: true });
+      }
+      return runPortalTabAuditAndEmail(body);
+    }
     case 'seedDemoData': {
       if (!user || !['owner', 'executive'].includes(user.role)) throw new Error('Owner or executive access required');
       const { seedDemoData, getDemoSeedSummary, getDemoDriverLogins } = await import('./seedDemo.js');
