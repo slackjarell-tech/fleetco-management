@@ -347,6 +347,7 @@ export async function getCustomerBillingOverview(user) {
   const customer = getEntity('Customer', user.customer_id);
   if (!customer) throw new Error('Customer not found');
 
+  const { getVehicleUnitUsage } = await import('./vehicleUnitLimits.js');
   const stripe = getStripeConfigStatus();
   return {
     success: true,
@@ -364,7 +365,9 @@ export async function getCustomerBillingOverview(user) {
       stripe_subscription_id: customer.stripe_subscription_id ? 'active' : null,
       is_broker_account: isBrokerAccount(customer),
       billing_model: customer.billing_model || null,
+      fleet_size: customer.fleet_size,
     },
+    vehicle_units: getVehicleUnitUsage(customer.id),
     stripe,
   };
 }

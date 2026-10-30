@@ -127,10 +127,19 @@ export default function CustomerModal({ customer, fleetManagers, fleetCoordinato
                   placeholder="0000000" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Fleet Size</label>
-                <input type="number" value={form.fleet_size} onChange={e => set('fleet_size', e.target.value)}
-                  placeholder="# of vehicles" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Licensed units (billing)</label>
+                <input type="number" min={1} value={form.fleet_size} onChange={e => set('fleet_size', e.target.value)}
+                  placeholder="Paid truck + trailer slots" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+                <p className="text-[11px] text-slate-500 mt-1">Active vehicles/trailers in the portal cannot exceed this count unless you add extra units below.</p>
               </div>
+              {isEditing && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Extra licensed units</label>
+                  <input type="number" min={0} value={form.extra_licensed_units ?? ''} onChange={e => set('extra_licensed_units', e.target.value)}
+                    placeholder="0" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+                  <p className="text-[11px] text-slate-500 mt-1">Promotional or paid add-ons on top of fleet_size.</p>
+                </div>
+              )}
               {isEditing && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Status</label>

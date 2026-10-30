@@ -22,7 +22,13 @@ import Flyer11_IFTACompliance from '@/components/marketing/Flyer11_IFTAComplianc
 import Flyer12_MaintenanceProgram from '@/components/marketing/Flyer12_MaintenanceProgram';
 import Banner01_TradeShow from '@/components/marketing/Banner01_TradeShow';
 import Email03_Nurture from '@/components/marketing/Email03_Nurture';
-import { CLIENT_DECK_DOWNLOAD, CAPABILITIES_DECK_DOWNLOAD, DEEP_DIVE_DECK_DOWNLOAD, TELEMATICS_DECK_DOWNLOAD } from '@/lib/brand';
+import {
+  CLIENT_DECK_DOWNLOAD,
+  CAPABILITIES_DECK_DOWNLOAD,
+  DEEP_DIVE_DECK_DOWNLOAD,
+  TELEMATICS_DECK_DOWNLOAD,
+  INVESTOR_ECONOMICS_DECK_DOWNLOAD,
+} from '@/lib/brand';
 
 const TEMPLATES = [
   { id: 'Flyer01', name: 'Fleet Services Flyer', category: 'Flyer', component: Flyer01_FleetServices, desc: 'Full-service fleet management overview with service cards and CTA' },
@@ -75,6 +81,15 @@ export default function MarketingGallery() {
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <a
+          href={INVESTOR_ECONOMICS_DECK_DOWNLOAD}
+          download="FleetCo-Investor-Cost-Revenue-Analysis.pptx"
+          className="rounded-xl border-2 border-indigo-500 bg-indigo-50 p-4 hover:bg-indigo-100 transition-colors sm:col-span-2 lg:col-span-1"
+        >
+          <div className="font-black text-slate-900 text-sm">Investor Cost & Revenue (36 slides)</div>
+          <p className="text-xs text-slate-600 mt-1">Hosting (Render vs AWS), unit economics at $35/unit, 10-year growth, FSI combined revenue, full data scope.</p>
+          <span className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-indigo-900"><Download className="w-3 h-3" /> Download .pptx</span>
+        </a>
         <a
           href={TELEMATICS_DECK_DOWNLOAD}
           download="FleetCo-Smartphone-Telematics-Demo.pptx"

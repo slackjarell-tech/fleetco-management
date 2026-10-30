@@ -69,6 +69,8 @@ export default function Fleet() {
   const [manualsVehicle, setManualsVehicle] = useState(null);
   const [detailVehicle, setDetailVehicle] = useState(null);
   const [showAddWizard, setShowAddWizard] = useState(false);
+  const [unitUsage, setUnitUsage] = useState(null);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     api.auth.me().then(async (u) => {
@@ -82,6 +84,14 @@ export default function Fleet() {
       setVehicles(filtered);
       setUsers(us);
       setCustomers(cs);
+      if (u?.customer_id) {
+        try {
+          const bill = await api.billing.getStatus();
+          setUnitUsage(bill?.vehicle_units || u?.billing?.vehicleUnits || null);
+        } catch {
+          setUnitUsage(u?.billing?.vehicleUnits || null);
+        }
+      }
       setLoading(false);
     });
   }, [effectiveCustomerId]);
@@ -93,6 +103,7 @@ export default function Fleet() {
   };
 
   const handleSave = async (data) => {
+    setSaveError('');
     let payload = data;
     const scopedCustomerId = user?.customer_id || (isViewingAsCustomer ? effectiveCustomerId : null);
     if (editVehicle && scopedCustomerId && useCustomerFleetUnitModal(user)) {
@@ -102,15 +113,23 @@ export default function Fleet() {
         assigned_customer_id: editVehicle.assigned_customer_id || scopedCustomerId,
       };
     }
-    if (editVehicle) {
-      const updated = await api.entities.Vehicle.update(editVehicle.id, payload);
-      setVehicles(prev => prev.map(v => v.id === editVehicle.id ? updated : v));
-    } else {
-      const created = await api.entities.Vehicle.create(data);
-      setVehicles(prev => [created, ...prev]);
+    try {
+      if (editVehicle) {
+        const updated = await api.entities.Vehicle.update(editVehicle.id, payload);
+        setVehicles(prev => prev.map(v => v.id === editVehicle.id ? updated : v));
+      } else {
+        const created = await api.entities.Vehicle.create(payload);
+        setVehicles(prev => [created, ...prev]);
+      }
+      if (user?.customer_id) {
+        const bill = await api.billing.getStatus().catch(() => null);
+        if (bill?.vehicle_units) setUnitUsage(bill.vehicle_units);
+      }
+      setShowModal(false);
+      setEditVehicle(null);
+    } catch (err) {
+      setSaveError(err.message || 'Could not save vehicle');
     }
-    setShowModal(false);
-    setEditVehicle(null);
   };
 
   const isAdmin = canAdministerFleetUnits(user);
@@ -142,6 +161,13 @@ export default function Fleet() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Fleet</h1>
           <p className="text-slate-500 text-sm">{powerUnits.length} vehicles · {trailers.length} trailers</p>
+          {unitUsage && (
+            <p className={`text-xs mt-1 font-semibold ${unitUsage.overLimit ? 'text-red-600' : 'text-slate-600'}`}>
+              Licensed units: {unitUsage.inUse} / {unitUsage.limit} in use
+              {unitUsage.remaining === 0 && !unitUsage.overLimit ? ' — at limit' : ''}
+              {unitUsage.overLimit ? ' — over limit; contact FleetCo' : ''}
+            </p>
+          )}
         </div>
         {(showAdminAddButtons || showCustomerAddWizard) && (
           <div className="flex gap-2">
@@ -318,14 +344,21 @@ export default function Fleet() {
       )}
 
       {showModal && (
-        <VehicleModal
-          vehicle={editVehicle || { unit_type: defaultUnitType }}
-          users={users}
-          customers={customers}
-          customerPortalEdit={customerFleetEdit}
-          onSave={handleSave}
-          onClose={() => { setShowModal(false); setEditVehicle(null); }}
-        />
+        <>
+          {saveError && (
+            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] max-w-lg bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3 rounded-xl shadow-lg">
+              {saveError}
+            </div>
+          )}
+          <VehicleModal
+            vehicle={editVehicle || { unit_type: defaultUnitType }}
+            users={users}
+            customers={customers}
+            customerPortalEdit={customerFleetEdit}
+            onSave={handleSave}
+            onClose={() => { setShowModal(false); setEditVehicle(null); setSaveError(''); }}
+          />
+        </>
       )}
 
       {showAddWizard && (

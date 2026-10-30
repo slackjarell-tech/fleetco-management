@@ -262,6 +262,30 @@ export default function SltBillingHub() {
                             <Loader2 className="w-6 h-6 text-cyan-500 animate-spin" />
                           ) : detail?.customer?.id === row.id ? (
                             <div className="space-y-4 text-sm">
+                              {detail.vehicle_units && (
+                                <div className={`rounded-lg border px-3 py-2 ${detail.vehicle_units.overLimit ? 'border-red-500/50 bg-red-950/30' : 'border-slate-700 bg-slate-950/50'}`}>
+                                  <span className="text-slate-300 font-medium">Licensed fleet units: </span>
+                                  <span className={detail.vehicle_units.overLimit ? 'text-red-300 font-bold' : 'text-white'}>
+                                    {detail.vehicle_units.inUse} / {detail.vehicle_units.limit} in use
+                                  </span>
+                                  {detail.vehicle_units.overLimit && (
+                                    <span className="text-red-400 text-xs ml-2">— increase fleet_size or extra_licensed_units</span>
+                                  )}
+                                </div>
+                              )}
+                              {(detail.vin_events || []).length > 0 && (
+                                <div>
+                                  <h3 className="text-slate-300 font-medium mb-2">VIN audit (removals & blocks)</h3>
+                                  <ul className="space-y-1 text-slate-400 max-h-40 overflow-y-auto text-xs font-mono">
+                                    {detail.vin_events.slice(0, 15).map((e) => (
+                                      <li key={e.id}>
+                                        {formatDueDate(e.created_at)} · {e.event_type} · {e.vin}
+                                        {e.unit_number ? ` · unit ${e.unit_number}` : ''}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                               <div className="flex flex-wrap gap-2">
                                 {row.stripe_subscription_url && (
                                   <Button asChild size="sm" variant="outline">

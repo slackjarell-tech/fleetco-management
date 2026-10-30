@@ -1,5 +1,6 @@
 /** Subscription billing — due dates, reminders, pause eligibility */
 import { isBrokerAccount, brokerBillingSnapshot } from './brokerAccounts.js';
+import { getVehicleUnitUsage } from './vehicleUnitLimits.js';
 
 export const REMINDER_THRESHOLDS = [7, 3, 1, 0];
 
@@ -37,6 +38,8 @@ export function getBillingSnapshot(customer) {
   else if (isOverdue) status = 'overdue';
   else if (days != null && days <= 7) status = 'due_soon';
 
+  const vehicleUnits = customer.id ? getVehicleUnitUsage(customer.id) : null;
+
   return {
     status,
     daysUntilDue: days,
@@ -48,6 +51,7 @@ export function getBillingSnapshot(customer) {
     term: customer.subscription_term || 'monthly',
     plan: customer.subscription_plan || '',
     lastPaymentAt: customer.last_payment_at || customer.payment_collected_at || null,
+    vehicleUnits,
   };
 }
 

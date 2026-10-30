@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '@/api/apiClient';
 import { Plus, Search, AlertTriangle, CheckCircle2, Clock, FileText, ChevronDown, ChevronUp, Shield, ClipboardCheck, ShieldCheck } from 'lucide-react';
 import HOSLogForm from '@/components/hos/HOSLogForm';
 import HOSGrid from '@/components/hos/HOSGrid';
 import HOSViolations from '@/components/hos/HOSViolations';
 import HOSRegulationKey from '@/components/hos/HOSRegulationKey';
-import HOSFleetClocksPanel from '@/components/hos/HOSFleetClocksPanel';
+import HOSPostedNotice, { HOSPostedDriverRow } from '@/components/hos/HOSPostedNotice';
 import HOSDriverClockCard from '@/components/hos/HOSDriverClockCard';
-import { computeDriverHosClocks } from '@/lib/hosFmcsa';
+import { computeDriverHosClocks, formatClockHours } from '@/lib/hosFmcsa';
 import { getDriverDuty } from '@/lib/driverDuty';
 import DVIRModal from '@/components/hos/DVIRModal';
 import DVIRSignoffModal from '@/components/hos/DVIRSignoffModal';
@@ -136,6 +136,26 @@ export default function HOSReport() {
     reviewed: logs.filter(l => l.status === 'reviewed').length,
   }), [logs]);
 
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const clocksForDriver = useCallback((driverId) => {
+    const driverLogs = logs.filter((l) => l.driver_id === driverId);
+    const todayLog = driverLogs.find((l) => l.log_date === todayStr);
+    const duty = user?.id === driverId ? getDriverDuty() : 'off_duty';
+    return todayLog?.hos_clocks || computeDriverHosClocks(driverLogs, { currentDuty: duty });
+  }, [logs, todayStr, user?.id]);
+
+  const postedDriverId = isPureDriverUser(user)
+    ? user?.id
+    : driverFilter !== 'all'
+      ? driverFilter
+      : null;
+
+  const postedClocks = postedDriverId ? clocksForDriver(postedDriverId) : null;
+  const postedDriverName = postedDriverId
+    ? (userMap[postedDriverId]?.full_name || 'Driver')
+    : null;
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
@@ -158,24 +178,28 @@ export default function HOSReport() {
         </button>
       </div>
 
-      <HOSRegulationKey defaultOpen />
+      <HOSPostedNotice
+        driverName={postedDriverName || (isPureDriverUser(user) ? user?.full_name : null)}
+        clocks={postedClocks || (isPureDriverUser(user) ? clocksForDriver(user.id) : null)}
+        subtitle={
+          postedDriverId
+            ? 'Counts update when this driver clocks in, moves the vehicle, or changes duty status.'
+            : isExecutiveView(user?.role)
+              ? 'Select a driver in the filter below for individual live status, or see all drivers listed under the notice.'
+              : undefined
+        }
+      />
 
-      {isPureDriverUser(user) && (
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <h2 className="text-sm font-black text-slate-900 mb-3">Your HOS clocks</h2>
-          <HOSDriverClockCard
-            clocks={(() => {
-              const today = new Date().toISOString().slice(0, 10);
-              const todayLog = logs.find((l) => l.log_date === today);
-              return todayLog?.hos_clocks || computeDriverHosClocks(logs, { currentDuty: getDriverDuty() });
-            })()}
-          />
+      {isExecutiveView(user?.role) && drivers.length > 0 && driverFilter === 'all' && (
+        <div className="space-y-2">
+          <div className="text-xs font-black text-slate-500 uppercase">All drivers — time remaining today</div>
+          {drivers.map((d) => (
+            <HOSPostedDriverRow key={d.id} driverName={d.full_name} clocks={clocksForDriver(d.id)} />
+          ))}
         </div>
       )}
 
-      {isExecutiveView(user?.role) && drivers.length > 0 && (
-        <HOSFleetClocksPanel drivers={drivers} hosLogs={logs} />
-      )}
+      <HOSRegulationKey defaultOpen={false} />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -288,9 +312,15 @@ export default function HOSReport() {
                     <span className="text-sm text-slate-600">{log.log_date}</span>
                     {vehicle && <span className="text-xs text-slate-400">Unit {vehicle.unit_number}</span>}
                   </div>
-                  <div className="flex items-center gap-4 mt-0.5 text-xs text-slate-500">
+                  <div className="flex items-center gap-4 mt-0.5 text-xs text-slate-500 flex-wrap">
                     <span className="text-emerald-600 font-semibold">{log.hours_driving?.toFixed(1) || '0.0'} hrs driving</span>
                     <span>{log.hours_on_duty?.toFixed(1) || '0.0'} on duty</span>
+                    {(log.hos_clocks || log.hours_remaining != null) && (
+                      <span className="text-amber-800 font-bold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                        Posted: {formatClockHours(log.hos_clocks?.driveRemaining ?? log.hours_remaining)} drive left
+                        {log.hos_clocks?.breakRequired ? ' · BREAK DUE' : log.hos_clocks ? ` · break in ${formatClockHours(log.hos_clocks.breakRemainingMinutes / 60)}` : ''}
+                      </span>
+                    )}
                     {log.total_miles > 0 && <span>{log.total_miles} mi</span>}
                     {log.starting_location && log.ending_location && (
                       <span className="hidden sm:inline truncate">{log.starting_location} → {log.ending_location}</span>

@@ -2,6 +2,10 @@ import { createEntity, createUser, findUserByEmail, listEntities, listUsers } fr
 import bcrypt from 'bcryptjs';
 import { isDriverCapableUser } from './driverAccess.js';
 import { generateNextDriverNumber, stampCustomerNumber } from './entityNumbers.js';
+import {
+  assertVehicleUnitCompliance,
+  resolveVehicleCustomerIdFromPayload,
+} from './vehicleUnitLimits.js';
 
 const INTERNAL_EMPLOYEE_ROLES = new Set(['owner', 'executive', 'fleet_manager', 'fleet_coordinator']);
 
@@ -140,6 +144,17 @@ function createBulkRecord(type, record, user, ctx) {
     payload = stampCustomerNumber(payload);
   }
   const data = enrichRecord(type, payload, user, ctx);
+  if (type === 'Vehicle') {
+    const customerId = resolveVehicleCustomerIdFromPayload(data, ctx, null);
+    assertVehicleUnitCompliance({
+      actor: user,
+      customerId,
+      status: data.status || 'active',
+      vin: data.vin,
+      vehicleId: null,
+      previousVehicle: null,
+    });
+  }
   return createEntity(type, data);
 }
 

@@ -45,6 +45,7 @@
     "audit:portal-tabs:email": "node scripts/email-portal-tab-report.mjs",
     "audit:portal-tabs:email:prod": "node scripts/email-portal-tab-report.mjs --production",
     "marketing:pitch": "node scripts/generate-pitch-deck.js",
+    "marketing:investor-economics": "node scripts/generate-investor-cost-revenue-deck.js",
     "marketing:video": "node scripts/generate-client-video.mjs",
     "marketing:video:rebuild": "node scripts/rebuild-client-video.mjs",
     "marketing:plan": "node scripts/generate-business-plan.mjs",

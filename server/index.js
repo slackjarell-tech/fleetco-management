@@ -970,6 +970,7 @@ const ENTITY_NAMES = [
   'EmployeeTaxProfile',
   'BrokerApplication', 'TrialRequest', 'LoadMessage', 'LoadMarketplaceEvent',
   'JobPosting', 'JobApplication',
+  'VehicleVinEvent',
 ];
 
 const IMMUTABLE_ENTITY_TYPES = new Set(['LoadMessage', 'LoadMarketplaceEvent']);
@@ -1153,6 +1154,28 @@ app.post('/api/entities/:type', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Drivers and HR cannot create work orders' });
     }
   }
+  if (type === 'VehicleVinEvent') {
+    return res.status(403).json({ error: 'VIN audit records are created automatically by the system' });
+  }
+  if (type === 'Vehicle') {
+    try {
+      const {
+        assertVehicleUnitCompliance,
+        resolveVehicleCustomerIdFromPayload,
+      } = await import('./vehicleUnitLimits.js');
+      const customerId = resolveVehicleCustomerIdFromPayload(payload, ctx, null);
+      assertVehicleUnitCompliance({
+        actor: req.user,
+        customerId,
+        status: payload.status || 'active',
+        vin: payload.vin,
+        vehicleId: null,
+        previousVehicle: null,
+      });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  }
   const item = createEntity(type, payload);
   if (type === 'Load' && item.marketplace_visible !== false && req.user) {
     import('./loadMarketplaceAudit.js').then(({ logLoadMarketplaceEvent }) => {
@@ -1231,6 +1254,52 @@ app.patch('/api/entities/:type/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: err.message });
     }
   }
+  if (type === 'VehicleVinEvent') {
+    return res.status(403).json({ error: 'VIN audit records cannot be modified' });
+  }
+  if (type === 'Vehicle') {
+    try {
+      const {
+        assertVehicleUnitCompliance,
+        resolveVehicleCustomerIdFromPayload,
+        recordVehicleStatusRemoval,
+        isBillableVehicleStatus,
+      } = await import('./vehicleUnitLimits.js');
+      const mergedStatus = patch?.status ?? existing.status ?? 'active';
+      const mergedVin = patch?.vin !== undefined ? patch.vin : existing.vin;
+      const customerId = resolveVehicleCustomerIdFromPayload(patch || {}, ctx, existing);
+      const wasBillable = isBillableVehicleStatus(existing.status);
+      const willBillable = isBillableVehicleStatus(mergedStatus);
+      if (!wasBillable && willBillable) {
+        assertVehicleUnitCompliance({
+          actor: req.user,
+          customerId,
+          status: mergedStatus,
+          vin: mergedVin,
+          vehicleId: id,
+          previousVehicle: existing,
+        });
+      } else if (willBillable && (mergedVin !== existing.vin || mergedStatus !== existing.status)) {
+        assertVehicleUnitCompliance({
+          actor: req.user,
+          customerId,
+          status: mergedStatus,
+          vin: mergedVin,
+          vehicleId: id,
+          previousVehicle: existing,
+        });
+      }
+      if (wasBillable && !willBillable) {
+        recordVehicleStatusRemoval(
+          { ...existing, status: mergedStatus },
+          req.user,
+          existing.status,
+        );
+      }
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  }
   const item = updateEntity(type, id, patch);
   if (!item) return res.status(404).json({ error: 'Not found' });
   res.json(item);
@@ -1263,6 +1332,15 @@ app.delete('/api/entities/:type/:id', requireAuth, async (req, res) => {
     assertEntityAccess(type, existing, ctx, ctx.scopeIndex);
   } catch (err) {
     return res.status(err.status || 403).json({ error: err.message });
+  }
+  if (type === 'VehicleVinEvent') {
+    return res.status(403).json({ error: 'VIN audit records cannot be deleted' });
+  }
+  if (type === 'Vehicle') {
+    const { recordVehicleRemoval, isBillableVehicleStatus } = await import('./vehicleUnitLimits.js');
+    if (isBillableVehicleStatus(existing.status)) {
+      recordVehicleRemoval(existing, req.user);
+    }
   }
   deleteEntity(type, id);
   res.json({ success: true });

@@ -343,8 +343,16 @@ export default function SubscriptionBilling() {
                 <div>
                   <h2 className="font-black text-lg">Per-unit subscription</h2>
                   <p className="text-sm text-slate-500 mt-1">
-                    {formatPrice(PRICE_PER_UNIT_MONTHLY)}/unit/mo · {units} unit{units !== 1 ? 's' : ''} on your account
+                    {formatPrice(PRICE_PER_UNIT_MONTHLY)}/unit/mo · {units} unit{units !== 1 ? 's' : ''} licensed on your account
                   </p>
+                  {billing?.vehicle_units && (
+                    <p className={`text-xs mt-2 font-semibold ${billing.vehicle_units.overLimit ? 'text-red-600' : 'text-slate-600'}`}>
+                      Portal fleet in use: {billing.vehicle_units.inUse} / {billing.vehicle_units.limit} active units
+                      {billing.vehicle_units.remaining > 0
+                        ? ` (${billing.vehicle_units.remaining} slot${billing.vehicle_units.remaining === 1 ? '' : 's'} available)`
+                        : ' — at limit; contact FleetCo to add units'}
+                    </p>
+                  )}
                 </div>
                 <p className="text-2xl font-black text-amber-600">
                   {formatPrice(summary.amountDue)}

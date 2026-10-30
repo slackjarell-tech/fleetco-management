@@ -1,5 +1,6 @@
 import { filterEntities, getEntity, listEntities } from './db.js';
 import { getBillingSnapshot } from './billing.js';
+import { getVehicleUnitUsage } from './vehicleUnitLimits.js';
 import {
   createStripePortalSessionForCustomerId,
   fetchStripePaymentsForCustomer,
@@ -81,6 +82,7 @@ export function getSltBillingDashboard(user) {
       stripe_customer_url: stripeResourceUrl('customer', c.stripe_customer_id),
       stripe_subscription_url: stripeResourceUrl('subscription', c.stripe_subscription_id),
       recent_payments: recentLocalPayments(c.id, 5),
+      vehicle_units: getVehicleUnitUsage(c.id),
     };
   });
 
@@ -133,6 +135,11 @@ export async function getSltCustomerBillingDetail(user, customerId) {
       stripe_subscription_url: stripeResourceUrl('subscription', customer.stripe_subscription_id),
     },
     billing,
+    vehicle_units: getVehicleUnitUsage(customer.id),
+    vin_events: listEntities('VehicleVinEvent')
+      .filter((e) => e.customer_id === customer.id)
+      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+      .slice(0, 50),
     local_payments: recentLocalPayments(customer.id, 24),
     stripe: stripeActivity,
     dashboard: stripeDashboardUrls(),
