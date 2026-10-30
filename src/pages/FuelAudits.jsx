@@ -9,6 +9,7 @@ import FuelLogModal from '@/components/fleet/FuelLogModal';
 import IFTAReport from '@/components/fuel/IFTAReport';
 import { isFleetCoAdmin } from '@/lib/roles';
 import { filterDriverRoster, isPureDriverUser, isDriverCapableUser } from '@/lib/driverAccess';
+import { usePrefillSearchFromUrl } from '@/lib/usePrefillSearchFromUrl';
 
 export default function FuelAudits() {
   const [user, setUser] = useState(null);
@@ -18,6 +19,7 @@ export default function FuelAudits() {
   const [fuelCards, setFuelCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  usePrefillSearchFromUrl(setSearch);
   const [vehicleFilter, setVehicleFilter] = useState('all');
   const [driverFilter, setDriverFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);

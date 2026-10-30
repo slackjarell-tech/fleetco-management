@@ -10,6 +10,7 @@ import { canManageCustomerTeam } from '@/lib/customerRoles';
 import { canDeleteDriver, isInternalRole } from '@/lib/roles';
 import { filterDriverRoster } from '@/lib/driverAccess';
 import DriverAppDownload from '@/components/shared/DriverAppDownload';
+import { usePrefillSearchFromUrl } from '@/lib/usePrefillSearchFromUrl';
 
 export default function Drivers() {
   const [user, setUser] = useState(null);
@@ -21,6 +22,7 @@ export default function Drivers() {
   const [inspections, setInspections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  usePrefillSearchFromUrl(setSearch);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [docsDriver, setDocsDriver] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);

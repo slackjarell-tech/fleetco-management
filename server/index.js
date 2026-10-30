@@ -855,6 +855,17 @@ app.get('/api/payroll/tax-profiles', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/portal/search', requireAuth, async (req, res) => {
+  try {
+    const { runPortalSearch } = await import('./portalSearch.js');
+    const requested = readCustomerContextHeader(req);
+    const q = req.query.q || req.query.query || '';
+    res.json(runPortalSearch(q, req.user, requested));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.get('/api/billing/status', requireAuth, async (req, res) => {
   try {
     const { getCustomerBillingOverview, getStripeConfigStatus } = await import('./stripeBilling.js');

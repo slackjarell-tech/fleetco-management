@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { usePrefillSearchFromUrl } from '@/lib/usePrefillSearchFromUrl';
 import { api } from '@/api/apiClient';
 import VehicleDetailPanel from '@/components/fleet/VehicleDetailPanel';
 import { Plus, Search, Edit, Trash2, Truck, FolderOpen, History, Container, BookOpen, ClipboardList } from 'lucide-react';
@@ -60,6 +61,7 @@ export default function Fleet() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  usePrefillSearchFromUrl(setSearch);
   const [activeTab, setActiveTab] = useState('vehicles');
   const [showModal, setShowModal] = useState(false);
   const [editVehicle, setEditVehicle] = useState(null);

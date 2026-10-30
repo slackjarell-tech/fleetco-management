@@ -28,6 +28,7 @@ import {
   DEEP_DIVE_DECK_DOWNLOAD,
   TELEMATICS_DECK_DOWNLOAD,
   INVESTOR_ECONOMICS_DECK_DOWNLOAD,
+  RAISE_2M_DECK_DOWNLOAD,
 } from '@/lib/brand';
 
 const TEMPLATES = [
@@ -81,6 +82,15 @@ export default function MarketingGallery() {
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <a
+          href={RAISE_2M_DECK_DOWNLOAD}
+          download="FleetCo-2M-Raise-Pitch-Deck.pptx"
+          className="rounded-xl border-2 border-violet-600 bg-violet-50 p-4 hover:bg-violet-100 transition-colors sm:col-span-2 lg:col-span-1"
+        >
+          <div className="font-black text-slate-900 text-sm">$2M Raise Pitch (detailed, 45+ slides)</div>
+          <p className="text-xs text-slate-600 mt-1">Master plan, ICP, product modules, GTM line items, burn, KPIs, 10-yr appendix — full investor deck.</p>
+          <span className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-violet-900"><Download className="w-3 h-3" /> Download .pptx</span>
+        </a>
         <a
           href={INVESTOR_ECONOMICS_DECK_DOWNLOAD}
           download="FleetCo-Investor-Cost-Revenue-Analysis.pptx"

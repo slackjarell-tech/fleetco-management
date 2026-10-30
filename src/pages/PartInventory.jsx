@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PartModal from '@/components/inventory/PartModal';
+import { usePrefillSearchFromUrl } from '@/lib/usePrefillSearchFromUrl';
 
 export default function PartInventory() {
   const [user, setUser] = useState(null);
   const [parts, setParts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  usePrefillSearchFromUrl(setSearch);
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [editingQty, setEditingQty] = useState(null); // { id, value }

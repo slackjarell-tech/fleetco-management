@@ -28,6 +28,7 @@ export const CAPABILITIES_DECK_DOWNLOAD = '/marketing/FleetCo-System-Capabilitie
 export const DEEP_DIVE_DECK_DOWNLOAD = '/marketing/FleetCo-System-Deep-Dive-Review.pptx';
 export const TELEMATICS_DECK_DOWNLOAD = '/marketing/FleetCo-Smartphone-Telematics-Demo.pptx';
 export const INVESTOR_ECONOMICS_DECK_DOWNLOAD = '/marketing/FleetCo-Investor-Cost-Revenue-Analysis.pptx';
+export const RAISE_2M_DECK_DOWNLOAD = '/marketing/FleetCo-2M-Raise-Pitch-Deck.pptx';
 export const CLIENT_VIDEO_URL = '/marketing/FleetCo-Client-Presentation.mp4';
 export const BUSINESS_PLAN_PDF = '/marketing/FleetCo-Business-Plan.pdf';
 export const REVENUE_PROJECTIONS_PDF = '/marketing/FleetCo-Revenue-Projections-10Year.pdf';

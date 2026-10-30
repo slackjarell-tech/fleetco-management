@@ -593,6 +593,12 @@ export const api = { auth, entities, functions, integrations, agents, marketingA
     return apiFetch('/customer-analytics/summary');
   },
 },
+portal: {
+  search(q) {
+    const params = new URLSearchParams({ q: String(q || '').trim() });
+    return apiFetch(`/portal/search?${params}`);
+  },
+},
 accounting: {
   async emailPurchaseOrder(poId, { pdfBase64, recipientEmail } = {}) {
     return apiFetch(`/accounting/purchase-orders/${poId}/email`, {

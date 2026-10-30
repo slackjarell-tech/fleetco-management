@@ -25,6 +25,7 @@ import {
 } from '@/lib/customerRoles';
 import { sectionForPath, isCustomerFacingPath } from '@/lib/portalSections';
 import { isPortalFullBleedPath } from '@/lib/portalLayout';
+import PortalGlobalSearch from '@/components/portal/PortalGlobalSearch';
 
 const isInternalRole = (role) => {
   return ['owner', 'executive', 'fleet_manager', 'fleet_coordinator'].includes(role);
@@ -473,14 +474,19 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
           fullBleedMain ? 'lg:h-screen lg:max-h-screen lg:overflow-hidden' : 'lg:overflow-y-auto'
         }`}
       >
-        <header className="lg:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
-          <Button size="icon" variant="ghost" onClick={() => setOpen(true)}>
-            <Menu className="w-5 h-5" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <FleetcoLogo size={36} variant="icon" />
-            <span className="font-bold text-slate-900 text-sm">FleetCo</span>
+        <header className="bg-white border-b border-slate-200 px-4 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4 sticky top-0 z-30">
+          <div className="flex items-center gap-3 lg:w-auto shrink-0">
+            <Button size="icon" variant="ghost" className="lg:hidden" onClick={() => setOpen(true)}>
+              <Menu className="w-5 h-5" />
+            </Button>
+            <div className="flex items-center gap-2 lg:hidden">
+              <FleetcoLogo size={36} variant="icon" />
+              <span className="font-bold text-slate-900 text-sm">FleetCo</span>
+            </div>
           </div>
+          {!fullBleedMain && (
+            <PortalGlobalSearch className="flex-1 min-w-0 max-w-3xl lg:mx-auto w-full" />
+          )}
         </header>
         <PaymentDueBanner user={user} />
         {isViewingAsCustomer && (

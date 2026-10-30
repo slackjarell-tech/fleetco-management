@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { usePrefillSearchFromUrl } from '@/lib/usePrefillSearchFromUrl';
 import { api } from '@/api/apiClient';
 import { Plus, Search, MapPin, List, Phone, User, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ export default function Vendors() {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  usePrefillSearchFromUrl(setSearch);
   const [typeFilter, setTypeFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
   const [editVendor, setEditVendor] = useState(null);

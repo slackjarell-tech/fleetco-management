@@ -23,6 +23,7 @@ import {
   paymentTermsLabel, paymentStatusLabel, PAYMENT_STATUS_COLORS,
   formatPaymentDueDate, canMarkCarrierPaymentSent, canConfirmCarrierPayment,
 } from '@/lib/loadCarrierPayments';
+import { usePrefillSearchFromUrl } from '@/lib/usePrefillSearchFromUrl';
 
 const STATUS_COLORS = {
   available: 'bg-green-100 text-green-700',
@@ -40,6 +41,7 @@ export default function LoadBoard() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  usePrefillSearchFromUrl(setSearch);
   const [statusFilter, setStatusFilter] = useState('all');
   const [equipmentFilter, setEquipmentFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);

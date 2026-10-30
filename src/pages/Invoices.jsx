@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { usePrefillSearchFromUrl } from '@/lib/usePrefillSearchFromUrl';
 import { api } from '@/api/apiClient';
 import { Plus, Search, Edit, Trash2, FileText, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ export default function Invoices() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  usePrefillSearchFromUrl(setSearch);
   const [statusFilter, setStatusFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [editInvoice, setEditInvoice] = useState(null);

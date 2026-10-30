@@ -29,6 +29,7 @@ import {
   repairTypesForStrategy,
   resolveWorkOrderMaintenance,
 } from '@/lib/workOrderTypes';
+import { usePrefillSearchFromUrl } from '@/lib/usePrefillSearchFromUrl';
 
 const PRIORITY_DOT = {
   low: 'bg-slate-400',
@@ -43,6 +44,7 @@ export default function WorkOrders() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  usePrefillSearchFromUrl(setSearch);
   const [statusFilter, setStatusFilter] = useState('all');
   const [strategyFilter, setStrategyFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
