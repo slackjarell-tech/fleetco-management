@@ -4,6 +4,10 @@ import { Clock, LogIn, LogOut, Wrench, Play, Square, User, MapPin, Navigation, C
 import useDriverLocation from '@/hooks/useDriverLocation';
 import CameraCapture from '@/components/driver/CameraCapture';
 import DriverDutyBar from '@/components/driver/DriverDutyBar';
+import { recordHosMovementEvent } from '@/lib/hosDutyClient';
+import { getDriverDuty } from '@/lib/driverDuty';
+import HOSDriverClockCard from '@/components/hos/HOSDriverClockCard';
+import { computeDriverHosClocks } from '@/lib/hosFmcsa';
 import { isPlatformAdmin } from '@/lib/roles';
 import { getCurrentPosition } from '@/lib/nativeBridge';
 
@@ -42,6 +46,7 @@ export default function TimeClock() {
   const [trailerBusy, setTrailerBusy] = useState(false);
   const [trailerMsg, setTrailerMsg] = useState('');
   const [vehicleConflict, setVehicleConflict] = useState(null);
+  const [hosClocks, setHosClocks] = useState(null);
 
   // Live clock tick
   useEffect(() => {
@@ -54,12 +59,16 @@ export default function TimeClock() {
     setUser(u);
     const isAdmin = isPlatformAdmin(u?.role);
 
-    const [ents, wos, vehs, users] = await Promise.all([
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const [ents, wos, vehs, users, hosLogs] = await Promise.all([
       api.entities.TimeClockEntry.filter({ user_id: u.id }, '-clock_in', 200),
       api.entities.WorkOrder.filter({ assigned_tech_id: u.id }, '-created_date', 100),
       api.entities.Vehicle.list(),
       isAdmin ? api.entities.User.list() : Promise.resolve([]),
+      api.entities.HOSLog.filter({ driver_id: u.id }, '-log_date', 30).catch(() => []),
     ]);
+    const todayHos = hosLogs.find((l) => l.log_date === todayStr);
+    setHosClocks(todayHos?.hos_clocks || computeDriverHosClocks(hosLogs, { currentDuty: getDriverDuty() }));
 
     setEntries(ents);
     setWorkOrders(wos);
@@ -205,6 +214,19 @@ export default function TimeClock() {
           await signInTrailer(selectedTrailerId, entry.id);
         } catch { /* hook can be retried from shift panel */ }
       }
+      const gps = await captureGps();
+      const hosRes = await recordHosMovementEvent({
+        event_type: 'vehicle_clock_in',
+        duty_status: getDriverDuty() === 'off_duty' ? 'on_duty_not_driving' : getDriverDuty(),
+        vehicle_id: selectedVehicleId && selectedVehicleId !== 'pov' ? selectedVehicleId : null,
+        vehicle_unit_number: selectedVehicleId === 'pov' ? 'POV' : (veh?.unit_number || null),
+        clock_entry_id: entry.id,
+        lat: gps.lat,
+        lng: gps.lng,
+        speed: 0,
+        driver_name: user.full_name,
+      });
+      if (hosRes?.clocks) setHosClocks(hosRes.clocks);
       await loadData();
     }
     setNotes('');
@@ -350,6 +372,13 @@ export default function TimeClock() {
 
           {activeShift && (
             <DriverDutyBar compact />
+          )}
+
+          {activeShift && hosClocks && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+              <div className="text-xs font-black text-slate-500 uppercase mb-2">HOS clocks (vehicle movement tracked)</div>
+              <HOSDriverClockCard clocks={hosClocks} compact />
+            </div>
           )}
 
           {/* Today Summary */}

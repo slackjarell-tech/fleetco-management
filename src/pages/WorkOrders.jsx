@@ -22,6 +22,13 @@ import {
   canAddWorkOrderComment,
   isWorkOrderCommentOnlyUser,
 } from '@/lib/workOrderWorkflow';
+import {
+  MAINTENANCE_STRATEGIES,
+  MAINTENANCE_STRATEGY_META,
+  allRepairTypeValues,
+  repairTypesForStrategy,
+  resolveWorkOrderMaintenance,
+} from '@/lib/workOrderTypes';
 
 const PRIORITY_DOT = {
   low: 'bg-slate-400',
@@ -30,8 +37,6 @@ const PRIORITY_DOT = {
   critical: 'bg-red-500',
 };
 
-const REPAIR_TYPES = ['All', 'Engine', 'Transmission', 'Brakes', 'Tires', 'Electrical', 'HVAC', 'Suspension', 'Fuel System', 'Exhaust', 'Preventive Maintenance', 'Body & Frame', 'Other'];
-
 export default function WorkOrders() {
   const [workOrders, setWorkOrders] = useState([]);
   const [vehicles, setVehicles] = useState([]);
@@ -39,6 +44,7 @@ export default function WorkOrders() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [strategyFilter, setStrategyFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
   const [showIntake, setShowIntake] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -156,9 +162,15 @@ export default function WorkOrders() {
       || wo.title?.toLowerCase().includes(q)
       || wo.complaint?.toLowerCase().includes(q);
     const matchStatus = statusFilter === 'all' || wo.status === statusFilter;
-    const matchType = typeFilter === 'All' || wo.repair_type === typeFilter;
-    return matchSearch && matchStatus && matchType;
+    const { maintenance_strategy, repair_type } = resolveWorkOrderMaintenance(wo);
+    const matchStrategy = strategyFilter === 'All' || maintenance_strategy === strategyFilter;
+    const matchType = typeFilter === 'All' || repair_type === typeFilter;
+    return matchSearch && matchStatus && matchStrategy && matchType;
   });
+
+  const typeFilterOptions = strategyFilter === 'All'
+    ? ['All', ...allRepairTypeValues()]
+    : ['All', ...repairTypesForStrategy(strategyFilter).map((t) => t.value)];
 
   const pendingApproval = workOrders.filter((w) => w.status === 'awaiting_approval');
   const awaitingEstimate = workOrders.filter((w) => w.status === 'awaiting_estimate');
@@ -295,11 +307,21 @@ export default function WorkOrders() {
           <option value="cancelled">Cancelled</option>
         </select>
         <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
+          value={strategyFilter}
+          onChange={(e) => { setStrategyFilter(e.target.value); setTypeFilter('All'); }}
           className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
         >
-          {REPAIR_TYPES.map((t) => <option key={t}>{t}</option>)}
+          <option value="All">All strategies</option>
+          {MAINTENANCE_STRATEGIES.map((id) => (
+            <option key={id} value={id}>{MAINTENANCE_STRATEGY_META[id].shortLabel}</option>
+          ))}
+        </select>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 max-w-[220px]"
+        >
+          {typeFilterOptions.map((t) => <option key={t}>{t}</option>)}
         </select>
       </div>
 
@@ -332,7 +354,18 @@ export default function WorkOrders() {
                         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${statusClass}`}>
                           {STATUS_LABELS[wo.status] || wo.status?.replace('_', ' ')}
                         </span>
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">{wo.repair_type}</span>
+                        {(() => {
+                          const m = resolveWorkOrderMaintenance(wo);
+                          const meta = MAINTENANCE_STRATEGY_META[m.maintenance_strategy];
+                          return (
+                            <>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${meta?.badgeClass || 'bg-slate-100 text-slate-600'}`}>
+                                {meta?.shortLabel || m.maintenance_strategy}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">{m.repair_type}</span>
+                            </>
+                          );
+                        })()}
                       </div>
                       <p className="text-slate-700 text-sm mt-0.5 font-medium truncate">{wo.title}</p>
                       {wo.complaint && (

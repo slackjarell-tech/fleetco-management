@@ -264,7 +264,7 @@ const SECTIONS = [
         steps: [
           'Enter a WO Number (e.g., WO-2024-0112). Keep a consistent numbering system.',
           'Enter a Title — a short description of the job (e.g., "Replace front brake pads - Unit 101").',
-          'Select Repair Type (Engine, Transmission, Brakes, Tires, Electrical, HVAC, Suspension, etc.).',
+          'Choose Maintenance strategy: Preventive (scheduled PM), Corrective (breakdown repair), or Predictive (DTC/telematics-driven). Then pick the specific repair type under that strategy.',
           'Set Priority: Low, Medium, High, or Critical.',
           'Select the Vehicle being serviced.',
           'Assign a Technician from the dropdown.',

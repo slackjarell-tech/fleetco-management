@@ -4,6 +4,11 @@ import { Plus, Search, AlertTriangle, CheckCircle2, Clock, FileText, ChevronDown
 import HOSLogForm from '@/components/hos/HOSLogForm';
 import HOSGrid from '@/components/hos/HOSGrid';
 import HOSViolations from '@/components/hos/HOSViolations';
+import HOSRegulationKey from '@/components/hos/HOSRegulationKey';
+import HOSFleetClocksPanel from '@/components/hos/HOSFleetClocksPanel';
+import HOSDriverClockCard from '@/components/hos/HOSDriverClockCard';
+import { computeDriverHosClocks } from '@/lib/hosFmcsa';
+import { getDriverDuty } from '@/lib/driverDuty';
 import DVIRModal from '@/components/hos/DVIRModal';
 import DVIRSignoffModal from '@/components/hos/DVIRSignoffModal';
 import { isExecutiveView } from '@/lib/roles';
@@ -152,6 +157,25 @@ export default function HOSReport() {
           <Plus className="w-4 h-4" /> New Log Entry
         </button>
       </div>
+
+      <HOSRegulationKey defaultOpen />
+
+      {isPureDriverUser(user) && (
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <h2 className="text-sm font-black text-slate-900 mb-3">Your HOS clocks</h2>
+          <HOSDriverClockCard
+            clocks={(() => {
+              const today = new Date().toISOString().slice(0, 10);
+              const todayLog = logs.find((l) => l.log_date === today);
+              return todayLog?.hos_clocks || computeDriverHosClocks(logs, { currentDuty: getDriverDuty() });
+            })()}
+          />
+        </div>
+      )}
+
+      {isExecutiveView(user?.role) && drivers.length > 0 && (
+        <HOSFleetClocksPanel drivers={drivers} hosLogs={logs} />
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -314,10 +338,17 @@ export default function HOSReport() {
                     </div>
                   )}
 
+                  {log.hos_clocks && (
+                    <div>
+                      <div className="text-xs font-black text-slate-400 uppercase mb-2">Clock snapshot</div>
+                      <HOSDriverClockCard clocks={log.hos_clocks} compact />
+                    </div>
+                  )}
+
                   {/* Violations */}
                   <div>
                     <div className="text-xs font-black text-slate-400 uppercase mb-2">FMCSA Compliance</div>
-                    <HOSViolations violations={log.violations || []} />
+                    <HOSViolations violations={log.violations?.length ? log.violations : (log.hos_clocks?.violations || [])} />
                   </div>
 
                   {/* Remarks */}

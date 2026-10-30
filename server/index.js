@@ -960,7 +960,7 @@ app.get('/api/customer-analytics/summary', requireAuth, (req, res) => {
 
 const ENTITY_NAMES = [
   'Customer', 'DriverLocation', 'DiagnosticCode', 'FuelLog', 'DeliveryRoute',
-  'DeliveryStop', 'HOSLog', 'FuelStation', 'FuelCard', 'Inquiry', 'Incident', 'Inspection',
+  'DeliveryStop', 'HOSLog', 'HOSDutyEvent', 'FuelStation', 'FuelCard', 'Inquiry', 'Incident', 'Inspection',
   'Invoice', 'Load', 'MaintenanceSchedule', 'Message', 'PartInventory',
   'PayrollRecord', 'PayrollRun', 'PurchaseOrder', 'ChartOfAccount', 'JournalEntry', 'PendingAccount', 'ScreeningRecord', 'ServiceTemplate',
   'DomainEmail', 'PaymentReminder', 'BarcodeScan', 'DashcamSession', 'DashcamFrame', 'DrivingSafetyEvent', 'LiveStreamSession', 'LiveStreamRecording', 'Subscription', 'UsageFeedback', 'PortalActivity', 'Vehicle', 'VehicleDocument', 'VehicleAccessory', 'DriverDocument', 'Vendor', 'TimeClockEntry', 'TrailerAssignment', 'WorkOrder', 'User', 'Yard', 'YardPlacement',

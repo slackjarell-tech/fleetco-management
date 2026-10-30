@@ -8,8 +8,8 @@ import {
   canSubmitEstimate,
   canApproveWorkOrder,
 } from '@/lib/workOrderWorkflow';
+import WorkOrderTypeFields from '@/components/workorders/WorkOrderTypeFields';
 
-const REPAIR_TYPES = ["Engine","Transmission","Brakes","Tires","Electrical","HVAC","Suspension","Fuel System","Exhaust","Preventive Maintenance","Body & Frame","Other"];
 const PRIORITIES = ["low","medium","high","critical"];
 
 const emptyPart = { part_number: '', description: '', quantity: 1, unit_cost: 0, source: 'in_stock', total_cost: 0 };
@@ -192,12 +192,13 @@ export default function WorkOrderModal({ wo, vehicles, techs, currentUser, onSav
                 placeholder="e.g. Replace front brake pads and rotors"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Repair Type</label>
-              <select value={form.repair_type} onChange={e => set('repair_type', e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
-                {REPAIR_TYPES.map(t => <option key={t}>{t}</option>)}
-              </select>
+            <div className="col-span-2">
+              <WorkOrderTypeFields
+                maintenanceStrategy={form.maintenance_strategy}
+                repairType={form.repair_type}
+                onMaintenanceStrategyChange={(v) => set('maintenance_strategy', v)}
+                onRepairTypeChange={(v) => set('repair_type', v)}
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Status</label>

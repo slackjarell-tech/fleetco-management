@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { api } from '@/api/apiClient';
 import { watchPosition } from '@/lib/nativeBridge';
+import { recordHosMovementEvent } from '@/lib/hosDutyClient';
+import { getDriverDuty } from '@/lib/driverDuty';
 
 /**
  * Tracks driver location while clocked in.
@@ -20,6 +22,9 @@ export default function useDriverLocation(user, clockEntryId, isClockedIn, vehic
     const lat = coords.latitude ?? coords.lat;
     const lng = coords.longitude ?? coords.lng;
 
+    const speedMps = coords.speed || 0;
+    const moving = speedMps >= 2.2;
+
     try {
       await api.entities.DriverLocation.create({
         user_id: user.id,
@@ -27,7 +32,7 @@ export default function useDriverLocation(user, clockEntryId, isClockedIn, vehic
         lat,
         lng,
         accuracy: coords.accuracy,
-        speed: coords.speed || 0,
+        speed: speedMps,
         heading: coords.heading || 0,
         timestamp: new Date(position.timestamp || now).toISOString(),
         clock_entry_id: clockEntryId,
@@ -36,9 +41,25 @@ export default function useDriverLocation(user, clockEntryId, isClockedIn, vehic
         trailer_id: vehicleInfo?.trailer_id || null,
         trailer_unit_number: vehicleInfo?.trailer_unit_number || null,
         source: 'driver_app',
+        moving,
       });
     } catch {
       // best-effort
+    }
+
+    if (moving || getDriverDuty() === 'driving') {
+      recordHosMovementEvent({
+        event_type: moving ? 'movement_ping' : 'location_ping',
+        duty_status: getDriverDuty(),
+        vehicle_id: vehicleInfo?.vehicle_id,
+        vehicle_unit_number: vehicleInfo?.vehicle_unit_number,
+        clock_entry_id: clockEntryId,
+        lat,
+        lng,
+        speed: speedMps,
+        driver_name: user.full_name,
+        source: 'driver_gps',
+      });
     }
   }, [user, clockEntryId, vehicleInfo]);
 

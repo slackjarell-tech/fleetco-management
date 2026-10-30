@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, MessageSquare, User, Truck } from 'lucide-react';
 import { complaintToTitle } from '@/lib/workOrderWorkflow';
-
-const REPAIR_TYPES = ['Engine', 'Transmission', 'Brakes', 'Tires', 'Electrical', 'HVAC', 'Suspension', 'Fuel System', 'Exhaust', 'Preventive Maintenance', 'Body & Frame', 'Other'];
+import { resolveWorkOrderMaintenance } from '@/lib/workOrderTypes';
+import WorkOrderTypeFields from '@/components/workorders/WorkOrderTypeFields';
 const PRIORITIES = ['low', 'medium', 'high', 'critical'];
 const CONTACT_METHODS = [
   { value: 'phone', label: 'Phone' },
@@ -25,7 +25,9 @@ export default function WorkOrderIntakeModal({
   const [vehicleId, setVehicleId] = useState(wo?.vehicle_id || '');
   const [complaint, setComplaint] = useState(wo?.complaint || '');
   const [priority, setPriority] = useState(wo?.priority || 'medium');
-  const [repairType, setRepairType] = useState(wo?.repair_type || 'Other');
+  const initialTypes = resolveWorkOrderMaintenance(wo || {});
+  const [maintenanceStrategy, setMaintenanceStrategy] = useState(initialTypes.maintenance_strategy);
+  const [repairType, setRepairType] = useState(initialTypes.repair_type);
   const [assignedTechId, setAssignedTechId] = useState(wo?.assigned_tech_id || '');
   const [odometer, setOdometer] = useState(wo?.odometer ?? '');
   const [customerName, setCustomerName] = useState(wo?.customer_name || '');
@@ -68,6 +70,7 @@ export default function WorkOrderIntakeModal({
       vehicle_id: vehicleId,
       assigned_tech_id: isCustomerPortal ? (wo?.assigned_tech_id || '') : assignedTechId,
       repair_type: repairType,
+      maintenance_strategy: maintenanceStrategy,
       priority,
       odometer,
       vin_at_checkin: vehicle?.vin || wo?.vin_at_checkin || '',
@@ -272,19 +275,15 @@ export default function WorkOrderIntakeModal({
             </div>
           </section>
 
-          <section className={`grid gap-3 ${isCustomerPortal ? 'grid-cols-2' : 'sm:grid-cols-3'}`}>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Repair type</label>
-              <select
-                value={repairType}
-                onChange={(e) => setRepairType(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                {REPAIR_TYPES.map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </select>
-            </div>
+          <section className={`grid gap-3 ${isCustomerPortal ? 'grid-cols-1 sm:grid-cols-2' : 'sm:grid-cols-2'}`}>
+            <WorkOrderTypeFields
+              className="sm:col-span-2"
+              maintenanceStrategy={maintenanceStrategy}
+              repairType={repairType}
+              onMaintenanceStrategyChange={setMaintenanceStrategy}
+              onRepairTypeChange={setRepairType}
+              showDescriptions={isCustomerPortal}
+            />
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Priority</label>
               <select

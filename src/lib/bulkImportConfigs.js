@@ -1,3 +1,5 @@
+import { normalizeRepairTypeAndStrategy } from '@/lib/workOrderTypes';
+
 const num = (v) => {
   if (v === '' || v == null) return undefined;
   const n = Number(v);
@@ -79,13 +81,14 @@ export const BULK_IMPORT_BY_ROUTE = {
   '/portal/workorders': {
     entity: 'WorkOrder',
     label: 'Work Orders',
-    headers: ['wo_number', 'title', 'repair_type', 'status', 'priority', 'vehicle_unit', 'complaint', 'labor_hours', 'labor_rate', 'parts_total', 'opened_date', 'due_date'],
+    headers: ['wo_number', 'title', 'maintenance_strategy', 'repair_type', 'status', 'priority', 'vehicle_unit', 'complaint', 'labor_hours', 'labor_rate', 'parts_total', 'opened_date', 'due_date'],
     required: ['wo_number', 'title'],
     columnHint: 'wo_number, title, repair_type, status, priority, vehicle_unit (optional)',
     exampleRows: [{
       wo_number: 'WO-241001',
       title: 'Brake inspection',
       repair_type: 'Brakes',
+      maintenance_strategy: 'corrective',
       status: 'open',
       priority: 'high',
       vehicle_unit: 'T-101',
@@ -96,10 +99,13 @@ export const BULK_IMPORT_BY_ROUTE = {
       opened_date: '2026-07-07',
       due_date: '2026-07-10',
     }],
-    mapRow: (row) => ({
+    mapRow: (row) => {
+      const types = normalizeRepairTypeAndStrategy(str(row.repair_type) || 'Other', str(row.maintenance_strategy));
+      return {
       wo_number: str(row.wo_number),
       title: str(row.title),
-      repair_type: str(row.repair_type) || 'Other',
+      repair_type: types.repair_type,
+      maintenance_strategy: types.maintenance_strategy,
       status: str(row.status) || 'open',
       priority: str(row.priority) || 'medium',
       vehicle_unit: str(row.vehicle_unit),
@@ -109,7 +115,8 @@ export const BULK_IMPORT_BY_ROUTE = {
       parts_total: num(row.parts_total),
       opened_date: str(row.opened_date),
       due_date: str(row.due_date),
-    }),
+    };
+    },
     preview: (row) => `${row.wo_number} · ${row.title}`,
   },
   '/portal/customers': {

@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { api } from '@/api/apiClient';
 import { Plus, Trash2, Edit, Clock, ClipboardList, Save, X } from 'lucide-react';
 import { toast } from "sonner";
-
-const REPAIR_TYPES = ["Engine","Transmission","Brakes","Tires","Electrical","HVAC","Suspension","Fuel System","Exhaust","Preventive Maintenance","Body & Frame","Other"];
+import {
+  MAINTENANCE_STRATEGIES,
+  MAINTENANCE_STRATEGY_META,
+  repairTypesForStrategy,
+  resolveWorkOrderMaintenance,
+} from '@/lib/workOrderTypes';
 
 export default function ServiceTemplates() {
   const [templates, setTemplates] = useState([]);
@@ -133,10 +137,20 @@ export default function ServiceTemplates() {
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Repair Type *</label>
-                  <select name="repairType" required defaultValue={editing?.repair_type || 'Brakes'}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
-                    {REPAIR_TYPES.map(t => <option key={t}>{t}</option>)}
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Repair type *</label>
+                  <select
+                    name="repairType"
+                    required
+                    defaultValue={resolveWorkOrderMaintenance(editing || { repair_type: 'Brakes' }).repair_type}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+                  >
+                    {MAINTENANCE_STRATEGIES.map((strategy) => (
+                      <optgroup key={strategy} label={MAINTENANCE_STRATEGY_META[strategy].shortLabel}>
+                        {repairTypesForStrategy(strategy).map((t) => (
+                          <option key={t.value} value={t.value}>{t.value}</option>
+                        ))}
+                      </optgroup>
+                    ))}
                   </select>
                 </div>
                 <div>

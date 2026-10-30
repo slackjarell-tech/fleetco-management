@@ -1,21 +1,11 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-/**
- * Detects FMCSA HOS violations (Property-carrying / 11/14/70-hour rules).
- * Returns array of violation strings.
- */
+import { detectViolationsFromDailyLog } from '@/lib/hosFmcsa';
+
+/** Daily log totals vs FMCSA limits (11 / 14 / 10-hour reset). */
 export function detectViolations(log) {
-  const v = [];
-  const driving = log.hours_driving || 0;
-  const onDuty = (log.hours_driving || 0) + (log.hours_on_duty || 0);
-  const offAndSleeper = (log.hours_off_duty || 0) + (log.hours_sleeper || 0);
-
-  if (driving > 11) v.push(`11-Hour Driving Limit exceeded (${driving.toFixed(1)} hrs driven)`);
-  if (onDuty > 14) v.push(`14-Hour On-Duty Window exceeded (${onDuty.toFixed(1)} hrs on-duty)`);
-  if (offAndSleeper < 10 && driving > 0) v.push(`10-Hour Off-Duty reset may be insufficient (${offAndSleeper.toFixed(1)} hrs off/sleeper)`);
-
-  return v;
+  return detectViolationsFromDailyLog(log);
 }
 
 export default function HOSViolations({ violations = [] }) {

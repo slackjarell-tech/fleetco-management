@@ -3,8 +3,12 @@ import { api } from '@/api/apiClient';
 import {
   Clock, Moon, Truck, HardHat, ClipboardCheck, FileText,
   CheckCircle2, XCircle, AlertTriangle, ChevronRight, ArrowLeft,
-  User, Calendar, ShieldAlert, MapPin
+  User, Calendar, ShieldAlert,   MapPin
 } from 'lucide-react';
+import HOSRegulationKey from '@/components/hos/HOSRegulationKey';
+import HOSDriverClockCard from '@/components/hos/HOSDriverClockCard';
+import { computeDriverHosClocks, detectViolationsFromDailyLog } from '@/lib/hosFmcsa';
+import { recordHosMovementEvent } from '@/lib/hosDutyClient';
 
 // ── Duty Status ──
 const DUTY_OPTIONS = [
@@ -158,43 +162,80 @@ export default function EldPortal() {
   const changeDutyStatus = async (status) => {
     setSavingDuty(true);
     const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-    const segment = { status, start_time: now.toISOString(), end_time: '' };
+    const nowIso = now.toISOString();
+    const today = nowIso.slice(0, 10);
 
-    // If there's already a log for today, append segment; otherwise create new log
-    const todayLog = hosLogs.find(l => l.log_date === today);
+    const todayLog = hosLogs.find((l) => l.log_date === today);
+    let segments = [...(todayLog?.duty_segments || [])];
+    if (segments.length > 0) {
+      const lastIdx = segments.length - 1;
+      const last = segments[lastIdx];
+      if (last.start_time && !last.end_time) {
+        segments[lastIdx] = { ...last, end_time: nowIso };
+      }
+    }
+    segments.push({ status, start_time: nowIso, end_time: '', location: '' });
+
+    const hours_driving = calcHours(segments, 'driving');
+    const hours_on_duty = calcHours(segments, 'on_duty_not_driving');
+    const hours_sleeper = calcHours(segments, 'sleeper_berth');
+    const hours_off_duty = calcHours(segments, 'off_duty');
+    const violations = detectViolationsFromDailyLog({
+      hours_driving,
+      hours_on_duty,
+      hours_off_duty,
+      hours_sleeper,
+    });
+
+    const hosRes = await recordHosMovementEvent({
+      event_type: 'duty_change',
+      duty_status: status,
+      vehicle_id: selectedVehicleId || todayLog?.vehicle_id,
+      driver_name: user?.full_name,
+    });
+
+    const patch = {
+      duty_segments: segments,
+      hours_driving: parseFloat(hours_driving.toFixed(2)),
+      hours_on_duty: parseFloat(hours_on_duty.toFixed(2)),
+      hours_sleeper: parseFloat(hours_sleeper.toFixed(2)),
+      hours_off_duty: parseFloat(hours_off_duty.toFixed(2)),
+      violations,
+      hos_clocks: hosRes?.clocks,
+      last_movement_at: nowIso,
+    };
+
     if (todayLog) {
-      const updatedSegments = [...(todayLog.duty_segments || []), segment];
-      await api.entities.HOSLog.update(todayLog.id, {
-        duty_segments: updatedSegments,
-        hours_off_duty: calcHours(updatedSegments, 'off_duty'),
-        hours_sleeper: calcHours(updatedSegments, 'sleeper_berth'),
-        hours_driving: calcHours(updatedSegments, 'driving'),
-        hours_on_duty: calcHours(updatedSegments, 'on_duty_not_driving'),
-      });
+      await api.entities.HOSLog.update(todayLog.id, patch);
     } else {
       await api.entities.HOSLog.create({
         driver_id: user.id,
         log_date: today,
         vehicle_id: selectedVehicleId || undefined,
-        duty_segments: [segment],
         status: 'draft',
+        ...patch,
       });
     }
 
     setCurrentDuty(status);
     setSavingDuty(false);
-    // Refresh logs
     const freshLogs = await api.entities.HOSLog.filter({ driver_id: user.id }, '-log_date', 30);
     setHosLogs(freshLogs);
   };
 
   function calcHours(segments, status) {
-    return segments.filter(s => s.status === status).reduce((sum, s) => {
-      if (!s.end_time) return sum;
-      return sum + (new Date(s.end_time) - new Date(s.start_time)) / 3600000;
+    const now = new Date();
+    return segments.filter((s) => s.status === status).reduce((sum, s) => {
+      if (!s.start_time) return sum;
+      const start = new Date(s.start_time);
+      const end = s.end_time ? new Date(s.end_time) : now;
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return sum;
+      return sum + Math.max(0, (end - start) / 3600000);
     }, 0);
   }
+
+  const todayHosLog = hosLogs.find((l) => l.log_date === new Date().toISOString().slice(0, 10));
+  const liveClocks = todayHosLog?.hos_clocks || computeDriverHosClocks(hosLogs, { currentDuty });
 
   if (loading) return (
     <div className="flex items-center justify-center h-64 bg-slate-900">
@@ -278,8 +319,15 @@ export default function EldPortal() {
               </select>
             </div>
 
+            <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+              <div className="text-xs font-black text-slate-300 uppercase mb-2">Your HOS clocks</div>
+              <HOSDriverClockCard clocks={liveClocks} compact light={false} />
+            </div>
+
+            <HOSRegulationKey />
+
             <div className="text-xs text-slate-500 text-center">
-              Duty changes are logged for HOS compliance. Accurate status reporting is required by FMCSA.
+              Duty changes and vehicle movement update your HOS clocks automatically.
             </div>
           </div>
         )}

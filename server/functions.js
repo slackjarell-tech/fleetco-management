@@ -298,6 +298,10 @@ export async function invokeFunction(name, body, user, ctx = null) {
       return { success: true };
     case 'refreshFuelPrices':
       return { success: true, message: 'Fuel prices refreshed (local mode)' };
+    case 'recordHosMovementEvent': {
+      const { recordHosMovementEvent } = await import('./hosDutyEvents.js');
+      return recordHosMovementEvent(body, user);
+    }
     case 'runPortalTabAuditAndEmail': {
       if (!user || user.role !== 'owner') throw new Error('Owner access required');
       const { runPortalTabAuditAndEmail } = await import('./portalTabAudit.js');

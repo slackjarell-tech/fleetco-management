@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Printer, Wrench, Truck, User, Calendar, Package, Phone, Mail } from 'lucide-react';
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/workOrderWorkflow';
+import { MAINTENANCE_STRATEGY_META, resolveWorkOrderMaintenance } from '@/lib/workOrderTypes';
 import RepairOrderPhaseBar from '@/components/workorders/RepairOrderPhaseBar';
 import SignaturePad from '@/components/ui/SignaturePad';
 import WorkOrderCommentPanel, { WorkOrderCommentsList } from '@/components/workorders/WorkOrderCommentPanel';
@@ -142,7 +143,18 @@ export default function WorkOrderDetail({
             <span className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${PRIORITY_COLORS[wo.priority]}`}>
               {wo.priority} priority
             </span>
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">{wo.repair_type}</span>
+            {(() => {
+              const m = resolveWorkOrderMaintenance(wo);
+              const meta = MAINTENANCE_STRATEGY_META[m.maintenance_strategy];
+              return (
+                <>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${meta?.badgeClass || 'bg-slate-100 text-slate-600'}`}>
+                    {meta?.shortLabel}
+                  </span>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">{m.repair_type}</span>
+                </>
+              );
+            })()}
             {wo.warranty_repair && <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Warranty</span>}
           </div>
 

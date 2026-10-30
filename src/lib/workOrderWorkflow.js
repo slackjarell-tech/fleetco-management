@@ -1,6 +1,7 @@
 /** Work order status lifecycle: intake → estimate → approval → repair */
 
 import { normalizeCustomerRole } from '@/lib/customerRoles';
+import { normalizeRepairTypeAndStrategy } from '@/lib/workOrderTypes';
 import { isFleetCoEmployee } from '@/lib/fleetUnitAccess';
 
 export const CUSTOMER_WO_ROLES = new Set([
@@ -81,6 +82,7 @@ export function normalizeWorkOrder(wo) {
     wo_number: `WO-${Date.now().toString().slice(-6)}`,
     title: '',
     repair_type: 'Other',
+    maintenance_strategy: 'corrective',
     status: 'awaiting_estimate',
     priority: 'medium',
     vehicle_id: '',
@@ -138,6 +140,12 @@ export function normalizeWorkOrder(wo) {
     mechanic_notes_log: Array.isArray(wo.mechanic_notes_log) ? wo.mechanic_notes_log : [],
     work_order_comments: Array.isArray(wo.work_order_comments) ? wo.work_order_comments : [],
   };
+  const { repair_type, maintenance_strategy } = normalizeRepairTypeAndStrategy(
+    merged.repair_type,
+    merged.maintenance_strategy,
+  );
+  merged.repair_type = repair_type;
+  merged.maintenance_strategy = maintenance_strategy;
   return computeWorkOrderTotals(merged);
 }
 

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Plus, Trash2, X, Save } from 'lucide-react';
 import HOSGrid from './HOSGrid';
 import HOSViolations, { detectViolations } from './HOSViolations';
+import { computeDriverHosClocks } from '@/lib/hosFmcsa';
+import HOSRegulationKey from '@/components/hos/HOSRegulationKey';
 import { filterDriverRoster } from '@/lib/driverAccess';
 
 const STATUS_OPTIONS = [
@@ -61,14 +63,21 @@ export default function HOSLogForm({ vehicles, users, onSave, onClose, initialDa
   const violations = detectViolations(logForViolations);
 
   const handleSubmit = (submitStatus) => {
-    onSave({
+    const draftLog = {
       ...form,
       hours_driving: parseFloat(hours_driving.toFixed(2)),
       hours_on_duty: parseFloat(hours_on_duty.toFixed(2)),
       hours_sleeper: parseFloat(hours_sleeper.toFixed(2)),
       hours_off_duty: parseFloat(hours_off_duty.toFixed(2)),
+    };
+    const hos_clocks = computeDriverHosClocks([draftLog], { currentDuty: 'off_duty' });
+    onSave({
+      ...draftLog,
       total_miles: total_miles || undefined,
       violations,
+      hos_clocks,
+      hours_remaining: hos_clocks.driveRemaining,
+      cycle_remaining: hos_clocks.cycleRemaining,
       status: submitStatus,
     });
   };
@@ -89,6 +98,7 @@ export default function HOSLogForm({ vehicles, users, onSave, onClose, initialDa
           </div>
 
           <div className="p-6 space-y-6">
+            <HOSRegulationKey />
             {/* Header info */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <div>
