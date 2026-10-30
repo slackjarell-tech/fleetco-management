@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { USER_MANUAL_PDF } from '@/lib/brand';
 import {
   Truck, LayoutDashboard, Package, FileText, Fuel, Wrench, ClipboardList,
   ClipboardCheck, Users, UserCheck, Archive, Calendar, Cpu, Store, Bot,
   MessageCircle, Navigation, TrendingUp, Map, Route, DollarSign, Globe,
   Clock, ShieldCheck, AlertTriangle, Award, BarChart2, ChevronDown, ChevronUp,
-  Printer, BookOpen, Phone, Info, CheckCircle2, AlertCircle, Lightbulb
+  Printer, BookOpen, Phone, Info, CheckCircle2, AlertCircle, Lightbulb, Download, ArrowLeft,
 } from 'lucide-react';
 
 const TIP = ({ children }) => (
@@ -879,6 +881,12 @@ export default function CustomerManual() {
           </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          <Link
+            to="/portal"
+            className="flex items-center gap-2 text-slate-300 hover:text-white text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Portal
+          </Link>
           <input
             type="text"
             placeholder="Search manual..."
@@ -886,6 +894,13 @@ export default function CustomerManual() {
             onChange={e => setSearch(e.target.value)}
             className="bg-slate-800 border border-slate-700 text-white placeholder-slate-400 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 w-48"
           />
+          <a
+            href={USER_MANUAL_PDF}
+            download="FleetCo-User-Manual.pdf"
+            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-1.5 rounded-lg text-sm transition-colors border border-slate-600"
+          >
+            <Download className="w-4 h-4" /> Download User Guide (PDF)
+          </a>
           <button
             onClick={() => window.print()}
             className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold px-4 py-1.5 rounded-lg text-sm transition-colors"

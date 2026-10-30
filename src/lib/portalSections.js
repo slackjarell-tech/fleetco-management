@@ -49,6 +49,7 @@ export const PATH_TO_SECTION = {
   '/portal/customers': 'Other',
   '/portal/messages': 'Other',
   '/portal/assistant': 'Other',
+  '/portal/manual': 'Help',
   '/portal/slt-marketing': 'Other',
   '/portal/slt-billing': 'Finance',
 };

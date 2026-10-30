@@ -7,7 +7,7 @@ import {
   Archive, Calendar, Cpu, Store, Bot, Crown, MessageCircle, Navigation, TrendingUp,
   Map, Route, DollarSign, Globe, Clock, ShieldCheck, AlertTriangle, Award, Lightbulb,
   MapPin, Megaphone, Zap, Mail, ScanLine, Video, Upload, Warehouse, Search,
-  ChevronDown, KeyRound, Bell, Database, Calculator, Smartphone, CreditCard, Briefcase,
+  ChevronDown, KeyRound, Bell, Database, Calculator, Smartphone, CreditCard, Briefcase, BookOpen,
 } from 'lucide-react';
 import { DRIVER_APP } from '@/lib/platform';
 import { Button } from '@/components/ui/button';
@@ -140,6 +140,14 @@ const NAV_GROUPS = [
       { label: 'AI Dev Feedback', icon: Lightbulb, path: '/portal/dev-feedback', advancedOnly: true },
       { label: 'Competitive Analysis', icon: Globe, path: '/portal/competitive-analysis', advancedOnly: true },
     ]
+  },
+  {
+    label: 'Help',
+    alwaysShow: true,
+    icon: BookOpen,
+    items: [
+      { label: 'Customer Manual', icon: BookOpen, path: '/portal/manual', alwaysShow: true },
+    ],
   },
 ];
 
@@ -326,9 +334,10 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
               ? viewCustomerModules
               : (modules && modules.length > 0 ? modules : null);
 
-            if (activeModuleFilter && !activeModuleFilter.includes(group.label)) return null;
+            if (activeModuleFilter && !group.alwaysShow && !activeModuleFilter.includes(group.label)) return null;
 
             const visibleItems = group.items.filter(item => {
+              if (item.alwaysShow) return true;
               if (item.internalOnly && !isInternal) return false;
               if (item.sltOnly && !['owner', 'executive', 'fleet_manager'].includes(user?.role)) return false;
               if (item.hrOnly && !isInternal && !canManageCustomerTeam(user?.role)) return false;

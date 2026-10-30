@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Mail, MapPin, Phone, Facebook, Linkedin, Youtube } from 'lucide-react';
 import SiteLegalNotice from '@/components/home/SiteLegalNotice';
 import FleetcoLogo from '@/components/home/FleetcoLogo';
-import { BRAND, SOCIAL, USER_MANUAL_PDF } from '@/lib/brand';
+import { BRAND, SOCIAL } from '@/lib/brand';
 import { DRIVER_APP } from '@/lib/platform';
 import DriverAppDownload from '@/components/shared/DriverAppDownload';
 
@@ -69,8 +69,6 @@ export default function FooterSection() {
                 </a>
               </li>
               <li><Link to="/driver/login" className="hover:text-amber-400 transition-colors">Driver Sign In</Link></li>
-              <li><Link to="/manual" className="hover:text-amber-400 transition-colors">Customer Manual</Link></li>
-              <li><a href={USER_MANUAL_PDF} className="hover:text-amber-400 transition-colors">Download User Guide (PDF)</a></li>
               <li><Link to="/overview" className="hover:text-amber-400 transition-colors">Investors</Link></li>
             </ul>
           </div>

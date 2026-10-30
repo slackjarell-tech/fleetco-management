@@ -1547,6 +1547,17 @@ app.post('/api/admin/datastore/backup', requireAuth, (req, res) => {
   res.json(exportStoreSnapshot());
 });
 
+/** Portal-only user guide PDF (not linked from public site). */
+app.get('/api/portal/user-manual.pdf', requireAuth, (req, res) => {
+  const file = path.join(__dirname, '..', 'public', 'marketing', 'FleetCo-User-Manual.pdf');
+  if (!fs.existsSync(file)) {
+    return res.status(404).json({ error: 'User guide PDF is not available yet. Run npm run marketing:manual to generate it.' });
+  }
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="FleetCo-User-Manual.pdf"');
+  res.sendFile(file);
+});
+
 // Production: serve built frontend + SPA fallback
 const distDir = path.join(__dirname, '..', 'dist');
 if (process.env.NODE_ENV === 'production' && fs.existsSync(distDir)) {

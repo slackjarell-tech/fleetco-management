@@ -4,6 +4,7 @@ export const PORTAL_FULL_BLEED_PATHS = [
   '/portal/assistant',
   '/portal/revan',
   '/portal/messages',
+  '/portal/manual',
 ];
 
 export function isPortalFullBleedPath(pathname) {

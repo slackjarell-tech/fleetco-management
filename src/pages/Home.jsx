@@ -48,9 +48,9 @@ export default function Home() {
               <a href="/login" className="bg-white text-green-800 font-bold px-5 py-2 rounded-lg text-sm hover:bg-green-50">
                 Sign In to Portal
               </a>
-              <a href="/manual" className="border border-green-200 text-white font-bold px-5 py-2 rounded-lg text-sm hover:bg-green-700">
-                Read Getting Started Guide
-              </a>
+              <p className="w-full text-green-100 text-xs mt-1">
+                After sign-in, open <strong className="text-white">Help → Customer Manual</strong> in the portal for the user guide and PDF download.
+              </p>
             </div>
           </div>
         </div>

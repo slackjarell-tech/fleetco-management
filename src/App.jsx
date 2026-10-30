@@ -224,10 +224,11 @@ const AuthenticatedApp = () => {
           <Route path="data-backup" element={<DataBackup />} />
           <Route path="driver-scans" element={<DriverScans />} />
           <Route path="driver-media" element={<DriverMedia />} />
+          <Route path="manual" element={<CustomerManual />} />
         </Route>
       </Route>
       <Route path="/fleet-owners" element={<Navigate to="/for-fleets" replace />} />
-      <Route path="/manual" element={<CustomerManual />} />
+      <Route path="/manual" element={<Navigate to="/portal/manual" replace />} />
       <Route path="/system-manual" element={<SystemManual />} />
       <Route path="/materials" element={<MarketingMaterials />} />
       <Route path="/about" element={<About />} />

@@ -1,5 +1,20 @@
 # FleetCo Marketing Assets
 
+## Named initiative: **PhonePulse**
+
+**Codename:** `PhonePulse` (smartphone-first telematics — strategy, demo deck, site positioning; implementation roadmap inside the deck)
+
+When you want this shipped to git, say something like: **“Push PhonePulse”** or **“Commit and push the PhonePulse pack.”**
+
+| Item | Path |
+|------|------|
+| Demo deck (80+ slides; dual iPhone/Android camera review + AI distraction) | `marketing/FleetCo-Smartphone-Telematics-Demo.pptx`, `public/marketing/` copy |
+| Generator | `npm run marketing:telematics` → `scripts/generate-smartphone-telematics-deck.js` |
+| Blank-slide audit | `scripts/audit-pptx-content.mjs` |
+| Gallery download | `TELEMATICS_DECK_DOWNLOAD` in `src/lib/brand.js`, card on Marketing Gallery |
+
+*Does not include unbuilt product work (geofence engine, Safety AI on live stream, BLE OBD) — those are documented in the deck as roadmap.*
+
 ## Client PowerPoint
 
 Generate the client-facing deck:

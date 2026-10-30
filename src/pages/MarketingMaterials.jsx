@@ -393,7 +393,7 @@ export default function MarketingMaterials() {
             <h2 className="font-black text-lg text-slate-900">System User Manual</h2>
             <p className="text-slate-500 text-sm">Complete platform reference guide — 15 sections covering every module</p>
           </div>
-          <Link to="/manual" className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg text-sm">
+          <Link to="/portal/manual" className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg text-sm">
             View Manual <ChevronRight className="w-4 h-4" />
           </Link>
         </div>

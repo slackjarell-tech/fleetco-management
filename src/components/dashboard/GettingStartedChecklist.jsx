@@ -89,7 +89,7 @@ export default function GettingStartedChecklist({ user }) {
       <div className="mt-4 space-y-3">
         <DriverAppDownload variant="compact" />
         <p className="text-xs text-slate-500">
-          Need help? Open the <Link to="/manual" className="text-amber-400 hover:underline">Customer Manual</Link> or email support@fleetcomanagement.org
+          Need help? Open the <Link to="/portal/manual" className="text-amber-400 hover:underline">Customer Manual</Link> or email support@fleetcomanagement.org
         </p>
       </div>
     </div>
