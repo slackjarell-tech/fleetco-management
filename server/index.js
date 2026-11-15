@@ -560,9 +560,15 @@ app.post('/api/marketing-ai/conversations/:id/messages', async (req, res) => {
   }
 });
 
-app.get('/api/agents/status', requireAuth, async (_req, res) => {
+app.get('/api/agents/status', requireAuth, async (req, res) => {
   const { getAiStatus } = await import('./aiProvider.js');
-  res.json(getAiStatus());
+  const { isLocalMarketingMode } = await import('./marketingLocalMode.js');
+  const ai = getAiStatus();
+  res.json({
+    ...ai,
+    revan_command_mode: ['owner', 'executive'].includes(req.user?.role),
+    marketing_command_mode: isLocalMarketingMode() || !ai.configured,
+  });
 });
 
 app.post('/api/agents/conversations', requireAuth, async (req, res) => {

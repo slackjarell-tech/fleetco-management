@@ -184,6 +184,16 @@ export default function AssistantChat({
                   Free AI · {aiStatus.provider}
                 </span>
               )}
+              {!aiStatus?.configured && isRevan && aiStatus?.revan_command_mode !== false && (
+                <span className="text-[10px] font-normal uppercase tracking-wide text-violet-300 bg-violet-950/50 border border-violet-700 px-1.5 py-0.5 rounded">
+                  Jarvis · no API key
+                </span>
+              )}
+              {!aiStatus?.configured && isSlt && (
+                <span className="text-[10px] font-normal uppercase tracking-wide text-cyan-300 bg-cyan-950/50 border border-cyan-800 px-1.5 py-0.5 rounded">
+                  Command mode
+                </span>
+              )}
             </div>
             <div className={`text-xs ${isPublic ? 'text-slate-500' : 'text-slate-400'}`}>{subtitle}</div>
           </div>
@@ -203,21 +213,34 @@ export default function AssistantChat({
       </div>
       )}
 
-      {!aiStatus?.configured && !starting && (
+      {!aiStatus?.configured && !starting && !isRevan && !isSlt && (
         <div className={`mx-4 mt-3 flex items-start gap-2 text-xs rounded-lg px-3 py-2 border ${
           isPublic
             ? 'text-amber-900 bg-amber-50 border-amber-200'
-            : isRevan
-              ? 'text-violet-200/90 bg-violet-950/30 border-violet-800/40'
-              : isSlt
-                ? 'text-cyan-200/90 bg-cyan-950/30 border-cyan-800/40'
-                : 'text-amber-200/90 bg-amber-950/30 border-amber-800/40'
+            : 'text-amber-200/90 bg-amber-950/30 border-amber-800/40'
         }`}>
-          <AlertCircle className={`w-4 h-4 flex-shrink-0 mt-0.5 ${isPublic ? 'text-amber-600' : isRevan ? 'text-violet-400' : isSlt ? 'text-cyan-400' : 'text-amber-400'}`} />
+          <AlertCircle className={`w-4 h-4 flex-shrink-0 mt-0.5 ${isPublic ? 'text-amber-600' : 'text-amber-400'}`} />
           <span>
             {isPublic
               ? 'Our AI assistant is starting up. Email support@fleetcomanagement.org or call (360) 952-1249 meanwhile.'
-              : <>Add a free <strong>GROQ_API_KEY</strong> in Render (console.groq.com) — or <strong>GEMINI_API_KEY</strong> — no credit card required.</>}
+              : <>Add a free <strong>GROQ_API_KEY</strong> on your server (console.groq.com) — or <strong>GEMINI_API_KEY</strong> — no credit card required.</>}
+          </span>
+        </div>
+      )}
+      {!aiStatus?.configured && !starting && isRevan && (
+        <div className="mx-4 mt-3 flex items-start gap-2 text-xs rounded-lg px-3 py-2 border text-violet-200/90 bg-violet-950/30 border-violet-800/40">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-violet-400" />
+          <span>
+            <strong>Jarvis command mode</strong> is active — no API key needed. Try: Morning briefing, Run business operations, System health, List open work orders.
+            Optional <strong>GROQ_API_KEY</strong> unlocks free-form chat.
+          </span>
+        </div>
+      )}
+      {!aiStatus?.configured && !starting && isSlt && (
+        <div className="mx-4 mt-3 flex items-start gap-2 text-xs rounded-lg px-3 py-2 border text-cyan-200/90 bg-cyan-950/30 border-cyan-800/40">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-cyan-400" />
+          <span>
+            <strong>Command mode</strong> — show dashboard, list leads, run autopilot work without Groq. Optional <strong>GROQ_API_KEY</strong> for free-form chat.
           </span>
         </div>
       )}

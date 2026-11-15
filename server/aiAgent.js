@@ -4,7 +4,7 @@ import { executeMarketingTool, getMarketingToolsForUser } from './marketingAiToo
 import { executePublicMarketingTool, getPublicMarketingTools, PUBLIC_MARKETING_AGENT } from './publicMarketingAiTools.js';
 import { SLT_MARKETING_ROLES } from './sltMarketing.js';
 import { runInternalMarketingAssistant } from './marketingInternalAssistant.js';
-import { runInternalRevanAssistant } from './revanExecutiveAssistant.js';
+import { runInternalRevanAssistant, runRevanJarvisFallback } from './revanExecutiveAssistant.js';
 import { getRevanToolsForUser, executeRevanTool } from './revanAiTools.js';
 import { runPublicGuideBot, shouldUsePublicGuideBot } from './marketingPublicGuide.js';
 import { isLocalMarketingMode } from './marketingLocalMode.js';
@@ -143,12 +143,19 @@ function offlineReply(agentName, userMessage) {
   const setup = `**Free AI not configured yet.** Add a free API key to enable ${label}:
 
 1. Get a free key at [console.groq.com](https://console.groq.com) (recommended) or [aistudio.google.com](https://aistudio.google.com)
-2. In Render → fleetco-management → Environment, add \`GROQ_API_KEY\` (or \`GEMINI_API_KEY\`)
+2. On your host (Consur/server env), add \`GROQ_API_KEY\` (or \`GEMINI_API_KEY\`)
 3. Redeploy — ${label} will then read and change your site & fleet data.
 
-Until then I can only show this setup guide.`;
+For **Revan**, Jarvis command mode works without any key — use commands like Morning briefing or Run business operations.
+
+Until LLM is configured, Site Commander shows this setup guide.`;
 
   const lower = userMessage.toLowerCase();
+  if (agentName === 'revan') {
+    return `**Revan (Jarvis mode)** works without an API key. Commands: **Morning briefing**, **Run business operations**, **System health**, **List interested leads**, **List open work orders**.
+
+Add optional \`GROQ_API_KEY\` (console.groq.com) on your server for free-form chat.`;
+  }
   if (lower.includes('help') || lower.includes('what can')) {
     const examples =
       agentName === 'revan'
@@ -189,8 +196,29 @@ export async function runAgent({ user, messages, agentName = 'site_commander', g
       return {
         message: internal.message,
         actions: internal.actions || [],
-        ai_status: { ...status, ...(internal.ai_status || {}), mode: internal.mode || 'jarvis_internal' },
+        ai_status: {
+          ...status,
+          ...(internal.ai_status || {}),
+          mode: internal.mode || 'jarvis_internal',
+          command_mode: true,
+        },
       };
+    }
+    if (!status.configured) {
+      const fallback = await runRevanJarvisFallback(user, lastUserText);
+      if (fallback.handled) {
+        return {
+          message: fallback.message,
+          actions: fallback.actions || [],
+          ai_status: {
+            ...status,
+            ...(fallback.ai_status || {}),
+            mode: 'jarvis_internal',
+            command_mode: true,
+            configured: false,
+          },
+        };
+      }
     }
   }
 
@@ -216,6 +244,14 @@ export async function runAgent({ user, messages, agentName = 'site_commander', g
   }
 
   if (!status.configured) {
+    if (isRevan && user) {
+      const fallback = await runRevanJarvisFallback(user, lastUserText);
+      return {
+        message: fallback.message,
+        actions: fallback.actions || [],
+        ai_status: { ...status, mode: 'jarvis_internal', command_mode: true },
+      };
+    }
     return {
       message: { role: 'assistant', content: offlineReply(agentName, lastUserText) },
       actions: [],
