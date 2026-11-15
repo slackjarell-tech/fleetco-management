@@ -567,6 +567,7 @@ app.get('/api/agents/status', requireAuth, async (req, res) => {
   res.json({
     ...ai,
     revan_command_mode: ['owner', 'executive'].includes(req.user?.role),
+    conversational: ['owner', 'executive'].includes(req.user?.role),
     marketing_command_mode: isLocalMarketingMode() || !ai.configured,
   });
 });
@@ -590,7 +591,7 @@ app.post('/api/agents/conversations', requireAuth, async (req, res) => {
       }
       const { createPortalAgentConversation } = await import('./marketingAiSessions.js');
       const welcomeMsg = agent_name === 'revan'
-        ? '**Revan online.** Jarvis-style executive commander for FleetCo — I report fleet health, leads, marketing autopilot, and production status. Try **"Morning briefing"**, **"Run business operations"**, or **"System health"**. Full reasoning unlocks with GROQ_API_KEY.'
+        ? '**Revan online.** Jarvis executive commander — voice enabled in this panel (toggle speaker). Try **"Morning briefing"**, **"Call me"**, **"Run business operations"**, or **"System health"**. Optional GROQ_API_KEY unlocks free-form chat.'
         : welcome;
       const conversation = createPortalAgentConversation(req.user.id, agent_name, welcomeMsg);
       return res.json({ ...conversation, metadata });
@@ -636,15 +637,21 @@ app.post('/api/agents/conversations/:id/messages', requireAuth, async (req, res)
   }
 
   try {
-    const { message, actions, ai_status } = await runAgent({
+    let { message, actions, ai_status } = await runAgent({
       user: req.user,
       messages: conversation.messages,
       agentName: conversation.agent_name,
     });
 
+    if (conversation.agent_name === 'revan') {
+      const { attachSpoken } = await import('./revanPersonality.js');
+      message = attachSpoken(message, req.user);
+    }
+
     conversation.messages.push({
       role: 'assistant',
       content: message.content,
+      spoken: message.spoken,
       actions: actions?.length ? actions : undefined,
     });
     conversation.updated_at = new Date().toISOString();
@@ -717,6 +724,85 @@ app.post('/api/revan/briefing/send', requireAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/revan/status', requireAuth, async (req, res) => {
+  if (!['owner', 'executive'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'Revan requires owner or executive' });
+  }
+  try {
+    const { getRevanCommsStatus } = await import('./revanComms.js');
+    const { getAiStatus } = await import('./aiProvider.js');
+    res.json({
+      ...getRevanCommsStatus(req.user),
+      ai: getAiStatus(),
+      revan_command_mode: true,
+      conversational: true,
+      jarvis_voice: true,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/revan/call-me', requireAuth, async (req, res) => {
+  if (!['owner', 'executive'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'Revan requires owner or executive' });
+  }
+  try {
+    const { callExecutive } = await import('./revanComms.js');
+    const slot = req.body?.slot === 'evening' ? 'evening' : req.body?.slot === 'morning' ? 'morning' : 'manual';
+    const result = await callExecutive(req.user, { slot, script: req.body?.script });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/revan/sms-brief', requireAuth, async (req, res) => {
+  if (!['owner', 'executive'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'Revan requires owner or executive' });
+  }
+  try {
+    const { smsExecutiveBriefing } = await import('./revanComms.js');
+    const slot = req.body?.slot === 'evening' ? 'evening' : req.body?.slot === 'morning' ? 'morning' : 'manual';
+    const result = await smsExecutiveBriefing(req.user, { slot, body: req.body?.body });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Direct Jarvis chat — survives conversation DB issues */
+app.post('/api/revan/chat', requireAuth, async (req, res) => {
+  if (!['owner', 'executive'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'Revan requires owner or executive' });
+  }
+  const text = (req.body?.message || '').trim();
+  if (!text) return res.status(400).json({ error: 'Message required' });
+
+  try {
+    const { runAgent } = await import('./aiAgent.js');
+    const { attachSpoken } = await import('./revanPersonality.js');
+    const history = Array.isArray(req.body?.messages) ? req.body.messages : [];
+    const messages = [...history, { role: 'user', content: text }].filter((m) => m.role && m.content);
+    const { message, actions, ai_status } = await runAgent({
+      user: req.user,
+      messages,
+      agentName: 'revan',
+    });
+    const spoken = attachSpoken(message, req.user);
+    res.json({
+      message: spoken,
+      content: spoken.content,
+      spoken: spoken.spoken,
+      actions: actions || [],
+      ai_status,
+    });
+  } catch (err) {
+    console.error('[revan chat]', err);
+    res.status(500).json({ error: err.message || 'Revan failed' });
   }
 });
 
@@ -1771,6 +1857,9 @@ async function startServer() {
     import('./revanScheduler.js').then(({ startRevanScheduler }) => {
       startRevanScheduler();
     }).catch((err) => console.warn('[revan] scheduler not started', err.message));
+    import('./revanJarvisLoop.js').then(({ startRevanJarvisLoop }) => {
+      startRevanJarvisLoop();
+    }).catch((err) => console.warn('[revan] jarvis loop not started', err.message));
     import('./jobApplicantAutopilot.js').then(({ startJobApplicantAutopilotScheduler }) => {
       startJobApplicantAutopilotScheduler();
     }).catch((err) => console.warn('[job-applicant-autopilot] scheduler not started', err.message));

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@/api/apiClient';
-import { Crown, Loader2, RefreshCw, MessageSquare, Zap } from 'lucide-react';
+import { Crown, Loader2, RefreshCw, MessageSquare, Zap, Phone, PhoneCall } from 'lucide-react';
 import AssistantChat from '@/components/assistant/AssistantChat';
 import PortalPageShell from '@/components/layout/PortalPageShell';
 import ReactMarkdown from 'react-markdown';
@@ -11,6 +11,10 @@ export default function Revan() {
   const [loading, setLoading] = useState(true);
   const [briefing, setBriefing] = useState(null);
   const [loadingBrief, setLoadingBrief] = useState(false);
+  const [jarvisStatus, setJarvisStatus] = useState(null);
+  const [phoneDraft, setPhoneDraft] = useState('');
+  const [callBusy, setCallBusy] = useState(false);
+  const [callNote, setCallNote] = useState('');
 
   const loadBriefing = useCallback(async () => {
     setLoadingBrief(true);
@@ -29,8 +33,38 @@ export default function Revan() {
   }, []);
 
   useEffect(() => {
-    if (user && ['owner', 'executive'].includes(user.role)) loadBriefing();
+    if (user && ['owner', 'executive'].includes(user.role)) {
+      loadBriefing();
+      api.revan.getStatus().then(setJarvisStatus).catch(() => setJarvisStatus(null));
+    }
   }, [user, loadBriefing]);
+
+  useEffect(() => {
+    if (user?.phone) setPhoneDraft(user.phone);
+  }, [user?.phone]);
+
+  const savePhone = async () => {
+    const updated = await api.auth.updateMe({ phone: phoneDraft.trim() });
+    setUser(updated);
+    const st = await api.revan.getStatus();
+    setJarvisStatus(st);
+    setCallNote('Mobile saved — Jarvis can call this number.');
+  };
+
+  const callMe = async () => {
+    setCallBusy(true);
+    setCallNote('');
+    try {
+      const r = await api.revan.callMe('manual');
+      setCallNote(r.success ? 'Calling your phone now…' : (r.message || r.error || 'Call failed'));
+      const st = await api.revan.getStatus();
+      setJarvisStatus(st);
+    } catch (e) {
+      setCallNote(e.message || 'Call failed');
+    } finally {
+      setCallBusy(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -74,6 +108,39 @@ export default function Revan() {
             </button>
           </div>
 
+          <JarvisCore active />
+
+          <div className="mb-3 p-3 rounded-xl border border-violet-800/50 bg-slate-900/80 space-y-2">
+            <p className="text-[11px] text-violet-300 font-semibold flex items-center gap-1">
+              <PhoneCall className="w-3.5 h-3.5" /> Jarvis phone line
+            </p>
+            <input
+              type="tel"
+              value={phoneDraft}
+              onChange={(e) => setPhoneDraft(e.target.value)}
+              placeholder="(360) 555-0100"
+              className="w-full text-sm bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white"
+            />
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="flex-1 border-slate-700" onClick={savePhone}>
+                Save mobile
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1 bg-violet-600 hover:bg-violet-500"
+                disabled={callBusy || !jarvisStatus?.can_call}
+                onClick={callMe}
+              >
+                {callBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4 mr-1" />}
+                Call me
+              </Button>
+            </div>
+            {jarvisStatus && !jarvisStatus.can_call && (
+              <p className="text-[10px] text-slate-500 leading-relaxed">{jarvisStatus.voice_note}</p>
+            )}
+            {callNote && <p className="text-[10px] text-violet-300">{callNote}</p>}
+          </div>
+
           <motionNote />
 
           {loadingBrief && !briefing?.markdown ? (
@@ -105,7 +172,7 @@ export default function Revan() {
             subtitle="Executive Commander · runs marketing autopilot, fleet audits, website control"
             placeholder="Jarvis — morning briefing, run the business for me, system health..."
             emptyTitle="Command your executive AI"
-            emptySubtitle="Revan operates FleetCo: briefings, autopilot, leads, site content, and fleet records. Works without Groq; smarter with GROQ_API_KEY."
+            emptySubtitle="Have a real back-and-forth — ask how we're doing, follow up on leads, or run the business. I remember this chat. Optional GROQ_API_KEY for even freer reasoning."
             suggestedQuestions={[
               'Morning briefing — what needs my attention today?',
               'Run business operations (autopilot + advertising AI)',
@@ -122,6 +189,19 @@ export default function Revan() {
   );
 }
 
+function JarvisCore({ active }) {
+  return (
+    <div className="relative flex justify-center mb-4" aria-hidden>
+      <div
+        className={`w-20 h-20 rounded-full border border-violet-500/40 bg-gradient-to-br from-violet-600/30 to-slate-950 shadow-[0_0_40px_rgba(139,92,246,0.35)] ${active ? 'animate-pulse' : ''}`}
+      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <Zap className="w-8 h-8 text-violet-300" />
+      </div>
+    </div>
+  );
+}
+
 function motionNote() {
   return (
     <div className="mb-3 p-2 rounded-lg border border-violet-900/40 bg-violet-950/25 text-[11px] text-slate-400">
@@ -129,7 +209,7 @@ function motionNote() {
         <Zap className="w-3 h-3" /> Autonomous loop
       </span>
       <p className="mt-1 leading-relaxed">
-        Marketing autopilot runs every 15 minutes. Revan can trigger the same tick on demand and summarizes results for you.
+        Marketing autopilot every 15 minutes. Jarvis loop runs business ops on a schedule, speaks replies in-chat, and can call or text your briefing when Twilio is set.
       </p>
     </div>
   );

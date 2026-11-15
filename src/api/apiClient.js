@@ -314,6 +314,27 @@ const revan = {
       body: JSON.stringify({ slot }),
     });
   },
+  getStatus() {
+    return apiFetch('/revan/status');
+  },
+  callMe(slot = 'manual') {
+    return apiFetch('/revan/call-me', {
+      method: 'POST',
+      body: JSON.stringify({ slot }),
+    });
+  },
+  smsBrief(slot = 'manual') {
+    return apiFetch('/revan/sms-brief', {
+      method: 'POST',
+      body: JSON.stringify({ slot }),
+    });
+  },
+  chat(message, messages = []) {
+    return apiFetch('/revan/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, messages }),
+    });
+  },
 };
 
 const agents = {

@@ -4,7 +4,11 @@ import { executeMarketingTool, getMarketingToolsForUser } from './marketingAiToo
 import { executePublicMarketingTool, getPublicMarketingTools, PUBLIC_MARKETING_AGENT } from './publicMarketingAiTools.js';
 import { SLT_MARKETING_ROLES } from './sltMarketing.js';
 import { runInternalMarketingAssistant } from './marketingInternalAssistant.js';
-import { runInternalRevanAssistant, runRevanJarvisFallback } from './revanExecutiveAssistant.js';
+import {
+  runInternalRevanAssistant,
+  runRevanJarvisFallback,
+  runRevanConversationalReply,
+} from './revanExecutiveAssistant.js';
 import { getRevanToolsForUser, executeRevanTool } from './revanAiTools.js';
 import { runPublicGuideBot, shouldUsePublicGuideBot } from './marketingPublicGuide.js';
 import { isLocalMarketingMode } from './marketingLocalMode.js';
@@ -90,6 +94,11 @@ Powers (real tools — never fake):
 - Full marketing stack: leads, nurture, social queue, daily lead report
 - update_site_settings + fleet CRUD + list_users / update_user / delete_record
 - get_dashboard_summary for audits
+
+Conversation:
+- Hold a natural multi-turn dialogue like a trusted chief of staff — reference earlier messages in the thread.
+- Answer in clear prose first; use bullet briefings when reporting status.
+- If the user is casual ("how are we?", "what worries you?", "thanks"), respond conversationally before offering commands.
 
 Behavior:
 1. When asked how the business is doing, call get_executive_briefing first.
@@ -219,6 +228,21 @@ export async function runAgent({ user, messages, agentName = 'site_commander', g
           },
         };
       }
+      const dialogue = await runRevanConversationalReply(user, messages);
+      if (dialogue.handled) {
+        return {
+          message: dialogue.message,
+          actions: dialogue.actions || [],
+          ai_status: {
+            ...status,
+            ...(dialogue.ai_status || {}),
+            mode: dialogue.mode || 'jarvis_dialogue',
+            command_mode: true,
+            conversational: true,
+            configured: false,
+          },
+        };
+      }
     }
   }
 
@@ -246,10 +270,18 @@ export async function runAgent({ user, messages, agentName = 'site_commander', g
   if (!status.configured) {
     if (isRevan && user) {
       const fallback = await runRevanJarvisFallback(user, lastUserText);
+      if (fallback.handled) {
+        return {
+          message: fallback.message,
+          actions: fallback.actions || [],
+          ai_status: { ...status, mode: 'jarvis_internal', command_mode: true },
+        };
+      }
+      const dialogue = await runRevanConversationalReply(user, messages);
       return {
-        message: fallback.message,
-        actions: fallback.actions || [],
-        ai_status: { ...status, mode: 'jarvis_internal', command_mode: true },
+        message: dialogue.message,
+        actions: dialogue.actions || [],
+        ai_status: { ...status, ...(dialogue.ai_status || {}), mode: 'jarvis_dialogue', conversational: true },
       };
     }
     return {
@@ -274,9 +306,10 @@ export async function runAgent({ user, messages, agentName = 'site_commander', g
   else if (isSltMarketing) tools = getMarketingToolsForUser(user);
   else if (isRevan) tools = getRevanToolsForUser(user);
   else tools = getToolsForUser(user, agentName);
+  const historyLimit = isRevan ? 22 : MAX_HISTORY_MESSAGES;
   const chatMessages = [
     { role: 'system', content: buildSystemPrompt(user, agentName) },
-    ...trimHistory(messages),
+    ...trimHistory(messages, historyLimit),
   ];
 
   const maxRounds = isPublicGuide || isSltMarketing ? 3 : isRevan ? 8 : MAX_TOOL_ROUNDS;

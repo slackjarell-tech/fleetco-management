@@ -73,8 +73,27 @@ export async function deliverRevanBriefing(slot, { force = false } = {}) {
     created_at: nowIso(),
   });
 
+  let sms = null;
+  if (process.env.REVAN_BRIEFING_SMS === 'true') {
+    try {
+      const { smsExecutiveBriefing } = await import('./revanComms.js');
+      sms = await smsExecutiveBriefing(primary, { slot });
+    } catch (err) {
+      console.warn('[revan] briefing sms', err.message);
+    }
+  }
+
+  if (process.env.REVAN_BRIEFING_CALL === 'true') {
+    try {
+      const { callExecutive } = await import('./revanComms.js');
+      await callExecutive(primary, { slot });
+    } catch (err) {
+      console.warn('[revan] briefing call', err.message);
+    }
+  }
+
   console.log(`[revan] ${slot} briefing sent to ${execs.length} executive(s)`);
-  return { success: true, dateKey, slot, messages: messages.length };
+  return { success: true, dateKey, slot, messages: messages.length, sms };
 }
 
 function shouldRunSlot(slot) {
