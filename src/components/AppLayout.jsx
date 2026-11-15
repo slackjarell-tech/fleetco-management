@@ -134,7 +134,7 @@ const NAV_GROUPS = [
       { label: 'Data Backup', icon: Database, path: '/portal/data-backup', sltOnly: true },
       { label: 'Messages', icon: MessageCircle, path: '/portal/messages' },
       { label: 'Site Commander AI', icon: Bot, path: '/portal/assistant' },
-      { label: 'Revan', icon: Zap, path: '/portal/revan', advancedOnly: true },
+      { label: 'Revan', icon: Zap, path: '/portal/revan', revanOnly: true },
       { label: 'FleetCo Marketing AI', icon: Megaphone, path: '/portal/slt-marketing', sltOnly: true },
       { label: 'Advertisement', icon: Megaphone, path: '/portal/advertisement', advancedOnly: true },
       { label: 'Marketing Gallery', icon: Megaphone, path: '/portal/marketing-gallery', advancedOnly: true },
@@ -341,6 +341,7 @@ function AppLayoutShell({ user, open, setOpen, showBulkImport, setShowBulkImport
               if (item.alwaysShow) return true;
               if (item.internalOnly && !isInternal) return false;
               if (item.sltOnly && !['owner', 'executive', 'fleet_manager'].includes(user?.role)) return false;
+              if (item.revanOnly && !['owner', 'executive'].includes(user?.role)) return false;
               if (item.hrOnly && !isInternal && !canManageCustomerTeam(user?.role)) return false;
               if (item.path === '/portal/fleetco-payroll' && !['owner', 'executive', 'fleet_manager'].includes(user?.role)) return false;
               if (item.ownerOnly && user?.role !== 'owner') return false;

@@ -136,14 +136,13 @@ function CustomersTab({ user, canAddCustomers, fleetManagers, fleetCoordinators,
   };
 
   const handleResetCustomerPassword = async (customer) => {
-    const linkedUser = allUsers.find(u => u.id === customer.user_id);
-    const email = customer.email;
-    if (!email) {
-      alert('No email on file for this customer.');
-      return;
+    setMessage('');
+    try {
+      const result = await api.auth.sendPasswordReset({ customerId: customer.id });
+      setMessage(result.message || `Password reset processed for ${result.email || 'portal login'}.`);
+    } catch (err) {
+      setMessage(err?.data?.message || err?.data?.error || err?.message || 'Could not send password reset.');
     }
-    await api.auth.resetPasswordRequest(email);
-    alert(`Password reset link sent to ${email}`);
   };
 
   const handleSendWelcomeEmail = async (customer) => {
@@ -579,8 +578,16 @@ function TeamTab({ user, isOwner, isCustomerAdmin, canManageTeam, availableRoles
   };
 
   const handleResetPassword = async (email) => {
-    await api.auth.resetPasswordRequest(email);
-    alert(`Password reset link sent to ${email}`);
+    if (!email) {
+      alert('No email on file for this team member.');
+      return;
+    }
+    try {
+      const result = await api.auth.sendPasswordReset({ email });
+      alert(result.message || `Password reset processed for ${email}.`);
+    } catch (err) {
+      alert(err?.data?.message || err?.data?.error || err?.message || 'Could not send password reset.');
+    }
   };
 
   const handleDeleteUser = async (member) => {

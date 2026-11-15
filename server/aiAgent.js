@@ -4,6 +4,8 @@ import { executeMarketingTool, getMarketingToolsForUser } from './marketingAiToo
 import { executePublicMarketingTool, getPublicMarketingTools, PUBLIC_MARKETING_AGENT } from './publicMarketingAiTools.js';
 import { SLT_MARKETING_ROLES } from './sltMarketing.js';
 import { runInternalMarketingAssistant } from './marketingInternalAssistant.js';
+import { runInternalRevanAssistant } from './revanExecutiveAssistant.js';
+import { getRevanToolsForUser, executeRevanTool } from './revanAiTools.js';
 import { runPublicGuideBot, shouldUsePublicGuideBot } from './marketingPublicGuide.js';
 import { isLocalMarketingMode } from './marketingLocalMode.js';
 
@@ -78,26 +80,25 @@ Behavior:
   }
 
   if (isRevan) {
-    return `You are Revan, the Executive Commander AI for FleetCo Management at fleetcomanagement.org.
-You operate like Cursor for this entire platform: you READ data and EXECUTE real changes via tools — never simulate changes.
+    return `You are Revan — FleetCo's Executive Commander AI (Jarvis-style) at fleetcomanagement.org.
+You report to ${user?.full_name || user?.email} (${role}). You run the business within tool limits: fleet ops, marketing autopilot, public website, users, and executive briefings.
 
-Current user: ${user?.email} (role: ${role}) — full executive authority.
+Personality: calm, loyal, precise — address the user as a trusted principal ("Sir" or by name). Lead with **briefing bullets**, then actions taken.
 
-Your powers:
-- update_site_settings: change public homepage hero text, descriptions, contact info, tagline
-- Full CRUD on fleet entities: Vehicle, WorkOrder, Customer, Load, Invoice, Driver, Vendor, etc.
-- list_users / update_user: manage portal accounts and roles
-- delete_record: remove records when explicitly requested
-- get_dashboard_summary: system-wide stats and health checks
+Powers (real tools — never fake):
+- get_executive_briefing / get_production_readiness / run_business_operations (autopilot + advertising AI)
+- Full marketing stack: leads, nurture, social queue, daily lead report
+- update_site_settings + fleet CRUD + list_users / update_user / delete_record
+- get_dashboard_summary for audits
 
 Behavior:
-1. Act immediately with tools when asked to change something.
-2. For audits, call get_dashboard_summary plus targeted list_records queries, then report findings.
-3. After changes, confirm exactly what was updated.
-4. Be direct, executive-level, and concise.
-5. Proactively suggest follow-up actions when you spot issues.
+1. When asked how the business is doing, call get_executive_briefing first.
+2. When asked to "run the business" or unattended ops, call run_business_operations and summarize.
+3. Execute changes immediately; confirm what changed.
+4. Proactively flag overdue work, new leads, outbox emails, and broken prod checks.
+5. Optional GROQ/Gemini makes free-form reasoning smarter; command mode works without API keys.
 
-Entity types: Customer, Vehicle, WorkOrder, Load, Invoice, FuelLog, MaintenanceSchedule, Vendor, PartInventory, Inquiry, Message, Inspection, Incident, and others.`;
+Website context: public marketing site + portal for owner-operators; FleetCo Guide captures leads; autopilot nurtures every 15 minutes.`;
   }
 
   const isExecutive = ['owner', 'executive'].includes(role);
@@ -151,7 +152,7 @@ Until then I can only show this setup guide.`;
   if (lower.includes('help') || lower.includes('what can')) {
     const examples =
       agentName === 'revan'
-        ? '\n- "Run a full system health audit"\n- "Change the homepage headline to Welcome to FleetCo"\n- "List all customers and their fleet size"\n- "Update the contact email on the website"'
+        ? '\n- "Morning briefing — what needs my attention?"\n- "Run business operations for me"\n- "Change the homepage headline to Welcome to FleetCo"\n- "List interested leads and queue a follow-up"\n- "System health audit"'
         : agentName === 'slt_marketing'
           ? '\n- "List interested leads from the website AI"\n- "Queue a LinkedIn post about our driver app"\n- "Schedule a call tomorrow at 2pm with Robert Kim"\n- "Send a demo invite to every new lead this week"'
           : agentName === PUBLIC_MARKETING_AGENT
@@ -167,11 +168,30 @@ export async function runAgent({ user, messages, agentName = 'site_commander', g
   const actions = [];
   const isPublicGuide = agentName === PUBLIC_MARKETING_AGENT;
   const isSltMarketing = agentName === 'slt_marketing';
+  const isRevan = agentName === 'revan';
   const lastUser = [...messages].reverse().find((m) => m.role === 'user');
   const lastUserText = lastUser?.content || '';
 
   if (isPublicGuide && (shouldUsePublicGuideBot() || !status.configured)) {
     return runPublicGuideBot(guest, messages);
+  }
+
+  if (isRevan && user) {
+    if (!['owner', 'executive'].includes(user.role)) {
+      return {
+        message: { role: 'assistant', content: 'Revan is restricted to owner and executive roles.' },
+        actions: [],
+        ai_status: status,
+      };
+    }
+    const internal = await runInternalRevanAssistant(user, lastUserText);
+    if (internal.handled) {
+      return {
+        message: internal.message,
+        actions: internal.actions || [],
+        ai_status: { ...status, ...(internal.ai_status || {}), mode: internal.mode || 'jarvis_internal' },
+      };
+    }
   }
 
   if (isSltMarketing && user) {
@@ -216,13 +236,14 @@ export async function runAgent({ user, messages, agentName = 'site_commander', g
   let tools;
   if (isPublicGuide) tools = getPublicMarketingTools();
   else if (isSltMarketing) tools = getMarketingToolsForUser(user);
+  else if (isRevan) tools = getRevanToolsForUser(user);
   else tools = getToolsForUser(user, agentName);
   const chatMessages = [
     { role: 'system', content: buildSystemPrompt(user, agentName) },
     ...trimHistory(messages),
   ];
 
-  const maxRounds = isPublicGuide || isSltMarketing ? 3 : MAX_TOOL_ROUNDS;
+  const maxRounds = isPublicGuide || isSltMarketing ? 3 : isRevan ? 8 : MAX_TOOL_ROUNDS;
 
   for (let round = 0; round < maxRounds; round++) {
     const response = await chatCompletion({ messages: chatMessages, tools });
@@ -235,6 +256,16 @@ export async function runAgent({ user, messages, agentName = 'site_commander', g
             message: internal.message,
             actions: internal.actions || [],
             ai_status: { ...getAiStatus(), mode: 'internal' },
+          };
+        }
+      }
+      if (isRevan && user) {
+        const internal = await runInternalRevanAssistant(user, lastUserText);
+        if (internal.handled) {
+          return {
+            message: internal.message,
+            actions: internal.actions || [],
+            ai_status: { ...getAiStatus(), mode: 'jarvis_internal' },
           };
         }
       }
@@ -272,6 +303,8 @@ export async function runAgent({ user, messages, agentName = 'site_commander', g
         result = await executePublicMarketingTool(guest, call.name, call.args);
       } else if (isSltMarketing) {
         result = await executeMarketingTool(user, call.name, call.args);
+      } else if (isRevan) {
+        result = await executeRevanTool(user, call.name, call.args);
       } else {
         result = executeTool(user, call.name, call.args);
       }

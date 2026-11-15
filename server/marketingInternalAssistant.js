@@ -99,6 +99,8 @@ export async function runInternalMarketingAssistant(user, userMessage) {
           '- **"Social queue"** — posts waiting for approval',
           '- **"Draft a LinkedIn post about the driver app"**',
           '- **"Run autopilot now"**',
+          '- **"List target companies"** or **"who needs FleetCo"** — ICP prospect list',
+          '- **"Advertising AI status"** — 24/7 rule-based campaigns (no API cost)',
           '- **"Pause autopilot for lead [id]"**',
           '',
           'Autopilot nurture emails use **Resend** (already on server). Chat gets smarter when **GROQ_API_KEY** is set — optional.',
@@ -257,6 +259,43 @@ export async function runInternalMarketingAssistant(user, userMessage) {
       ai_status,
       actions,
       message: { role: 'assistant', content: `**Pending outbox (${items.length})**\n\n${list}` },
+    };
+  }
+
+  if (/target compan|icp list|who needs fleetco|prospect list|companies that need/.test(lower)) {
+    const action = await runTool(user, 'list_target_prospects', { limit: 30 });
+    actions.push(action);
+    return {
+      handled: true,
+      mode: 'internal',
+      ai_status,
+      actions,
+      message: { role: 'assistant', content: action.result?.markdown || 'No targets loaded.' },
+    };
+  }
+
+  if (/advertising ai|ad ai status|24\/7 ad|zero cost ad/.test(lower)) {
+    const action = await runTool(user, 'get_advertising_ai_status', {});
+    actions.push(action);
+    const s = action.result || {};
+    const focus = s.today_focus?.example?.name || '—';
+    return {
+      handled: true,
+      mode: 'internal',
+      ai_status,
+      actions,
+      message: {
+        role: 'assistant',
+        content: [
+          '**Advertising AI (rule-based, $0 API)**',
+          `- Runs with autopilot **every 15 minutes**; daily ICP post + SLT brief`,
+          `- Segments: **${s.target_segments ?? '—'}** · Example targets: **${s.target_examples ?? '—'}**`,
+          `- Today’s focus: **${focus}**`,
+          `- Ran today: **${s.ran_today ? 'yes' : 'not yet'}**`,
+          '',
+          'Say **"list target companies"** for the full ICP list.',
+        ].join('\n'),
+      },
     };
   }
 

@@ -110,7 +110,7 @@ export function appendPublicMessage(req, conversationId, content) {
   return { conversation, guestId };
 }
 
-const PORTAL_AGENTS = new Set(['slt_marketing']);
+const PORTAL_AGENTS = new Set(['slt_marketing', 'revan']);
 const PORTAL_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 function portalGuestId(userId) {

@@ -1,4 +1,5 @@
 import { PRICE_PER_UNIT_MONTHLY, YEARLY_DISCOUNT_PERCENT } from './roles.js';
+import { TARGET_SEGMENTS, listTargetCompanies } from './marketingTargetCompanies.js';
 
 const APP_URL = process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org';
 
@@ -46,6 +47,8 @@ export function marketingFactsMarkdown() {
     `- Pricing: ${FLEETCO_PRICING.summary}`,
     `- Website AI: FleetCo Guide captures leads → autopilot nurture (Resend)`,
     `- Autopilot: 4-step email sequence, runs every 15 minutes`,
+    `- Advertising AI: rule-based ICP rotation daily (zero LLM cost), social draft + SLT brief`,
+    `- ICP targets: ${TARGET_SEGMENTS.length} segments / ${listTargetCompanies({ limit: 200 }).length} example prospects`,
     `- Social: weekly drafts Monday 9am CST; approve in SLT hub`,
     `- Daily report: 3:00 PM CST to SLT inbox`,
     `- No HubSpot/Apollo required`,

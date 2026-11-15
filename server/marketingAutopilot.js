@@ -26,6 +26,7 @@ import {
   queueMarketingOutbox,
 } from './marketingInApp.js';
 import { sendInquiryNotificationEmail } from './inquiryEmails.js';
+import { getAdvertisingAiStatus } from './marketingAdvertisingAi.js';
 
 const APP_URL = process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org';
 const TICK_MS = 15 * 60 * 1000;
@@ -288,12 +289,21 @@ export async function runAutopilotTick() {
     socialResult = await runWeeklySocialDrafts();
   }
 
+  let advertisingAi = { skipped: true };
+  try {
+    const { runDailyAdvertisingAi } = await import('./marketingAdvertisingAi.js');
+    advertisingAi = await runDailyAdvertisingAi();
+  } catch (err) {
+    advertisingAi = { skipped: true, error: err.message };
+  }
+
   const run = createEntity('MarketingAutopilotRun', {
     started_at: started,
     finished_at: nowIso(),
     nurture_count: nurtureResults.length,
     social: socialResult.skipped ? 'skipped' : 'drafted',
     nurture_details: JSON.stringify(nurtureResults.slice(0, 20)),
+    advertising_ai: advertisingAi.skipped ? 'skipped' : 'ran',
   });
 
   return {
@@ -301,6 +311,7 @@ export async function runAutopilotTick() {
     run,
     nurture: nurtureResults,
     social: socialResult,
+    advertising_ai: advertisingAi,
     scheduled_posts: scheduledPosts,
   };
 }
@@ -319,6 +330,7 @@ export function getAutopilotStatus() {
   return {
     enabled: isAutopilotEnabled(),
     local_mode: isLocalMarketingMode(),
+    advertising_ai: getAdvertisingAiStatus(),
     enrolled_count: enrolled.length,
     due_now: dueNow.length,
     outbox_pending: pendingOutbox.length,
@@ -343,7 +355,7 @@ export function startMarketingAutopilotScheduler() {
 
   setTimeout(tick, 30_000);
   setInterval(tick, TICK_MS);
-  console.log('[marketing-autopilot] Scheduler active (local-first) — nurture every 15m, social drafts Monday 9am CST');
+  console.log('[marketing-autopilot] Scheduler active — nurture every 15m, rule-based Advertising AI daily, social drafts Monday 9am CST');
 }
 
 export async function onNewLead(inquiry) {

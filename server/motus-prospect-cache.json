@@ -1,0 +1,135 @@
+{
+  "_note": "POC fields from FMCSA Motus (motus.dot.gov/customer/{USDOT}/account). Refresh via npm run marketing:motus-cache.",
+  "4290274": {
+    "legalName": "MOTUS TRANSPORTATION LLC",
+    "businessEmail": "dispatch@motustransportationllc.com",
+    "businessPhone": "(563) 293-2921",
+    "officialName": "Damjan Parlapanov",
+    "officialTitle": "Vice President of Safety",
+    "address": "16W470 LAKE DR APT 105, WILLOWBROOK, IL 60527",
+    "motusStatus": "Active",
+    "researchedAt": "2026-10-30"
+  },
+  "3495775": {
+    "legalName": "JC COMPANY LLC",
+    "businessEmail": "john@jcservicesnj.com",
+    "businessPhone": "(609) 457-1168",
+    "address": "870 HARDING HWY STE B, NEWFIELD, NJ 08344-5311",
+    "motusStatus": "Active",
+    "researchedAt": "2026-10-30"
+  },
+  "1869625": {
+    "legalName": "TONY GROTE",
+    "businessEmail": "mark@truckingconsultant.com",
+    "businessPhone": "(419) 286-2063",
+    "address": "15903 RD 22 K, CLOVERDALE, OH 45827",
+    "motusStatus": "Active",
+    "researchedAt": "2026-10-30"
+  },
+  "3066594": {
+    "legalName": "US TRUCKING LLC",
+    "dbaName": "US TRUCKING",
+    "businessEmail": "ustrucking2017@gmail.com",
+    "businessPhone": "(832) 249-0446",
+    "address": "8787 BRAE ACRES RD #1001, HOUSTON, TX 77074",
+    "motusStatus": "Active",
+    "researchedAt": "2026-10-30"
+  },
+  "3651117": {
+    "legalName": "SAVAGE GROUP LLC",
+    "businessEmail": "dario_d@savagegroupllc.com",
+    "businessPhone": "(325) 650-2320",
+    "address": "6916 S COUNTY ROAD 1276, MIDLAND, TX 79706",
+    "motusStatus": "Active",
+    "researchedAt": "2026-10-30"
+  },
+  "2060420": {
+    "legalName": "GOMDEL TRANSPORTATION LLC",
+    "businessEmail": "jorogo73@hotmail.com",
+    "businessPhone": "(956) 478-2420",
+    "address": "3568 E US HIGHWAY, HIDALGO, TX 78557",
+    "motusStatus": "Inactive",
+    "researchedAt": "2026-10-30"
+  },
+  "1256453": {
+    "legalName": "C&K TRUCKING LLC",
+    "businessEmail": "cktrucking99@gmail.com",
+    "businessPhone": "(972) 492-0588",
+    "officialName": "Kenyon A Collins",
+    "officialTitle": "President",
+    "address": "3740 N JOSEY LN STE 230, CARROLLTON, TX 75007",
+    "motusStatus": "Active",
+    "researchedAt": "2026-10-30"
+  },
+  "3868385": {
+    "legalName": "TRUCKING 340 LLC",
+    "dbaName": "TRUCKING 340",
+    "businessEmail": "trucking340llc@gmail.com",
+    "businessPhone": "(904) 878-4181",
+    "address": "18014 RIVER SAGE DR, HOUSTON, TX 77084",
+    "motusStatus": "Active",
+    "researchedAt": "2026-10-30"
+  },
+  "2530569": {
+    "legalName": "ATLAS TRUCKING LLC",
+    "businessEmail": "adam@atlastruckingllc.com",
+    "businessPhone": "(646) 644-9973",
+    "address": "35 MANOR DRIVE, MARLBORO, NJ 07746",
+    "source": "MCS-150 directory + Motus",
+    "researchedAt": "2026-10-30"
+  },
+  "2791611": {
+    "legalName": "MDT TRUCKING LLC",
+    "businessEmail": "mdttruckingllc@yahoo.com",
+    "businessPhone": "(510) 355-2967",
+    "address": "5607 PACES GLEN AVE APT 522, CHARLOTTE, NC 28212",
+    "source": "MCS-150 directory",
+    "researchedAt": "2026-10-30"
+  },
+  "2827159": {
+    "legalName": "BKG TRUCKING COMPANY LLC",
+    "businessEmail": "bkgtruckingstl@gmail.com",
+    "businessPhone": "(314) 305-3710",
+    "address": "6743 DAIBER STREET, SAINT LOUIS, MO 63121",
+    "source": "MCS-150 directory",
+    "researchedAt": "2026-10-30"
+  },
+  "3815096": {
+    "legalName": "ISD TRUCKLINE INC",
+    "businessEmail": "isdtrucklineinc@gmail.com",
+    "businessPhone": "(209) 600-8451",
+    "address": "3542 TEMECULA CT, MERCED, CA 95348",
+    "motusStatus": "Active",
+    "researchedAt": "2026-10-30"
+  },
+  "4196781": {
+    "legalName": "US ONE CARRIER CORP",
+    "businessEmail": "safety@usonecarriercorp.com",
+    "businessPhone": "(219) 219-8795",
+    "address": "301 W COMMERCIAL AVE, LOWELL, IN 46356",
+    "motusStatus": "Active",
+    "researchedAt": "2026-10-30"
+  },
+  "1277340": {
+    "legalName": "EAGLE TRUCKING LLC",
+    "businessPhone": "(515) 272-4312",
+    "address": "4807 80TH AVE, SWEA CITY, IA 50590",
+    "source": "FMCSA MCS-150 directory",
+    "researchedAt": "2026-10-30"
+  },
+  "3148082": {
+    "legalName": "WHITTAKER HOLDING 5 LLC",
+    "dbaName": "OPTIMUM LOGISTICS",
+    "businessPhone": "(678) 908-7465",
+    "address": "Charlotte, NC",
+    "source": "FMCSA public directory",
+    "researchedAt": "2026-10-30"
+  },
+  "3759326": {
+    "legalName": "5SS CARRIERS INC",
+    "businessPhone": "(682) 978-8641",
+    "address": "Laredo, TX",
+    "source": "FMCSA public directory",
+    "researchedAt": "2026-10-30"
+  }
+}

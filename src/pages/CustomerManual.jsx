@@ -62,7 +62,7 @@ const SECTIONS = [
       },
       {
         heading: 'Resetting a Forgotten Password',
-        body: 'On the login screen, click "Forgot Password?" and enter your email address. You will receive a password reset link within a few minutes. Click the link and follow the prompts to create a new password. Reset links expire after 24 hours.',
+        body: 'On the login screen, click "Forgot Password?" and enter your email address. You will receive a password reset link within a few minutes. Click the link and follow the prompts to create a new password. Reset links expire after 1 hour.',
         extra: <NOTE>If you do not receive the reset email after a few minutes, check your spam/junk folder. If the issue persists, contact your fleet administrator to resend an invitation.</NOTE>
       },
       {

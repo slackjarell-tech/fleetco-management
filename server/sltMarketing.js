@@ -10,6 +10,12 @@ import {
 import { sendEmail, getResendApiKey } from './email.js';
 import { isLocalMarketingMode, marketingModeStatus } from './marketingLocalMode.js';
 import { queueMarketingOutbox, saveDailyDigest, listMarketingOutbox, getLatestDailyDigest } from './marketingInApp.js';
+import {
+  listTargetCompanies,
+  listTargetSegments,
+  pickDailyTargetFocus,
+  formatTargetCompaniesMarkdown,
+} from './marketingTargetCompanies.js';
 
 export const SLT_MARKETING_ROLES = new Set(['owner', 'executive', 'fleet_manager']);
 
@@ -355,6 +361,14 @@ export function getMarketingDashboard(user) {
 
   const outboxPending = listMarketingOutbox({ status: 'pending', limit: 30 });
 
+  const target_companies = {
+    segments: listTargetSegments(),
+    daily_focus: pickDailyTargetFocus(),
+    preview: listTargetCompanies({ limit: 12 }),
+    total_examples: listTargetCompanies({ limit: 200 }).length,
+    markdown_summary: formatTargetCompaniesMarkdown({ limit: 15 }),
+  };
+
   return {
     success: true,
     marketing_mode: marketingModeStatus(),
@@ -384,6 +398,7 @@ export function getMarketingDashboard(user) {
       last_run: reportSentToday || null,
     },
     calendar_url: defaultCalendarUrl(),
+    target_companies,
   };
 }
 

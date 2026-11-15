@@ -112,8 +112,16 @@ export default function Team() {
   };
 
   const handleResetPassword = async (email) => {
-    await api.auth.resetPasswordRequest(email);
-    alert(`Password reset link sent to ${email}`);
+    if (!email) {
+      alert('No email on file for this team member.');
+      return;
+    }
+    try {
+      const result = await api.auth.sendPasswordReset({ email });
+      alert(result.message || `Password reset processed for ${email}.`);
+    } catch (err) {
+      alert(err?.data?.message || err?.data?.error || err?.message || 'Could not send password reset.');
+    }
   };
 
   if (loading) return (

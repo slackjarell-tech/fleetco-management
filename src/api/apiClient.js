@@ -240,6 +240,14 @@ const auth = {
     });
   },
 
+  /** FleetCo staff — detailed send result (uses portal login email when customerId is passed). */
+  async sendPasswordReset(payload) {
+    return apiFetch('/auth/send-password-reset', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   async resetPassword({ resetToken, newPassword }) {
     return apiFetch('/auth/reset-password', {
       method: 'POST',
@@ -292,6 +300,19 @@ const integrations = {
         body: JSON.stringify(params),
       });
     },
+  },
+};
+
+const revan = {
+  getBriefing(slot) {
+    const params = slot ? `?slot=${encodeURIComponent(slot)}` : '';
+    return apiFetch(`/revan/briefing${params}`);
+  },
+  sendBriefing(slot = 'morning') {
+    return apiFetch('/revan/briefing/send', {
+      method: 'POST',
+      body: JSON.stringify({ slot }),
+    });
   },
 };
 
@@ -447,6 +468,25 @@ const sltMarketing = {
       body: JSON.stringify({}),
     });
   },
+  async downloadIcpProspectSpreadsheet() {
+    const token = getToken();
+    const API_ROOT = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '') || '';
+    const base = API_ROOT || '';
+    const res = await fetch(`${base}/api/slt-marketing/target-companies/export`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Export failed');
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'FleetCo-ICP-Prospect-Outreach.xlsx';
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 };
 
 const sltBilling = {
@@ -533,7 +573,7 @@ const workOrders = {
   },
 };
 
-export const api = { auth, entities, functions, integrations, agents, marketingAi, billing, payroll, sltMarketing, sltBilling, jobBoard, workOrders, reports: {
+export const api = { auth, entities, functions, integrations, agents, revan, marketingAi, billing, payroll, sltMarketing, sltBilling, jobBoard, workOrders, reports: {
   listEntity(entityName, sort, limit) {
     const params = new URLSearchParams();
     if (sort) params.set('sort', sort);

@@ -64,6 +64,28 @@ export const MARKETING_TOOL_DEFINITIONS = [
   {
     type: 'function',
     function: {
+      name: 'list_target_prospects',
+      description: 'List ICP target companies/segments that need FleetCo (research prospects).',
+      parameters: {
+        type: 'object',
+        properties: {
+          segment_id: { type: 'string', description: 'Optional: owner_operator, regional_carrier, construction_haul, etc.' },
+          limit: { type: 'number' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_advertising_ai_status',
+      description: 'Rule-based 24/7 advertising AI status (zero API cost).',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'run_daily_lead_report',
       description: 'Send the SLT daily interested-leads email report now.',
       parameters: {
@@ -197,7 +219,25 @@ export async function executeMarketingTool(user, name, args) {
         nurture_count: result.nurture?.length ?? 0,
         nurture: result.nurture,
         social: result.social,
+        advertising_ai: result.advertising_ai,
       };
+    }
+
+    case 'list_target_prospects': {
+      const { listTargetCompanies, formatTargetCompaniesMarkdown } = await import('./marketingTargetCompanies.js');
+      const limit = Math.min(args.limit || 30, 100);
+      const items = listTargetCompanies({ segmentId: args.segment_id, limit });
+      return {
+        success: true,
+        count: items.length,
+        items,
+        markdown: formatTargetCompaniesMarkdown({ segmentId: args.segment_id, limit }),
+      };
+    }
+
+    case 'get_advertising_ai_status': {
+      const { getAdvertisingAiStatus } = await import('./marketingAdvertisingAi.js');
+      return { success: true, ...getAdvertisingAiStatus() };
     }
 
     case 'run_daily_lead_report': {

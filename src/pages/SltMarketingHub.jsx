@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '@/api/apiClient';
-import { Loader2, Megaphone, Users, RefreshCw, Send, Globe, Bot, Zap, Mail, Copy, Check, X } from 'lucide-react';
+import { Loader2, Megaphone, Users, RefreshCw, Send, Globe, Bot, Zap, Mail, Copy, Check, X, Download } from 'lucide-react';
 import AssistantChat from '@/components/assistant/AssistantChat';
 import PortalPageShell from '@/components/layout/PortalPageShell';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ export default function SltMarketingHub() {
   const [autopilotRunning, setAutopilotRunning] = useState(false);
   const [outboxActionId, setOutboxActionId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [exportingIcp, setExportingIcp] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     setLoadingDash(true);
@@ -56,6 +57,17 @@ export default function SltMarketingHub() {
       await loadDashboard();
     } finally {
       setReportSending(false);
+    }
+  };
+
+  const downloadIcpSpreadsheet = async () => {
+    setExportingIcp(true);
+    try {
+      await api.sltMarketing.downloadIcpProspectSpreadsheet();
+    } catch (err) {
+      alert(err?.message || 'Could not download spreadsheet.');
+    } finally {
+      setExportingIcp(false);
     }
   };
 
@@ -131,6 +143,9 @@ export default function SltMarketingHub() {
   const localMode = marketingMode?.local_only !== false;
   const outbox = dashboard?.outbox || [];
   const dailyDigest = dashboard?.daily_digest;
+  const targets = dashboard?.target_companies;
+  const adAi = autopilot?.advertising_ai;
+  const dailyFocus = targets?.daily_focus;
 
   return (
     <PortalPageShell variant="fullBleed">
@@ -167,8 +182,8 @@ export default function SltMarketingHub() {
             </div>
             <p className="text-slate-400 leading-relaxed">
               {localMode
-                ? 'Leads, nurture, social drafts, and daily digest all run inside FleetCo. Copy emails from the outbox and send from your own inbox. No Groq, Resend, or social tokens required.'
-                : 'Hybrid mode — Resend sends nurture emails when configured. Social drafts Monday mornings. Optional Groq/Gemini adds free-form chat.'}
+                ? 'Leads, nurture, rule-based Advertising AI (24/7), social drafts, and daily digest run inside FleetCo — no Groq bill. Copy emails from the outbox when Resend is off.'
+                : 'Hybrid mode — Resend sends nurture when configured. Advertising AI still runs rule-based at zero LLM cost. Optional Groq/Gemini adds free-form chat only.'}
             </p>
             {autopilot && (
               <p className="mt-2 text-slate-500">
@@ -211,7 +226,47 @@ export default function SltMarketingHub() {
                 <StatCard label="Website AI" value={aiLeads} icon={Bot} />
                 <StatCard label="Outbox" value={summary?.outbox_pending ?? '—'} icon={Mail} />
                 <StatCard label="Social drafts" value={summary?.social_draft ?? '—'} icon={Megaphone} />
+                <StatCard label="ICP targets" value={targets?.total_examples ?? '—'} icon={Globe} />
               </div>
+
+              {adAi && (
+                <div className="mb-4 p-3 rounded-lg border border-violet-900/40 bg-violet-950/20 text-xs text-slate-300">
+                  <div className="font-semibold text-violet-300 mb-1">Advertising AI · 24/7 · $0 LLM</div>
+                  <p className="text-slate-400 leading-relaxed">
+                    {adAi.ran_today ? 'Today’s ICP post drafted.' : 'Daily draft pending — runs on next autopilot tick.'}
+                    {dailyFocus?.example?.name ? (
+                      <> Focus: <span className="text-slate-200">{dailyFocus.example.name}</span>.</>
+                    ) : null}
+                  </p>
+                </div>
+              )}
+
+              {targets?.preview?.length > 0 && (
+                <div className="mb-4">
+                  <h2 className="text-xs font-bold uppercase text-slate-400 mb-2">Who needs FleetCo (ICP)</h2>
+                  <p className="text-[10px] text-slate-500 mb-2">
+                    Research prospects — verify on SAFER/LinkedIn, fill Email/Phone in the Excel export, then mail-merge or use outbox.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mb-2 border-cyan-800 text-cyan-300 hover:bg-cyan-950"
+                    disabled={exportingIcp}
+                    onClick={downloadIcpSpreadsheet}
+                  >
+                    {exportingIcp ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+                    Download outreach spreadsheet (.xlsx)
+                  </Button>
+                  <ul className="space-y-1.5 max-h-40 overflow-y-auto text-[11px] text-slate-400">
+                    {targets.preview.map((t) => (
+                      <li key={t.id} className="border-l-2 border-cyan-900 pl-2">
+                        <span className="text-slate-200">{t.name}</span>
+                        <span className="text-slate-600"> · {t.segment_label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <div className="text-xs text-slate-500 mb-2">Social accounts (optional env tokens)</div>
               <div className="flex flex-wrap gap-1.5 mb-4">

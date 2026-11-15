@@ -51,6 +51,8 @@
     "marketing:video:rebuild": "node scripts/rebuild-client-video.mjs",
     "marketing:plan": "node scripts/generate-business-plan.mjs",
     "marketing:manual": "node scripts/generate-user-manual.mjs",
+    "marketing:icp-export": "node scripts/export-icp-prospect-spreadsheet.mjs --downloads",
+    "marketing:motus-cache": "node scripts/refresh-motus-prospect-cache.mjs",
     "marketing:send": "node scripts/email-client-presentation.mjs",
     "process:logo": "node scripts/process-logo.mjs",
     "build:android": "powershell -ExecutionPolicy Bypass -File scripts/build-android-release.ps1"

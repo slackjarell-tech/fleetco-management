@@ -41,7 +41,9 @@ import {
   canProvisionCustomers,
   canManageCustomerTeam,
   canManageDatastore,
+  isFleetCoInternal,
 } from './roles.js';
+import { deliverPasswordReset, resolvePortalLoginEmailForCustomer } from './passwordResetRequest.js';
 import { bulkCreateEntities } from './bulkImport.js';
 import { prepareLoadForCreate, validateLoadForUpdate } from './loadCarrierPayments.js';
 import { stampCustomerNumber, generateNextDriverNumber } from './entityNumbers.js';
@@ -351,34 +353,57 @@ app.post('/api/auth/reset-password-request', async (req, res) => {
     return res.status(400).json({ error: 'Email is required' });
   }
 
-  const user = findUserByEmail(email.trim());
-  if (user) {
-    const token = jwt.sign({ email: user.email, type: 'reset' }, JWT_SECRET, { expiresIn: '1h' });
-    const appOrigin = (process.env.APP_ORIGIN || process.env.PUBLIC_APP_URL || 'https://fleetcomanagement.org').replace(/\/$/, '');
-    const resetUrl = `${appOrigin}/reset-password?token=${encodeURIComponent(token)}`;
-    console.log(`[password reset for ${user.email}]: ${resetUrl}`);
-
-    try {
-      const { sendPasswordResetEmail } = await import('./passwordResetEmails.js');
-      const emailResult = await sendPasswordResetEmail({
-        to: user.email,
-        fullName: user.full_name,
-        resetUrl,
-      });
-      if (emailResult.skipped) {
-        console.warn('[password reset] Email not sent — RESEND_API_KEY not configured. Use the link above manually.');
-      } else if (!emailResult.success) {
-        console.error('[password reset email failed]', emailResult.error, emailResult.hint || '');
-      }
-    } catch (err) {
-      console.error('[password reset email error]', err.message);
-    }
-  }
+  await deliverPasswordReset(email);
 
   res.json({
     success: true,
     message: 'If an account exists with that email, a password reset link was sent.',
   });
+});
+
+function canSendStaffPasswordReset(actor, targetEmail) {
+  if (!actor) return false;
+  if (isFleetCoInternal(actor.role)) return true;
+  if (!canManageCustomerTeam(actor.role) || !actor.customer_id || !targetEmail) return false;
+  const target = findUserByEmail(String(targetEmail).trim().toLowerCase());
+  return !!target && target.customer_id === actor.customer_id;
+}
+
+/** Authenticated staff — honest status (portal login email, send result). */
+app.post('/api/auth/send-password-reset', requireAuth, async (req, res) => {
+  const { email, customerId } = req.body || {};
+  let targetEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+  if (customerId) {
+    if (!isFleetCoInternal(req.user?.role)) {
+      return res.status(403).json({ error: 'Only FleetCo staff can reset passwords from the customer record' });
+    }
+    const customer = getEntity('Customer', customerId);
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    targetEmail = resolvePortalLoginEmailForCustomer(customer) || '';
+    if (!targetEmail) {
+      return res.status(400).json({
+        error: 'No portal login email for this customer',
+        message: 'Add a portal login or contact email before sending a password reset.',
+      });
+    }
+  }
+
+  if (!targetEmail) {
+    return res.status(400).json({ error: 'Email or customerId is required' });
+  }
+
+  if (!canSendStaffPasswordReset(req.user, targetEmail)) {
+    return res.status(403).json({ error: 'You cannot send a password reset for this account' });
+  }
+
+  const result = await deliverPasswordReset(targetEmail);
+  if (!result.ok) {
+    return res.status(502).json(result);
+  }
+  res.json({ success: true, ...result });
 });
 
 app.post('/api/auth/reset-password', (req, res) => {
@@ -484,6 +509,7 @@ app.get('/api/marketing-ai/status', async (_req, res) => {
     public_agent: 'fleetco_guide',
     guide_mode: mode.local_only ? 'rule_based' : 'llm',
     autopilot: true,
+    advertising_ai: true,
   });
 });
 
@@ -552,9 +578,15 @@ app.post('/api/agents/conversations', requireAuth, async (req, res) => {
           ? 'FleetCo Marketing AI online — works internally with Autopilot + Resend (no HubSpot). Commands like **show dashboard**, **list interested leads**, **draft LinkedIn post**, **run autopilot** work without any LLM key. Optional Groq/Gemini makes free-form chat smarter.'
           : 'Site Commander online. I can read your fleet data and make real changes — like Cursor for your portal. Try: "Show open work orders" or "Change the homepage headline to …"';
 
-    if (agent_name === 'slt_marketing') {
+    if (agent_name === 'slt_marketing' || agent_name === 'revan') {
+      if (agent_name === 'revan' && !['owner', 'executive'].includes(req.user?.role)) {
+        return res.status(403).json({ error: 'Revan requires owner or executive role' });
+      }
       const { createPortalAgentConversation } = await import('./marketingAiSessions.js');
-      const conversation = createPortalAgentConversation(req.user.id, agent_name, welcome);
+      const welcomeMsg = agent_name === 'revan'
+        ? '**Revan online.** Jarvis-style executive commander for FleetCo — I report fleet health, leads, marketing autopilot, and production status. Try **"Morning briefing"**, **"Run business operations"**, or **"System health"**. Full reasoning unlocks with GROQ_API_KEY.'
+        : welcome;
+      const conversation = createPortalAgentConversation(req.user.id, agent_name, welcomeMsg);
       return res.json({ ...conversation, metadata });
     }
 
@@ -590,7 +622,7 @@ app.post('/api/agents/conversations/:id/messages', requireAuth, async (req, res)
       return res.status(appendResult.status || 404).json({ error: appendResult.error });
     }
     conversation = appendResult.conversation;
-    persistPortal = conversation.agent_name === 'slt_marketing';
+    persistPortal = conversation.agent_name === 'slt_marketing' || conversation.agent_name === 'revan';
   } else if (conversation.user_id !== req.user.id) {
     return res.status(404).json({ error: 'Conversation not found' });
   } else {
@@ -637,6 +669,48 @@ app.post('/api/work-orders/:id/comments', requireAuth, async (req, res) => {
     res.json(item);
   } catch (err) {
     res.status(err.message?.includes('not found') ? 404 : 403).json({ error: err.message });
+  }
+});
+
+app.get('/api/slt-marketing/target-companies/export', requireAuth, async (req, res) => {
+  if (!['owner', 'executive', 'fleet_manager'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'SLT access required' });
+  }
+  try {
+    const { buildIcpProspectWorkbookBuffer, ICP_EXPORT_FILENAME } = await import('./marketingTargetExport.js');
+    const buf = await buildIcpProspectWorkbookBuffer({ includePortalRecords: true });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${ICP_EXPORT_FILENAME}"`);
+    res.send(buf);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/revan/briefing', requireAuth, async (req, res) => {
+  if (!['owner', 'executive'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'Revan briefing requires owner or executive' });
+  }
+  try {
+    const { buildExecutiveBriefing } = await import('./revanBriefing.js');
+    const briefing = await buildExecutiveBriefing({ user: req.user, slot: req.query.slot || 'manual' });
+    res.json({ success: true, ...briefing });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/revan/briefing/send', requireAuth, async (req, res) => {
+  if (!['owner', 'executive'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'Revan briefing requires owner or executive' });
+  }
+  try {
+    const { deliverRevanBriefing } = await import('./revanScheduler.js');
+    const slot = req.body?.slot === 'evening' ? 'evening' : 'morning';
+    const result = await deliverRevanBriefing(slot, { force: true });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -1688,6 +1762,9 @@ async function startServer() {
     import('./marketingAutopilot.js').then(({ startMarketingAutopilotScheduler }) => {
       startMarketingAutopilotScheduler();
     }).catch((err) => console.warn('[marketing-autopilot] scheduler not started', err.message));
+    import('./revanScheduler.js').then(({ startRevanScheduler }) => {
+      startRevanScheduler();
+    }).catch((err) => console.warn('[revan] scheduler not started', err.message));
     import('./jobApplicantAutopilot.js').then(({ startJobApplicantAutopilotScheduler }) => {
       startJobApplicantAutopilotScheduler();
     }).catch((err) => console.warn('[job-applicant-autopilot] scheduler not started', err.message));
