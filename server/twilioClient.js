@@ -12,7 +12,7 @@ function normalizeE164(raw) {
   return digits.length >= 10 ? `+${digits}` : null;
 }
 
-function escapeXml(text) {
+export function escapeXml(text) {
   return String(text || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -101,6 +101,39 @@ export async function placeVoiceCall({ to, sayText }) {
     throw new Error(data.message || `Twilio voice error ${res.status}`);
   }
   return { placed: true, sid: data.sid, to: dest };
+}
+
+export async function placeVoiceCallUrl({ to, url }) {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_FROM_NUMBER;
+  const dest = normalizeE164(to);
+
+  if (!sid || !token || !from) {
+    return { placed: false, reason: 'missing_twilio_env' };
+  }
+  if (!dest) {
+    return { placed: false, reason: 'invalid_phone' };
+  }
+  if (!url) {
+    return { placed: false, reason: 'missing_twiml_url' };
+  }
+
+  const api = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Calls.json`;
+  const auth = Buffer.from(`${sid}:${token}`).toString('base64');
+  const res = await fetch(api, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({ To: dest, From: from, Url: url }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || `Twilio voice error ${res.status}`);
+  }
+  return { placed: true, sid: data.sid, to: dest, interactive: true };
 }
 
 export { normalizeE164 };

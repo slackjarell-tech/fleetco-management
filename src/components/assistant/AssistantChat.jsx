@@ -6,9 +6,12 @@ import {
 } from 'lucide-react';
 import {
   isRevanAutoSpeak,
+  isRevanContinuous,
   isRevanVoiceOn,
   listenOnce,
+  loadRevanThread,
   markdownToSpeakable,
+  saveRevanThread,
   setRevanAutoSpeak,
   setRevanVoiceOn,
   speakRevan,
@@ -100,6 +103,10 @@ export default function AssistantChat({
   emptySubtitle = 'I can query fleet records and make real updates — website text, work orders, vehicles, and more.',
   showHeader = true,
   compact = false,
+  externalUtterance = null,
+  onExternalUtteranceHandled,
+  onJarvisActivity,
+  jarvisContinuous = false,
 }) {
   const isRevan = variant === 'revan';
   const isSlt = variant === 'slt_marketing';
@@ -128,13 +135,38 @@ export default function AssistantChat({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const startMicAfterReply = () => {
+    if (!isRevan || !jarvisContinuous || !speechRecognitionAvailable()) return;
+    setListening(true);
+    onJarvisActivity?.({ listening: true });
+    listenRef.current = listenOnce({
+      onResult: (transcript) => {
+        setListening(false);
+        onJarvisActivity?.({ listening: false });
+        sendUserText(transcript);
+      },
+      onError: () => {
+        setListening(false);
+        onJarvisActivity?.({ listening: false });
+      },
+      onEnd: () => setListening(false),
+    });
+  };
+
   const speakAssistant = (msg) => {
     if (!isRevan || !voiceOn || !autoSpeak || !msg || msg.role !== 'assistant') return;
     const text = msg.spoken || markdownToSpeakable(msg.content);
     if (!text) return;
     speakRevan(text, {
-      onStart: () => setSpeaking(true),
-      onEnd: () => setSpeaking(false),
+      onStart: () => {
+        setSpeaking(true);
+        onJarvisActivity?.({ speaking: true });
+      },
+      onEnd: () => {
+        setSpeaking(false);
+        onJarvisActivity?.({ speaking: false });
+        startMicAfterReply();
+      },
       onError: () => setSpeaking(false),
     });
   };
@@ -154,7 +186,8 @@ export default function AssistantChat({
         const status = await api.agents.getStatus().catch(() => ({ configured: false, revan_command_mode: true }));
         setAiStatus({ ...status, conversational: true });
         setConversation({ id: 'revan-dialogue', agent_name: 'revan' });
-        setMessages([{ role: 'assistant', content: REVAN_LOCAL_WELCOME }]);
+        const saved = loadRevanThread();
+        setMessages(saved.length ? saved : [{ role: 'assistant', content: REVAN_LOCAL_WELCOME }]);
       } else {
         const client = isPublic ? api.marketingAi : api.agents;
         const [conv, status] = await Promise.all([
@@ -173,9 +206,20 @@ export default function AssistantChat({
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || sending || !conversation) return;
-    const text = input.trim();
+  useEffect(() => {
+    if (isRevan && messages.length) saveRevanThread(messages);
+  }, [isRevan, messages]);
+
+  useEffect(() => {
+    if (!isRevan || !externalUtterance || sending || !conversation) return;
+    sendUserText(externalUtterance);
+    onExternalUtteranceHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalUtterance]);
+
+  const sendUserText = async (raw) => {
+    const text = String(raw || input).trim();
+    if (!text || sending || !conversation) return;
     setInput('');
     setSending(true);
     const optimistic = [...messages, { role: 'user', content: text }];
@@ -208,6 +252,8 @@ export default function AssistantChat({
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   };
+
+  const handleSend = () => sendUserText();
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

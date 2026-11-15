@@ -11,12 +11,21 @@ export function resolveExecutivePhone(user) {
 
 export function getRevanCommsStatus(user) {
   const phone = resolveExecutivePhone(user);
+  const from = getTwilioFromNumber();
+  const inbound = {
+    inbound_number: from,
+    inbound_instructions: from
+      ? `Call or text ${from} from your saved executive mobile — two-way Jarvis (voice + SMS).`
+      : null,
+    webhook_paths: ['/api/twilio/revan/voice', '/api/twilio/revan/sms'],
+  };
   return {
     twilio_configured: twilioConfigured(),
     from_number: twilioConfigured() ? getTwilioFromNumber() : null,
     executive_phone: phone,
     can_call: twilioConfigured() && !!phone,
     can_sms: twilioConfigured() && !!phone,
+    inbound_jarvis: inbound,
     voice_note: !twilioConfigured()
       ? 'Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER on server for phone calls.'
       : !phone
@@ -36,7 +45,7 @@ export async function spokenBriefForUser(user, slot = 'manual') {
   return { script, markdown, summary };
 }
 
-export async function callExecutive(user, { slot = 'manual', script } = {}) {
+export async function callExecutive(user, { slot = 'manual', script, req } = {}) {
   const to = resolveExecutivePhone(user);
   if (!to) {
     return {
@@ -56,14 +65,29 @@ export async function callExecutive(user, { slot = 'manual', script } = {}) {
   let sayText = script;
   if (!sayText) {
     const brief = await spokenBriefForUser(user, slot);
-    sayText = brief.script;
+    const intro = `${jarvisOpenLine(user)} Revan calling with a quick briefing.`;
+    const core = markdownToSpoken(brief.markdown || '').slice(0, 700);
+    sayText = `${intro} ${core}`.slice(0, 1150);
+  }
+
+  const useInteractive = process.env.REVAN_INTERACTIVE_CALLS === 'true';
+  if (useInteractive && twilioConfigured()) {
+    try {
+      const { placeInteractiveOutboundCall, syntheticRevanReq } = await import('./revanVoiceWebhook.js');
+      const interactive = await placeInteractiveOutboundCall(user, req || syntheticRevanReq());
+      if (interactive.placed) {
+        return { success: true, call_sid: interactive.sid, to: interactive.to, interactive: true };
+      }
+    } catch (err) {
+      console.warn('[revan] interactive call fallback', err.message);
+    }
   }
 
   const result = await placeVoiceCall({ to, sayText });
   if (!result.placed) {
     return { success: false, error: result.reason || 'call_failed' };
   }
-  return { success: true, call_sid: result.sid, to: result.to };
+  return { success: true, call_sid: result.sid, to: result.to, interactive: false };
 }
 
 export async function smsExecutiveBriefing(user, { slot = 'manual', body } = {}) {

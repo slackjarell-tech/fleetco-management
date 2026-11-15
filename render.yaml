@@ -83,6 +83,17 @@ services:
         sync: false
       - key: LIVE_STREAM_RETENTION_DAYS
         value: "15"
+      # Revan Jarvis — Twilio voice/SMS (console.twilio.com)
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: REVAN_EXECUTIVE_PHONE
+        value: "+13609521249"
+      # - key: REVAN_INTERACTIVE_CALLS
+      #   value: "true"
     disk:
       name: fleetco-data
       mountPath: /opt/render/project/src/server/data

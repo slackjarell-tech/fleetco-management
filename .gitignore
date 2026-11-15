@@ -30,6 +30,9 @@ dist-ssr
 .env
 .vite
 
+# Local secrets (Twilio for Revan test script)
+server/local.env
+
 # Local API data
 server/data/
 server/uploads/

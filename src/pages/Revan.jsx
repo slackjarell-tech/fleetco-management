@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@/api/apiClient';
-import { Crown, Loader2, RefreshCw, MessageSquare, Zap, Phone, PhoneCall } from 'lucide-react';
+import { Crown, Loader2, RefreshCw, MessageSquare, Zap, Phone, PhoneCall, Maximize2 } from 'lucide-react';
+import JarvisSpeakMode from '@/components/assistant/JarvisSpeakMode';
 import AssistantChat from '@/components/assistant/AssistantChat';
 import PortalPageShell from '@/components/layout/PortalPageShell';
 import ReactMarkdown from 'react-markdown';
@@ -15,6 +16,9 @@ export default function Revan() {
   const [phoneDraft, setPhoneDraft] = useState('');
   const [callBusy, setCallBusy] = useState(false);
   const [callNote, setCallNote] = useState('');
+  const [speakOpen, setSpeakOpen] = useState(false);
+  const [utterance, setUtterance] = useState(null);
+  const [jarvisActivity, setJarvisActivity] = useState({});
 
   const loadBriefing = useCallback(async () => {
     setLoadingBrief(true);
@@ -56,7 +60,11 @@ export default function Revan() {
     setCallNote('');
     try {
       const r = await api.revan.callMe('manual');
-      setCallNote(r.success ? 'Calling your phone now…' : (r.message || r.error || 'Call failed'));
+      setCallNote(
+        r.success
+          ? (r.interactive ? 'Jarvis is calling — answer and talk back-and-forth.' : 'Calling your phone now…')
+          : (r.message || r.error || 'Call failed'),
+      );
       const st = await api.revan.getStatus();
       setJarvisStatus(st);
     } catch (e) {
@@ -135,6 +143,9 @@ export default function Revan() {
                 Call me
               </Button>
             </div>
+            {jarvisStatus?.inbound_jarvis?.inbound_instructions && (
+              <p className="text-[10px] text-violet-400/80 leading-relaxed">{jarvisStatus.inbound_jarvis.inbound_instructions}</p>
+            )}
             {jarvisStatus && !jarvisStatus.can_call && (
               <p className="text-[10px] text-slate-500 leading-relaxed">{jarvisStatus.voice_note}</p>
             )}
@@ -164,7 +175,28 @@ export default function Revan() {
           </Button>
         </aside>
 
-        <div className="flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col relative">
+          <Button
+            type="button"
+            size="sm"
+            className="absolute top-3 right-3 z-10 bg-violet-600 hover:bg-violet-500 hidden lg:flex"
+            onClick={() => setSpeakOpen(true)}
+          >
+            <Maximize2 className="w-4 h-4 mr-1" /> Jarvis TV mode
+          </Button>
+          <JarvisSpeakMode
+            open={speakOpen}
+            onClose={() => setSpeakOpen(false)}
+            onUtterance={(t) => setUtterance(t)}
+            statusText={
+              jarvisActivity.listening
+                ? 'Listening…'
+                : jarvisActivity.speaking
+                  ? 'Revan speaking…'
+                  : 'Full-screen Jarvis — like the Luke Builds AI demo'
+            }
+            listening={jarvisActivity.listening}
+          />
           <AssistantChat
             agentName="revan"
             variant="revan"
@@ -182,6 +214,10 @@ export default function Revan() {
               'Full fleet audit — customers, open work orders, new inquiries',
             ]}
             showHeader
+            jarvisContinuous={speakOpen}
+            externalUtterance={utterance}
+            onExternalUtteranceHandled={() => setUtterance(null)}
+            onJarvisActivity={setJarvisActivity}
           />
         </div>
       </div>

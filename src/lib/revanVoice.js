@@ -1,5 +1,7 @@
 const VOICE_KEY = 'fleetco_revan_voice_on';
 const AUTO_KEY = 'fleetco_revan_auto_speak';
+const CONTINUOUS_KEY = 'fleetco_revan_continuous';
+export const REVAN_THREAD_KEY = 'fleetco_revan_thread_v1';
 
 export function isRevanVoiceOn() {
   try {
@@ -24,6 +26,41 @@ export function isRevanAutoSpeak() {
     return v !== 'false';
   } catch {
     return true;
+  }
+}
+
+export function isRevanContinuous() {
+  try {
+    return localStorage.getItem(CONTINUOUS_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function setRevanContinuous(on) {
+  try {
+    localStorage.setItem(CONTINUOUS_KEY, on ? 'true' : 'false');
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadRevanThread() {
+  try {
+    const raw = localStorage.getItem(REVAN_THREAD_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveRevanThread(messages) {
+  try {
+    const trimmed = (messages || []).slice(-30);
+    localStorage.setItem(REVAN_THREAD_KEY, JSON.stringify(trimmed));
+  } catch {
+    /* ignore */
   }
 }
 

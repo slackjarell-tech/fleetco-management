@@ -9,6 +9,7 @@ import {
   runRevanJarvisFallback,
   runRevanConversationalReply,
 } from './revanExecutiveAssistant.js';
+import { revanMemorySystemSnippet } from './revanMemory.js';
 import { getRevanToolsForUser, executeRevanTool } from './revanAiTools.js';
 import { runPublicGuideBot, shouldUsePublicGuideBot } from './marketingPublicGuide.js';
 import { isLocalMarketingMode } from './marketingLocalMode.js';
@@ -84,8 +85,10 @@ Behavior:
   }
 
   if (isRevan) {
+    const memoryBlock = revanMemorySystemSnippet(user?.id) || '';
     return `You are Revan — FleetCo's Executive Commander AI (Jarvis-style) at fleetcomanagement.org.
 You report to ${user?.full_name || user?.email} (${role}). You run the business within tool limits: fleet ops, marketing autopilot, public website, users, and executive briefings.
+${memoryBlock ? `\n${memoryBlock}\n` : ''}
 
 Personality: calm, loyal, precise — address the user as a trusted principal ("Sir" or by name). Lead with **briefing bullets**, then actions taken.
 

@@ -1,3 +1,6 @@
+import { loadLocalEnv } from './loadEnv.js';
+loadLocalEnv();
+
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
@@ -130,6 +133,7 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
 });
 
 app.use(express.json({ limit: '50mb' }));
+app.use('/api/twilio', express.urlencoded({ extended: false }));
 
 /** Serve uploads from persistent disk, falling back to object storage (R2/S3) if local file missing. */
 app.use('/uploads', async (req, res, next) => {
@@ -753,7 +757,7 @@ app.post('/api/revan/call-me', requireAuth, async (req, res) => {
   try {
     const { callExecutive } = await import('./revanComms.js');
     const slot = req.body?.slot === 'evening' ? 'evening' : req.body?.slot === 'morning' ? 'morning' : 'manual';
-    const result = await callExecutive(req.user, { slot, script: req.body?.script });
+    const result = await callExecutive(req.user, { slot, script: req.body?.script, req });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -775,6 +779,56 @@ app.post('/api/revan/sms-brief', requireAuth, async (req, res) => {
 });
 
 /** Direct Jarvis chat — survives conversation DB issues */
+app.post('/api/twilio/revan/voice', async (req, res) => {
+  try {
+    const { handleRevanVoiceInbound } = await import('./revanVoiceWebhook.js');
+    await handleRevanVoiceInbound(req, res);
+  } catch (err) {
+    console.error('[twilio revan voice]', err);
+    res.type('text/xml').send('<Response><Say>Revan error.</Say></Response>');
+  }
+});
+
+app.get('/api/twilio/revan/voice/outbound', async (req, res) => {
+  try {
+    const { handleRevanVoiceOutbound } = await import('./revanVoiceWebhook.js');
+    await handleRevanVoiceOutbound(req, res);
+  } catch (err) {
+    console.error('[twilio revan outbound GET]', err);
+    res.type('text/xml').send('<Response><Say>Revan error.</Say></Response>');
+  }
+});
+
+app.post('/api/twilio/revan/voice/outbound', async (req, res) => {
+  try {
+    const { handleRevanVoiceOutbound } = await import('./revanVoiceWebhook.js');
+    await handleRevanVoiceOutbound(req, res);
+  } catch (err) {
+    console.error('[twilio revan outbound]', err);
+    res.type('text/xml').send('<Response><Say>Revan error.</Say></Response>');
+  }
+});
+
+app.post('/api/twilio/revan/voice/gather', async (req, res) => {
+  try {
+    const { handleRevanVoiceGather } = await import('./revanVoiceWebhook.js');
+    await handleRevanVoiceGather(req, res);
+  } catch (err) {
+    console.error('[twilio revan gather]', err);
+    res.type('text/xml').send('<Response><Say>Revan error.</Say></Response>');
+  }
+});
+
+app.post('/api/twilio/revan/sms', async (req, res) => {
+  try {
+    const { handleRevanSmsInbound } = await import('./revanVoiceWebhook.js');
+    await handleRevanSmsInbound(req, res);
+  } catch (err) {
+    console.error('[twilio revan sms]', err);
+    res.type('text/xml').send('<Response><Message>Revan error.</Message></Response>');
+  }
+});
+
 app.post('/api/revan/chat', requireAuth, async (req, res) => {
   if (!['owner', 'executive'].includes(req.user?.role)) {
     return res.status(403).json({ error: 'Revan requires owner or executive' });
@@ -793,6 +847,8 @@ app.post('/api/revan/chat', requireAuth, async (req, res) => {
       agentName: 'revan',
     });
     const spoken = attachSpoken(message, req.user);
+    const { appendRevanMemoryTurn } = await import('./revanMemory.js');
+    appendRevanMemoryTurn(req.user.id, text, spoken.content);
     res.json({
       message: spoken,
       content: spoken.content,

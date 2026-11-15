@@ -19,6 +19,7 @@
     "seed:local-drivers": "node scripts/seed-local-demo-drivers.mjs",
     "driver:create-personal": "node scripts/create-personal-driver.mjs",
     "driver:send-install-sms": "node scripts/send-driver-install-sms.mjs",
+    "revan:call": "node scripts/test-revan-call.mjs",
     "driver:preview": "powershell -ExecutionPolicy Bypass -File scripts/run-driver-mobile-preview.ps1",
     "driver:simulation": "powershell -ExecutionPolicy Bypass -File scripts/run-driver-simulation.ps1",
     "driver:android-emulator": "powershell -ExecutionPolicy Bypass -File scripts/setup-android-emulator.ps1",
